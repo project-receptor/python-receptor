@@ -34,10 +34,8 @@ class MeshRouter:
     def node_is_known(self, node_id):
         return node_id in self._nodes
     
-    def register_node(self, node_id):
-        self._nodes.add(node_id)
-    
     def register_edge(self, left, right, cost):
+        self._nodes.add(left, right)
         self._edges.add(
             (
                 left if left < right else right,
