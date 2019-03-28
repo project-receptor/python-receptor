@@ -2,24 +2,23 @@ import argparse
 import asyncio
 import logging
 
-from .protocol import BasicProtocol
+from .protocol import BasicProtocol, BasicClientProtocol
 
 logger = logging.getLogger(__name__)
 
-def mainloop():
+def mainloop(listen, port, controller={}, peers=[]):
     loop = asyncio.get_event_loop()
-    coro = loop.create_server(
+    listener = loop.create_server(
         BasicProtocol,
-        None, 8888)
-    server = loop.run_until_complete(coro)
-
-    # Serve requests until Ctrl+C is pressed
-    print('Serving on {}'.format(server.sockets[0].getsockname()))
+        listen, port)
+    loop.create_task(listener)
+    for peer in peers:
+        p = loop.create_connection(BasicClientProtocol,
+                                   peer.split(":")[0], peer.split(":")[1])
+        loop.create_task(p)
+    print('Serving on {}'.format("{}:{}".format(listen, port)))
     try:
         loop.run_forever()
     except KeyboardInterrupt:
         pass
-
-    server.close()
-    loop.run_until_complete(server.wait_closed())
     loop.close()
