@@ -1,23 +1,29 @@
 import argparse
 import logging
-from configparser import SafeConfigParser
 from .events import mainloop
+import receptor
+
 
 logger = logging.getLogger(__name__)
 
+def map_args_to_config(args):
+    to_return = {}
+    if args.listen_address:
+        to_return.setdefault('server', {})['address'] = args.listen_address
+    if args.listen_port:
+        to_return.setdefault('server', {})['port'] = args.listen_port
+    return to_return
 
 def main(args=None):
     parser = argparse.ArgumentParser("receptor")
     parser.add_argument("-c", "--config", default="./receptor.conf")
-    parser.add_argument("--listen-address", default="0.0.0.0")
-    parser.add_argument("--listen-port", default=8888)
-    parser.add_argument("-p", "--peer", action='append')
+    parser.add_argument("--listen-address")
+    parser.add_argument("--listen-port")
     args = parser.parse_args(args)
-    config = SafeConfigParser()
-    config.read([args.config])
-    mainloop(config.get('server', 'listen', fallback=args.listen_address),
-             config.get('server', 'port', fallback=args.listen_port),
-             peers=args.peer if args.peer else [],
+    
+    receptor.config = receptor.ReceptorConfig(args.config, map_args_to_config(args))
+    mainloop(receptor.config.server.listen, receptor.config.server.port,
+             peers=receptor.config.peers
     )
 
 
