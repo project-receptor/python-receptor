@@ -13,10 +13,9 @@ async def handle_msg(msg):
     if next_hop is None:
         # it's a meee
         await outer_env.deserialize_inner()
-        namespace, action = outer_env.inner_obj.directive.split(':', 1)
+        namespace, _ = outer_env.inner_obj.directive.split(':', 1)
         if namespace == 'receptor':
-            directive_handler = getattr(directive, f'do_{action}')
-            await directive_handler(outer_env.inner_obj)
+            await directive.control(outer_env.inner_obj)
         await work_manager.handle(outer_env.inner_obj)
     else:
         await router.forward(outer_env, next_hop)
