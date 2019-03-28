@@ -5,7 +5,6 @@ from . import router, work_manager
 logger = logging.getLogger(__name__)
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
-CONTROL_DIRECTIVES = ['ping']
 
 async def handle_msg(msg):
     outer_env = envelope.OuterEnvelope.from_raw(msg)

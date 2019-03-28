@@ -1,6 +1,11 @@
-from .. import security_manager
+import base64
+import datetime
 import json
 import logging
+import uuid
+
+from .. import config, security_manager
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,16 +29,18 @@ class OuterEnvelope:
 
 class InnerEnvelope:
     def __init__(self, message_id, sender, recipient, message_type, timestamp,
-                 raw_payload, directive, in_response_to=None, ttl=None):
+                 raw_payload, directive=None, in_response_to=None, ttl=None,
+                 serial=1):
         self.message_id = message_id
         self.sender = sender
         self.recipient = recipient
-        self.message_type = message_type
-        self.timestamp = timestamp
+        self.message_type = message_type # 'directive' or 'response'
+        self.timestamp = timestamp # ISO format
         self.raw_payload = raw_payload
-        self.directive = directive
-        self.in_response_to = in_response_to
-        self.ttl = ttl
+        self.directive = directive # None if response, 'namespace:action' if not
+        self.in_response_to = in_response_to # None if directive, a message_id if not
+        self.ttl = ttl # Optional
+        self.serial = serial # serial index of responses
 
     @classmethod
     def deserialize(cls, msg):
@@ -41,3 +48,26 @@ class InnerEnvelope:
         # validate msg
         # msg+sig
         return cls(**json.loads(payload))
+    
+    @classmethod
+    def make_response(cls, recipient, payload, in_response_to, serial, ttl=None):
+        if isinstance(payload, bytes):
+            encoded_payload = base64.encodebytes(bytes)
+        else:
+            encoded_payload = payload
+        return cls(
+            message_id=str(uuid.uuid4()),
+            sender=config.node_id,
+            recipient=recipient,
+            message_type='response',
+            timestamp=datetime.datetime.utcnow().isoformat(),
+            raw_payload=encoded_payload,
+            directive=None,
+            in_response_to=in_response_to,
+            ttl=ttl,
+            serial=serial
+        )
+    
+    def sign_and_serialize(self):
+        return security_manager.sign_response(self)
+        
