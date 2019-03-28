@@ -1,4 +1,4 @@
-def forward(outer_envelope, next_hop):
+async def forward(outer_envelope, next_hop):
     """
     Forward a message on to the next hop closer to its destination
     """
@@ -12,7 +12,7 @@ def next_hop(recipient):
     """
     raise NotImplementedError()
 
-def send(outer_envelope):
+async def send(outer_envelope):
     """
     Send a new message with the given outer envelope.
     """

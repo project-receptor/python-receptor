@@ -27,6 +27,6 @@ class Control:
                 in_response_to=inner_env.message_id,
                 serial=serial
             )
-            router.send(enveloped_response)
+            await router.send(enveloped_response)
 
 control = Control()
