@@ -1,6 +1,8 @@
 import logging
 from .messages import envelope, directive
-from . import router, work_manager, exceptions
+from . import router
+from . import work_manager
+from . import exceptions
 
 logger = logging.getLogger(__name__)
 
