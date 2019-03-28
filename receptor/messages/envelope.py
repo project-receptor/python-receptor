@@ -1,5 +1,6 @@
 import base64
 import datetime
+from .. import config
 import json
 import logging
 import uuid
@@ -19,7 +20,7 @@ class OuterEnvelope:
         self.inner_obj = None
 
     async def deserialize_inner(self):
-        self.inner = InnerEnvelope.deserialize(self.inner)
+        self.inner = await InnerEnvelope.deserialize(self.inner)
 
     @classmethod
     def from_raw(cls, raw):
@@ -43,12 +44,12 @@ class InnerEnvelope:
         self.serial = serial # serial index of responses
 
     @classmethod
-    def deserialize(cls, msg):
-        payload = security_manager.validate_msg(msg)
+    async def deserialize(cls, msg):
+        payload = await config.security_manager.validate_msg(msg)
         # validate msg
         # msg+sig
         return cls(**json.loads(payload))
-    
+
     @classmethod
     def make_response(cls, recipient, payload, in_response_to, serial, ttl=None):
         if isinstance(payload, bytes):
@@ -67,7 +68,6 @@ class InnerEnvelope:
             ttl=ttl,
             serial=serial
         )
-    
+
     def sign_and_serialize(self):
         return security_manager.sign_response(self)
-        
