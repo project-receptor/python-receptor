@@ -1,6 +1,6 @@
 import logging
 from .messages import envelope, directive
-from . import router, work_manager
+from . import router, work_manager, exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +12,18 @@ async def handle_msg(msg):
     if next_hop is None:
         # it's a meee
         await outer_env.deserialize_inner()
-        namespace, _ = outer_env.inner_obj.directive.split(':', 1)
-        if namespace == 'receptor':
-            await directive.control(outer_env.inner_obj)
-        await work_manager.handle(outer_env.inner_obj)
+        if outer_env.inner_obj.message_type == 'directive':
+            namespace, _ = outer_env.inner_obj.directive.split(':', 1)
+            if namespace == 'receptor':
+                await directive.control(outer_env.inner_obj)
+            await work_manager.handle(outer_env.inner_obj)
+        elif outer_env.inner_obj.message_type == 'response':
+            # Who the fuck knows?
+            pass
+        else:
+            raise exceptions.UnknownMessageType(
+                f'Unknown message type: {outer_env.inner_obj.message_type}')
+
     else:
         await router.forward(outer_env, next_hop)
 
