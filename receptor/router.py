@@ -19,7 +19,7 @@ def next_hop(recipient):
     given recipient. If the current node is the recipient, then return
     None.
     """
-    return router.find_shortest_path(recipient)
+    return router.find_shortest_path(recipient)[-2]
 
 async def send(outer_envelope):
     """
@@ -61,7 +61,7 @@ class MeshRouter:
                 path = [vertex] + path                
                 if vertex == to_node_id:
                     logger.debug(f'Shortest path to {to_node_id} with cost {cost} is {path}')
-                    return path[-1]
+                    return path
                 cost_map_for_vertex = cost_map.get(vertex, ())
                 random.shuffle(cost_map_for_vertex)
                 for next_cost, next_vertex in cost_map.get(vertex, ()):
