@@ -25,6 +25,7 @@ class BasicProtocol(asyncio.Protocol):
         self.greeted = False
 
     def data_received(self, data):
+        logger.info(data)
         if not self.greeted:
             self.handshake(data)
         else:
@@ -34,13 +35,13 @@ class BasicProtocol(asyncio.Protocol):
         # self.transport.write(data)
 
     def handshake(self, data):
-        cmd, id_ = data.split(" ", 1)
-        if cmd != "HI":
+        cmd, id_ = data.split(b" ", 1)
+        if cmd != b"HI":
             logger.error("Handshake failed!")
         else:
-            self.id_ = id_
             self.greeted = True
-            self.transport.write("AHOY\n")
+            logger.debug("Received handshake from client with id %s, responding...", id_)
+            self.transport.write(b"HI %s" % get_node_id().encode("utf-8"))
             # send routing updates
 
 
@@ -50,9 +51,11 @@ class BasicClientProtocol(asyncio.Protocol):
         print('Connection to {}'.format(peername))
         self.transport = transport
         self.greeted = False
-        self.transport.write(b"HI %s\n" % get_node_id())
+        logger.debug("Sending handshake to server...")
+        self.transport.write(b"HI %s" % get_node_id().encode("utf-8"))
 
     def data_received(self, data):
+        logger.info(data)
         if not self.greeted:
             self.handshake(data)
         else:
@@ -67,7 +70,9 @@ class BasicClientProtocol(asyncio.Protocol):
         loop.create_task(create_peer(info[0], info[1]))
 
     def handshake(self, data):
-        if data == "AHOY":
-            self.greeted = True
+        cmd, id_ = data.split(b" ", 1)
+        if cmd != b"HI":
+            logger.error("Handshake failed!")
         else:
-            logger.error("Failed handshake")
+            logger.debug("Received handshake from server with id %s", id_)
+            self.greeted = True

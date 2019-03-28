@@ -5,7 +5,7 @@ import json
 import logging
 import uuid
 
-from .. import config, security_manager
+from .. import config
 
 logger = logging.getLogger(__name__)
 

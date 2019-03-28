@@ -5,6 +5,7 @@ import receptor
 
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 def map_args_to_config(args):
     to_return = {}
@@ -12,7 +13,7 @@ def map_args_to_config(args):
         to_return.setdefault('server', {})['address'] = args.listen_address
     if args.listen_port:
         to_return.setdefault('server', {})['port'] = args.listen_port
-    if args.peers:
+    if args.peer:
         to_return['peers'] = {peer: '' for peer in args.peer}
     return to_return
 
@@ -25,7 +26,7 @@ def main(args=None):
     args = parser.parse_args(args)
     
     receptor.config = receptor.ReceptorConfig(args.config, map_args_to_config(args))
-    mainloop(receptor.config.server.listen, receptor.config.server.port,
+    mainloop(receptor.config.server.address, receptor.config.server.port,
              peers=receptor.config.peers
     )
 
