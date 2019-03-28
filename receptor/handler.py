@@ -1,9 +1,11 @@
 import logging
-from .messages import envelope
+from .messages import envelope, directive
 from . import router, work_manager
 
 logger = logging.getLogger(__name__)
 
+RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
+CONTROL_DIRECTIVES = ['ping']
 
 async def handle_msg(msg):
     outer_env = envelope.OuterEnvelope.from_raw(msg)
@@ -11,6 +13,11 @@ async def handle_msg(msg):
     if next_hop is None:
         # it's a meee
         await outer_env.deserialize_inner()
-        await work_manager.handle(outer_env.inner)
+        namespace, action = outer_env.inner_obj.directive.split(':', 1)
+        if namespace == 'receptor':
+            directive_handler = getattr(directive, f'do_{action}')
+            await directive_handler(outer_env.inner_obj)
+        await work_manager.handle(outer_env.inner_obj)
     else:
         await router.forward(outer_env, next_hop)
+
