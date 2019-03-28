@@ -1,5 +1,7 @@
 import importlib
 import configparser
+import os
+import uuid
 
 DEFAULT_CONFIG = dict(
     server=dict(
@@ -38,6 +40,8 @@ class ReceptorConfigSection:
         self._section = section
     
     def __getattr__(self, key):
+        if not self._parser.has_section(self._section):
+            return None
         to_return = self._parser.get(self._section, key)
         cast_fn = CAST_MAP.get(self._section, {}).get(key, None)
         if cast_fn:
@@ -54,9 +58,19 @@ class ReceptorConfig:
             self._parser.read_dict(cmdline_args)
     
     def __getattr__(self, key):
-        if self._parser.has_section(key):
-            if key in VALUELESS_SECTIONS:
-                return list(dict(self._parser.items(key)).keys())
-            return ReceptorConfigSection(self._parser, key)
+        if key in VALUELESS_SECTIONS:
+            return list(dict(self._parser.items(key)).keys())
+        return ReceptorConfigSection(self._parser, key)
 
 config = ReceptorConfig()
+
+def get_node_id():
+    if config.receptor.node_id:
+        return config.receptor.node_id
+    if not 'RECEPTOR_NODE_ID' in os.environ:
+        node_id = uuid.uuid4()
+        os.environ['RECEPTOR_NODE_ID'] = str(node_id)
+        if os.path.exists(os.path.join(os.getcwd(), 'Pipfile')):
+            with open(os.path.join(os.getcwd(), '.env'), 'w+') as ofs:
+                ofs.write(f'\nRECEPTOR_NODE_ID={node_id}\n')
+    return os.environ['RECEPTOR_NODE_ID']
