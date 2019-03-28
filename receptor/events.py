@@ -1,15 +1,25 @@
 import argparse
-from .listener import listener_run
-from .server import server_run
+import asyncio
+import logging
 
+from .protocol import BasicProtocol
 
-def main(sys_args=None):
-    parser = argparse.ArgumentParser("receptor")
-    parser.add_argument("--listen")
-    parser.add_argument("--server")
-    
-    args = parser.parse_args(sys_args)
-    if args.listen:
-        listener_run()
-    else:
-        server_run()
+logger = logging.getLogger(__name__)
+
+def mainloop():
+    loop = asyncio.get_event_loop()
+    coro = loop.create_server(
+        BasicProtocol,
+        None, 8888)
+    server = loop.run_until_complete(coro)
+
+    # Serve requests until Ctrl+C is pressed
+    print('Serving on {}'.format(server.sockets[0].getsockname()))
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    server.close()
+    loop.run_until_complete(server.wait_closed())
+    loop.close()
