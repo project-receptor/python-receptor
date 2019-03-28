@@ -5,8 +5,6 @@ import json
 import logging
 import uuid
 
-from .. import config
-
 logger = logging.getLogger(__name__)
 
 

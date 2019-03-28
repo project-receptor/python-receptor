@@ -1,6 +1,7 @@
 import logging
 logger = logging.getLogger(__name__)
 
+import json
 from collections import defaultdict
 import heapq
 import random
@@ -43,6 +44,10 @@ class MeshRouter:
                 cost
             )
         )
+
+    def get_edges(self):
+        """Returns serialized (as json) list of edges"""
+        return json.dumps(list(self._edges))
 
     def find_shortest_path(self, to_node_id):
         """Implementation of Dijkstra algorithm"""
