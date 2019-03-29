@@ -27,7 +27,8 @@ CAST_MAP = dict(
         port=int
     ),
     components=dict(
-        security_manager=py_class
+        security_manager=py_class,
+        buffer_manager=py_class
     )
 )
 

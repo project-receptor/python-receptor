@@ -68,4 +68,4 @@ class InnerEnvelope:
         )
 
     def sign_and_serialize(self):
-        return security_manager.sign_response(self)
+        return config.components.security_manager.sign_response(self)

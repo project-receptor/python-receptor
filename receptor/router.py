@@ -6,13 +6,16 @@ from collections import defaultdict
 import heapq
 import random
 
-from receptor import get_node_id
+from receptor import get_node_id, config
 
-async def forward(outer_envelope, next_hop):
+await def forward(outer_envelope, next_hop):
     """
     Forward a message on to the next hop closer to its destination
     """
-    raise NotImplementedError()
+    buffer_mgr = config.components.buffer_manager
+    buffer_obj = buffer_mgr.get_buffer_for_node(next_hop)
+    outer_envelope.route_list.append(get_node_id())
+    buffer_obj.push(outer_envelope)
 
 def next_hop(recipient):
     """
@@ -26,7 +29,8 @@ async def send(outer_envelope):
     """
     Send a new message with the given outer envelope.
     """
-    raise NotImplementedError()
+    next_node_id = next_hop(outer_envelope.recipient)
+    await forward(outer_envelope, next_node_id)
 
 class MeshRouter:
     _nodes = set()
