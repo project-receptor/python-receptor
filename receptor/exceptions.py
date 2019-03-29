@@ -5,4 +5,4 @@ class ReceptorConfigError(Exception): pass
 class UnknownDirective(ReceptorMessageError): pass
 class InvalidDirectiveAction(ReceptorMessageError): pass
 class UnknownMessageType(ReceptorMessageError): pass
-class UnrouteableError(ReceptorMessageError: pass)
+class UnrouteableError(ReceptorMessageError): pass
