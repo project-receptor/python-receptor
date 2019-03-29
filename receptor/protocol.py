@@ -20,7 +20,6 @@ async def create_peer(host, port):
 
 
 def join_router(id_, edges):
-    router.register_node(id_)
     router.register_edge(id_, get_node_id(), 1)
     for edge in json.loads(edges):
         router.register_edge(*edge)
