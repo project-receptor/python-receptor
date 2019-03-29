@@ -6,7 +6,8 @@ import uuid
 DEFAULT_CONFIG = dict(
     server=dict(
         port=8888,
-        address='0.0.0.0'
+        address='0.0.0.0',
+        server_disable=False,
     ),
     peers=dict(),
     components=dict(

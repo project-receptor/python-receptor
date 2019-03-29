@@ -13,8 +13,12 @@ def map_args_to_config(args):
         to_return.setdefault('server', {})['address'] = args.listen_address
     if args.listen_port:
         to_return.setdefault('server', {})['port'] = args.listen_port
+    if args.server_disable:
+        to_return.setdefault('server', {})['server_disable'] = args.server_disable
     if args.peer:
         to_return['peers'] = {peer: '' for peer in args.peer}
+    if args.node_id:
+        to_return.setdefault('receptor', {})['node_id'] = args.node_id
     return to_return
 
 
@@ -25,6 +29,9 @@ def main(args=None):
     parser.add_argument("--listen-port")
     parser.add_argument("-p", "--peer", action='append')
     parser.add_argument("--debug", action="store_true", default=False)
+    parser.add_argument("--node-id")
+    parser.add_argument("--server-disable", action="store_true", default=False)
+    parser.add_argument("--ping")
     args = parser.parse_args(args)
     
     logging.config.dictConfig(
@@ -51,8 +58,8 @@ def main(args=None):
             },
         }
     )
-
     receptor.config = receptor.ReceptorConfig(args.config, map_args_to_config(args))
+    logger.info("Node Id: {}".format(receptor.get_node_id()))
     mainloop(receptor.config)
 
 
