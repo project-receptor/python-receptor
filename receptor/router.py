@@ -1,5 +1,4 @@
 import logging
-logger = logging.getLogger(__name__)
 
 import json
 from collections import defaultdict
@@ -7,6 +6,8 @@ import heapq
 import random
 
 from receptor import get_node_id, config
+
+logger = logging.getLogger(__name__)
 
 async def forward(outer_envelope, next_hop):
     """
