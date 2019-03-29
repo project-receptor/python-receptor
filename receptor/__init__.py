@@ -8,12 +8,14 @@ DEFAULT_CONFIG = dict(
         port=8888,
         address='0.0.0.0'
     ),
+    peers=dict(),
     components=dict(
         security_manager='receptor.security.MallCop',
         buffer_manager='receptor.buffers.memory.InMemoryBufferManager'
     ),
     peers=dict()
 )
+
 
 def py_class(class_spec):
     if class_spec not in SINGLETONS:
@@ -23,19 +25,23 @@ def py_class(class_spec):
         SINGLETONS[class_spec] = class_obj()
     return SINGLETONS[class_spec]
 
+
 CAST_MAP = dict(
     server=dict(
         port=int
     ),
+    peers=dict(),
     components=dict(
         security_manager=py_class,
         buffer_manager=py_class
     )
 )
 
+
 VALUELESS_SECTIONS = ['peers']
 
 SINGLETONS = dict()
+
 
 class ReceptorConfigSection:
     def __init__(self, parser, section):
@@ -50,6 +56,7 @@ class ReceptorConfigSection:
         if cast_fn:
             return cast_fn(to_return)
         return to_return
+
 
 class ReceptorConfig:
     def __init__(self, config_path=None, cmdline_args=None):

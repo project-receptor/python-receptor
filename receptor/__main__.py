@@ -6,6 +6,7 @@ import receptor
 
 logger = logging.getLogger(__name__)
 
+
 def map_args_to_config(args):
     to_return = {}
     if args.listen_address:
@@ -15,6 +16,7 @@ def map_args_to_config(args):
     if args.peer:
         to_return['peers'] = {peer: '' for peer in args.peer}
     return to_return
+
 
 def main(args=None):
     parser = argparse.ArgumentParser("receptor")
@@ -51,9 +53,7 @@ def main(args=None):
     )
 
     receptor.config = receptor.ReceptorConfig(args.config, map_args_to_config(args))
-    mainloop(receptor.config.server.address, receptor.config.server.port,
-             peers=receptor.config.peers
-    )
+    mainloop(receptor.config)
 
 
 main()
