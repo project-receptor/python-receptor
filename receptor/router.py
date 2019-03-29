@@ -36,7 +36,8 @@ class MeshRouter:
         return node_id in self._nodes
     
     def register_edge(self, left, right, cost):
-        self._nodes.add(left, right)
+        self._nodes.add(left)
+        self._nodes.add(right)
         self._edges.add(
             (
                 left if left < right else right,
