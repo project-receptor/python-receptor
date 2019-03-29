@@ -12,7 +12,7 @@ class MallCop:
         return True
 
     async def verify_msg(self, msg):
-        return True
+        return msg
 
     async def verify_directive(self, directive):
         return True

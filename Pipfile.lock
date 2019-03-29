@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "c12ccb08d4b41347f8b8d40f66d2d01e48cfcd92f87fc32d8982f6229194bbcc"
+            "sha256": "309bfa8f8c44e34671c2e1bfa840a2d6a9a59e6dfbee974c7a4a4d68f8bd74e6"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -15,7 +15,23 @@
             }
         ]
     },
-    "default": {},
+    "default": {
+        "python-dateutil": {
+            "hashes": [
+                "sha256:7e6584c74aeed623791615e26efd690f29817a27c73085b78e4bad02493df2fb",
+                "sha256:c89805f6f4d64db21ed966fda138f8a5ed7a4fdbc1a8ee329ce1b74e3c74da9e"
+            ],
+            "index": "pypi",
+            "version": "==2.8.0"
+        },
+        "six": {
+            "hashes": [
+                "sha256:3350809f0555b11f552448330d0b52d5f24c91a322ea4a15ef22629740f3761c",
+                "sha256:d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73"
+            ],
+            "version": "==1.12.0"
+        }
+    },
     "develop": {
         "astroid": {
             "hashes": [

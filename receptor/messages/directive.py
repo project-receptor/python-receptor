@@ -1,4 +1,6 @@
+import datetime
 import logging
+
 from ..exceptions import UnknownDirective
 from .. import router
 from . import envelope
@@ -31,6 +33,9 @@ class Control:
                 serial=serial
             )
             await router.send(enveloped_response)
-
+    
+    async def ping(self, inner_env):
+        logger.info(f'Received ping from {inner_env.sender}')
+        yield f'{inner_env.raw_payload}|{datetime.datetime.utcnow().isoformat()}'
 
 control = Control()

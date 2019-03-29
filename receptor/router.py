@@ -1,16 +1,20 @@
 import logging
 
+import datetime
 import json
 from collections import defaultdict
 import heapq
 import random
 import uuid
 
+from dateutil import parser
 from receptor import get_node_id, config
 from .messages import envelope
 from .exceptions import UnrouteableError
 
 logger = logging.getLogger(__name__)
+
+response_callback_registry = {}
 
 async def forward(outer_envelope, next_hop):
     """
@@ -34,7 +38,7 @@ def next_hop(recipient):
     if path:
         return router.find_shortest_path(recipient)[-2]
 
-async def send(inner_envelope):
+async def send(inner_envelope, callback=None):
     """
     Send a new message with the given outer envelope.
     """
@@ -50,7 +54,16 @@ async def send(inner_envelope):
         inner=signed
     )
     logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
+    if callback and inner_envelope.message_type == 'directive':
+        response_callback_registry[inner_envelope.message_id] = callback
     await forward(outer_envelope, next_node_id)
+
+async def log_ping(response):
+    pong_received = datetime.datetime.utcnow()
+    ping_sent, ping_received = response.raw_payload.split('|')
+    ping_time = parser.parse(ping_sent) - parser.parse(ping_received)
+    pong_time = parser.parse(ping_received) - pong_received
+    logger.info(f'Ping report for {response.sender}: ping={ping_time}s; pong={pong_time}s')
 
 class MeshRouter:
     _nodes = set()
@@ -73,6 +86,24 @@ class MeshRouter:
     def get_edges(self):
         """Returns serialized (as json) list of edges"""
         return json.dumps(list(self._edges))
+    
+    def get_nodes(self):
+        return self._nodes
+    
+    async def ping_node(self, node_id, callback=log_ping):
+        logger.info(f'Sending ping to node {node_id}')
+        now = datetime.datetime.utcnow().isoformat()
+        ping_envelope = envelope.InnerEnvelope(
+            message_id=str(uuid.uuid4()),
+            sender=get_node_id(),
+            recipient=node_id,
+            message_type='directive',
+            timestamp=now,
+            raw_payload=now,
+            directive='receptor:ping',
+            ttl=15
+        )
+        await send(ping_envelope, callback)
 
     def find_shortest_path(self, to_node_id):
         """Implementation of Dijkstra algorithm"""

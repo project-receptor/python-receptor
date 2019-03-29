@@ -8,8 +8,6 @@ logger = logging.getLogger(__name__)
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 
-response_callback_registry = {}
-
 async def handle_msg(msg):
     outer_env = envelope.OuterEnvelope.from_raw(msg)
     next_hop = await router.next_hop(outer_env.recipient)
@@ -24,9 +22,9 @@ async def handle_msg(msg):
                 await work_manager.handle(outer_env.inner_obj)
         elif outer_env.inner_obj.message_type == 'response':
             in_response_to = outer_env.inner_obj.in_response_to
-            if in_response_to in response_callback_registry:
+            if in_response_to in router.response_callback_registry:
                 logger.info(f'Handling response to {in_response_to} with callback.')
-                callback = response_callback_registry[in_response_to]
+                callback = router.response_callback_registry[in_response_to]
                 await callback(outer_env.inner_obj)
             else:
                 logger.warning(f'Received response to {in_response_to} but no callback registered!')

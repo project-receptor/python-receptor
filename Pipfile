@@ -8,6 +8,7 @@ pylint = "*"
 ipython = "*"
 
 [packages]
+python-dateutil = "*"
 
 [requires]
 python_version = "3.6"

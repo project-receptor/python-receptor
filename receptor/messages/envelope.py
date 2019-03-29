@@ -19,7 +19,7 @@ class OuterEnvelope:
         self.inner_obj = None
 
     async def deserialize_inner(self):
-        self.inner = await InnerEnvelope.deserialize(self.inner)
+        self.inner_obj = await InnerEnvelope.deserialize(self.inner)
 
     @classmethod
     def from_raw(cls, raw):
@@ -44,7 +44,7 @@ class InnerEnvelope:
 
     @classmethod
     async def deserialize(cls, msg):
-        payload = await receptor.config.security_manager.validate_msg(msg)
+        payload = await receptor.config.components.security_manager.verify_msg(msg)
         # validate msg
         # msg+sig
         return cls(**json.loads(payload))
