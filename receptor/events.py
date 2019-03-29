@@ -19,5 +19,7 @@ def mainloop(config):
         loop.create_task(create_peer(peer.split(":")[0], peer.split(":")[1]))
     try:
         loop.run_forever()
+    except KeyboardInterrupt:
+        pass
     finally:
-        loop.close()
+        loop.stop()
