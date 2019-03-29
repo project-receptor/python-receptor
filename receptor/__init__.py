@@ -28,7 +28,8 @@ def py_class(class_spec):
 
 CAST_MAP = dict(
     server=dict(
-        port=int
+        port=int,
+        server_disable=lambda val: val == "True",
     ),
     peers=dict(),
     components=dict(
@@ -77,7 +78,7 @@ config = ReceptorConfig()
 def get_node_id():
     if config.receptor.node_id:
         return config.receptor.node_id
-    if not 'RECEPTOR_NODE_ID' in os.environ:
+    if 'RECEPTOR_NODE_ID' not in os.environ:
         node_id = uuid.uuid4()
         os.environ['RECEPTOR_NODE_ID'] = str(node_id)
         if os.path.exists(os.path.join(os.getcwd(), 'Pipfile')):

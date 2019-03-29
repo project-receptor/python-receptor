@@ -13,8 +13,7 @@ def map_args_to_config(args):
         to_return.setdefault('server', {})['address'] = args.listen_address
     if args.listen_port:
         to_return.setdefault('server', {})['port'] = args.listen_port
-    if args.server_disable:
-        to_return.setdefault('server', {})['server_disable'] = args.server_disable
+    to_return.setdefault('server', {})['server_disable'] = args.server_disable
     if args.peer:
         to_return['peers'] = {peer: '' for peer in args.peer}
     if args.node_id:
