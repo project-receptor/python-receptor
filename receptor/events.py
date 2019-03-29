@@ -15,7 +15,7 @@ def mainloop(listen, port, controller={}, peers=[]):
     loop.create_task(listener)
     for peer in peers:
         loop.create_task(create_peer(peer.split(":")[0], peer.split(":")[1]))
-    print('Serving on {}'.format("{}:{}".format(listen, port)))
+    logger.info('Serving on {}'.format("{}:{}".format(listen, port)))
     try:
         loop.run_forever()
     except KeyboardInterrupt:

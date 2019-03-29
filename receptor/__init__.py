@@ -12,6 +12,7 @@ DEFAULT_CONFIG = dict(
         security_manager='receptor.security.MallCop',
         buffer_manager='receptor.buffers.memory.InMemoryBufferManager'
     ),
+    peers=dict()
 )
 
 def py_class(class_spec):

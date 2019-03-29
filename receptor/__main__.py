@@ -1,11 +1,10 @@
 import argparse
 import logging
+import logging.config
 from .events import mainloop
 import receptor
 
-
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG)
 
 def map_args_to_config(args):
     to_return = {}
@@ -23,8 +22,34 @@ def main(args=None):
     parser.add_argument("--listen-address")
     parser.add_argument("--listen-port")
     parser.add_argument("-p", "--peer", action='append')
+    parser.add_argument("--debug", action="store_true", default=False)
     args = parser.parse_args(args)
     
+    logging.config.dictConfig(
+        {
+            'version': 1,
+            'disable_existing_loggers': False,
+            'formatters': {
+                'verbose': {
+                    'format': '{levelname} {asctime} {module} {message}',
+                    'style': '{',
+                }
+            },
+            'handlers': {
+                'console': {
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'verbose'
+                },
+            },
+            'loggers': {
+                'receptor': {
+                    'handlers': ['console'],
+                    'level': 'DEBUG' if args.debug else 'INFO',
+                },
+            },
+        }
+    )
+
     receptor.config = receptor.ReceptorConfig(args.config, map_args_to_config(args))
     mainloop(receptor.config.server.address, receptor.config.server.port,
              peers=receptor.config.peers

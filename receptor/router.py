@@ -8,7 +8,7 @@ import random
 
 from receptor import get_node_id, config
 
-await def forward(outer_envelope, next_hop):
+async def forward(outer_envelope, next_hop):
     """
     Forward a message on to the next hop closer to its destination
     """
