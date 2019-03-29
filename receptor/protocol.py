@@ -4,8 +4,12 @@ import json
 from .handler import handle_msg
 from .router import router
 from receptor import get_node_id, config
+from collections import deque
 
 logger = logging.getLogger(__name__)
+
+DELIM = b"\x1b[K"
+SIZEB = b"\x1b[%dD"
 
 
 async def create_peer(host, port):
@@ -44,20 +48,40 @@ def join_router(id_, edges):
         router.register_edge(*edge)
 
 
+class DataBuffer:
+    def __init__(self):
+        self.q = deque()
+
+    def add(self, data):
+        self.q.append(data)
+
+    def get(self):
+        b = b"".join(self.q)
+        if DELIM not in b:
+            return
+        self.q.clear()
+        for chunk in b.split(DELIM):
+            if chunk:
+                yield chunk
+
+
 class BasicProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         peername = transport.get_extra_info('peername')
         print('Connection from {}'.format(peername))
         self.transport = transport
         self.greeted = False
+        self._buf = DataBuffer()
 
     def data_received(self, data):
         logger.info(data)
         loop = asyncio.get_event_loop()
-        if not self.greeted:
-            self.handshake(data)
-        else:
-            loop.create_task(handle_msg(data))
+        self._buf.add(data)
+        for d in self._buf.get():
+            if not self.greeted:
+                self.handshake(d)
+            else:
+                loop.create_task(handle_msg(d))
 
     def handshake(self, data):
         data = data.decode("utf-8")
@@ -66,7 +90,7 @@ class BasicProtocol(asyncio.Protocol):
         if cmd == "HI":
             self.greeted = True
             logger.debug("Received handshake from client with id %s, responding...", id_)
-            self.transport.write(f"HI:{get_node_id()}:{router.get_edges()}".encode("utf-8"))
+            self.transport.write(f"HI:{get_node_id()}:{router.get_edges()}".encode("utf-8") + DELIM)
             join_router(id_, edges)
             loop.create_task(watch_queue(id_, self.transport))
         else:
@@ -80,15 +104,18 @@ class BasicClientProtocol(asyncio.Protocol):
         self.transport = transport
         self.greeted = False
         logger.debug("Sending handshake to server...")
-        self.transport.write(f"HI:{get_node_id()}:{router.get_edges()}".encode("utf-8"))
+        self.transport.write(f"HI:{get_node_id()}:{router.get_edges()}".encode("utf-8") + DELIM)
+        self._buf = DataBuffer()
 
     def data_received(self, data):
         logger.info(data)
         loop = asyncio.get_event_loop()
-        if not self.greeted:
-            self.handshake(data)
-        else:
-            loop.create_task(handle_msg(data))
+        self._buf.add(data)
+        for d in self._buf.get():
+            if not self.greeted:
+                self.handshake(d)
+            else:
+                loop.create_task(handle_msg(d))
 
     def connection_lost(self, exc):
         logger.info('Connection lost with the client...')
