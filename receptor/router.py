@@ -4,8 +4,10 @@ import json
 from collections import defaultdict
 import heapq
 import random
+import uuid
 
 from receptor import get_node_id, config
+from .messages import envelope
 
 logger = logging.getLogger(__name__)
 
@@ -21,16 +23,28 @@ async def forward(outer_envelope, next_hop):
 def next_hop(recipient):
     """
     Return the node ID of the next hop for routing a message to the
-    given recipient. If the current node is the recipient, then return
-    None.
+    given recipient. If the current node is the recipient or there is
+    no path, then return None.
     """
-    return router.find_shortest_path(recipient)[-2]
+    if recipient == get_node_id():
+        return None
+    path = router.find_shortest_path(recipient)
+    if path:
+        return router.find_shortest_path(recipient)[-2]
 
-async def send(outer_envelope):
+async def send(inner_envelope):
     """
     Send a new message with the given outer envelope.
     """
-    next_node_id = next_hop(outer_envelope.recipient)
+    next_node_id = next_hop(inner_envelope.recipient)
+    signed = await inner_envelope.sign_and_serialize()
+    outer_envelope = envelope.OuterEnvelope(
+        frame_id=str(uuid.uuid4()),
+        sender=get_node_id(),
+        recipient=inner_envelope.recipient,
+        route_list=[get_node_id()],
+        inner=signed
+    )
     await forward(outer_envelope, next_node_id)
 
 class MeshRouter:

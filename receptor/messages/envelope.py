@@ -1,9 +1,10 @@
 import base64
 import datetime
-from .. import config
 import json
 import logging
 import uuid
+
+import receptor
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class InnerEnvelope:
 
     @classmethod
     async def deserialize(cls, msg):
-        payload = await config.security_manager.validate_msg(msg)
+        payload = await receptor.config.security_manager.validate_msg(msg)
         # validate msg
         # msg+sig
         return cls(**json.loads(payload))
@@ -51,12 +52,12 @@ class InnerEnvelope:
     @classmethod
     def make_response(cls, recipient, payload, in_response_to, serial, ttl=None):
         if isinstance(payload, bytes):
-            encoded_payload = base64.encodebytes(bytes)
+            encoded_payload = base64.encodebytes(payload)
         else:
             encoded_payload = payload
         return cls(
             message_id=str(uuid.uuid4()),
-            sender=config.node_id,
+            sender=receptor.get_node_id(),
             recipient=recipient,
             message_type='response',
             timestamp=datetime.datetime.utcnow().isoformat(),
@@ -68,4 +69,4 @@ class InnerEnvelope:
         )
 
     def sign_and_serialize(self):
-        return config.components.security_manager.sign_response(self)
+        return receptor.config.components.security_manager.sign_response(self)
