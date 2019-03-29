@@ -21,12 +21,15 @@ class InMemoryBuffer(BaseBuffer):
         self._buffer = collections.deque()
 
     def push(self, message):
+        logger.debug(f'Pushing a message to {self.node_id} buffer.')
         self._buffer.append(message)
     
     def pop(self):
+        logger.debug(f'Popping a message from {self.node_id} buffer.')
         return self._buffer.popleft()
     
     def flush(self):
+        logger.debug(f'Flushing buffer for {self.node_id}')
         to_return = list(self._buffer)
         self._buffer.clear()
         return to_return

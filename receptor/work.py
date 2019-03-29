@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 class WorkManager:
     async def handle(self, inner_env):
+        logger.info(f'Handling work for {inner_env.message_id} as {inner_env.directive}')
         namespace, action = inner_env.directive.split(':', 1)
         try:
             worker_module = importlib.import_module(f'receptor.worker.{namespace}')
@@ -23,6 +24,7 @@ class WorkManager:
         serial = 0
         async for response in responses:
             serial += 1
+            logger.debug(f'Response emitted for {inner_env.message_id}, serial {serial}')
             enveloped_response = envelope.InnerEnvelope.make_response(
                 recipient=inner_env.sender,
                 payload=response,

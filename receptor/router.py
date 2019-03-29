@@ -8,6 +8,7 @@ import uuid
 
 from receptor import get_node_id, config
 from .messages import envelope
+from .exceptions import UnrouteableError
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ async def forward(outer_envelope, next_hop):
     buffer_mgr = config.components.buffer_manager
     buffer_obj = buffer_mgr.get_buffer_for_node(next_hop)
     outer_envelope.route_list.append(get_node_id())
+    logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
     buffer_obj.push(outer_envelope)
 
 def next_hop(recipient):
@@ -37,6 +39,8 @@ async def send(inner_envelope):
     Send a new message with the given outer envelope.
     """
     next_node_id = next_hop(inner_envelope.recipient)
+    if not next_node_id:
+        raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
     signed = await inner_envelope.sign_and_serialize()
     outer_envelope = envelope.OuterEnvelope(
         frame_id=str(uuid.uuid4()),
@@ -45,6 +49,7 @@ async def send(inner_envelope):
         route_list=[get_node_id()],
         inner=signed
     )
+    logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
     await forward(outer_envelope, next_node_id)
 
 class MeshRouter:
