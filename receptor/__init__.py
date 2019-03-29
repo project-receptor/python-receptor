@@ -9,7 +9,8 @@ DEFAULT_CONFIG = dict(
         address='0.0.0.0'
     ),
     components=dict(
-        security_manager='receptor.security.MallCop'
+        security_manager='receptor.security.MallCop',
+        buffer_manager='receptor.buffers.memory.InMemoryBufferManager'
     ),
 )
 
