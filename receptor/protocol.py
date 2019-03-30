@@ -51,18 +51,17 @@ def join_router(id_, edges):
 class DataBuffer:
     def __init__(self):
         self.q = deque()
+        self._buf = b""
 
     def add(self, data):
-        self.q.append(data)
+        self._buf = self._buf + data
+        *ready, self._buf = self._buf.rsplit(DELIM)
+        for chunk in ready:
+            self.q.append(chunk)
 
     def get(self):
-        b = b"".join(self.q)
-        if DELIM not in b:
-            return
-        self.q.clear()
-        for chunk in b.split(DELIM):
-            if chunk:
-                yield chunk
+        while self.q:
+            yield self.q.popleft()
 
 
 class BasicProtocol(asyncio.Protocol):
