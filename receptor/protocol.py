@@ -10,13 +10,13 @@ logger = logging.getLogger(__name__)
 
 DELIM = b"\x1b[K"
 SIZEB = b"\x1b[%dD"
+loop = asyncio.get_event_loop
 
 
 async def create_peer(host, port):
     while True:
         try:
-            loop = asyncio.get_event_loop()
-            await loop.create_connection(BasicClientProtocol, host, port)
+            await loop().create_connection(BasicClientProtocol, host, port)
             break
         except Exception:
             print("Connection Refused: {}:{}".format(host, port))
@@ -64,72 +64,63 @@ class DataBuffer:
             yield self.q.popleft()
 
 
-class BasicProtocol(asyncio.Protocol):
+class BaseProtocol(asyncio.Protocol):
+
     def connection_made(self, transport):
-        peername = transport.get_extra_info('peername')
-        print('Connection from {}'.format(peername))
+        self.peername = transport.get_extra_info('peername')
         self.transport = transport
         self.greeted = False
         self._buf = DataBuffer()
 
     def data_received(self, data):
         logger.info(data)
-        loop = asyncio.get_event_loop()
         self._buf.add(data)
         for d in self._buf.get():
             if not self.greeted:
-                self.handshake(d)
+                self.handle_handshake(d)
             else:
-                loop.create_task(handle_msg(d))
+                loop().create_task(handle_msg(d))
 
-    def handshake(self, data):
+    def handle_handshake(self, data):
         data = data.decode("utf-8")
         cmd, id_, edges = data.split(":", 2)
-        loop = asyncio.get_event_loop()
         if cmd == "HI":
-            self.greeted = True
-            logger.debug("Received handshake from client with id %s, responding...", id_)
-            self.transport.write(f"HI:{get_node_id()}:{router.get_edges()}".encode("utf-8") + DELIM)
-            join_router(id_, edges)
-            loop.create_task(watch_queue(id_, self.transport))
+            self.handshake(id_, edges)
         else:
             logger.error("Handshake failed!")
 
+    def handshake(self, id_, edges):
+        self.greeted = True
+        join_router(id_, edges)
+        loop().create_task(watch_queue(id_, self.transport))
 
-class BasicClientProtocol(asyncio.Protocol):
-    def connection_made(self, transport):
-        peername = transport.get_extra_info('peername')
-        print('Connection to {}'.format(peername))
-        self.transport = transport
-        self.greeted = False
-        logger.debug("Sending handshake to server...")
+    def send_handshake(self):
         self.transport.write(f"HI:{get_node_id()}:{router.get_edges()}".encode("utf-8") + DELIM)
-        self._buf = DataBuffer()
 
-    def data_received(self, data):
-        logger.info(data)
-        loop = asyncio.get_event_loop()
-        self._buf.add(data)
-        for d in self._buf.get():
-            if not self.greeted:
-                self.handshake(d)
-            else:
-                loop.create_task(handle_msg(d))
+
+class BasicProtocol(BaseProtocol):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+        print('Connection from {}'.format(self.peername))
+
+    def handshake(self, id_, edges):
+        super().handshake(id_, edges)
+        logger.debug("Received handshake from client with id %s, responding...", id_)
+        self.send_handshake()
+
+
+class BasicClientProtocol(BaseProtocol):
+    def connection_made(self, transport):
+        super().connection_made(transport)
+        logger.info("Connection to %s", self.peername)
+        logger.debug("Sending handshake to server...")
+        self.send_handshake()
 
     def connection_lost(self, exc):
         logger.info('Connection lost with the client...')
         info = self.transport.get_extra_info('peername')
-        loop = asyncio.get_event_loop()
-        loop.create_task(create_peer(info[0], info[1]))
+        loop().create_task(create_peer(info[0], info[1]))
 
-    def handshake(self, data):
-        data = data.decode("utf-8")
-        cmd, id_, edges = data.split(":", 2)
-        loop = asyncio.get_event_loop()
-        if cmd == "HI":
-            logger.debug("Received handshake from server with id %s", id_)
-            self.greeted = True
-            join_router(id_, edges)
-            loop.create_task(watch_queue(id_, self.transport))
-        else:
-            logger.error("Handshake failed!")
+    def handshake(self, id_, edges):
+        super().handshake(id_, edges)
+        logger.debug("Received handshake from server with id %s", id_)
