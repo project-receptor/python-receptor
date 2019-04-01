@@ -75,7 +75,7 @@ class MeshRouter:
     def register_edge(self, left, right, cost):
         self._nodes.add(left)
         self._nodes.add(right)
-        self._edges.add((*sorted(left, right), cost))
+        self._edges.add((*sorted([left, right]), cost))
 
     def get_edges(self):
         """Returns serialized (as json) list of edges"""
