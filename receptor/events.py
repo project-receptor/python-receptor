@@ -22,8 +22,6 @@ def mainloop(config):
         loop.create_task(create_peer(peer.split(":")[0], peer.split(":")[1]))
     ping_time = (((int(loop.time()) + 1) // PING_INTERVAL) + 1) * PING_INTERVAL
     loop.call_at(ping_time, loop.create_task, send_pings_and_reschedule(loop, ping_time))
-    logger.info('Serving on {}'.format("{}:{}".format(config.server.address,
-                                                      config.server.port)))
     try:
         loop.run_forever()
     except KeyboardInterrupt:
