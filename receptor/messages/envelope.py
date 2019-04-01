@@ -25,6 +25,15 @@ class OuterEnvelope:
     def from_raw(cls, raw):
         doc = json.loads(raw)
         return cls(**doc)
+    
+    def serialize(self):
+        return json.dumps(dict(
+            frame_id=self.frame_id,
+            sender=self.sender,
+            recipient=self.recipient,
+            route_list=self.route_list,
+            inner=self.inner
+        ))
 
 
 class InnerEnvelope:

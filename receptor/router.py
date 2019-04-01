@@ -70,11 +70,13 @@ class MeshRouter:
     _edges = set()
 
     def node_is_known(self, node_id):
-        return node_id in self._nodes
+        return node_id in self._nodes or node_id == get_node_id()
     
     def register_edge(self, left, right, cost):
-        self._nodes.add(left)
-        self._nodes.add(right)
+        if left != get_node_id():
+            self._nodes.add(left)
+        if right != get_node_id():
+            self._nodes.add(right)
         self._edges.add((*sorted([left, right]), cost))
 
     def get_edges(self):

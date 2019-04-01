@@ -31,7 +31,7 @@ async def watch_queue(node, transport):
             break
         try:
             msg = buffer_obj.pop()
-            transport.write(msg)
+            transport.write(msg.serialize().encode('utf8'))
         except IndexError:
             pass
         except Exception as e:
