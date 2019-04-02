@@ -36,7 +36,7 @@ def next_hop(recipient):
         return None
     path = router.find_shortest_path(recipient)
     if path:
-        return router.find_shortest_path(recipient)[-2]
+        return path[-2]
 
 async def send(inner_envelope, callback=None):
     """
