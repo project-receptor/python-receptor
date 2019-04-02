@@ -61,9 +61,11 @@ async def send(inner_envelope, callback=None):
 async def log_ping(response):
     pong_received = datetime.datetime.utcnow()
     ping_sent, ping_received = response.raw_payload.split('|')
-    ping_time = parser.parse(ping_sent) - parser.parse(ping_received)
-    pong_time = parser.parse(ping_received) - pong_received
-    logger.info(f'Ping report for {response.sender}: ping={ping_time}s; pong={pong_time}s')
+    ping_time =  parser.parse(ping_received) - parser.parse(ping_sent)
+    pong_time =  pong_received - parser.parse(ping_received)
+    logger.info(f'Ping report for {response.sender}: '
+                f'ping={ping_time.total_seconds()}s; '
+                f'pong={pong_time.total_seconds()}s')
 
 class MeshRouter:
     _nodes = set()

@@ -10,7 +10,7 @@ RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 
 async def handle_msg(msg):
     outer_env = envelope.OuterEnvelope.from_raw(msg)
-    next_hop = await router.next_hop(outer_env.recipient)
+    next_hop = router.next_hop(outer_env.recipient)
     if next_hop is None:
         await outer_env.deserialize_inner()
         if outer_env.inner_obj.message_type == 'directive':

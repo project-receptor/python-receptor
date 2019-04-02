@@ -10,16 +10,15 @@ logger = logging.getLogger(__name__)
 
 DELIM = b"\x1b[K"
 SIZEB = b"\x1b[%dD"
-loop = asyncio.get_event_loop
 
 
-async def create_peer(host, port):
+async def create_peer(host, port, loop):
     while True:
         try:
-            await loop().create_connection(BasicClientProtocol, host, port)
+            await loop.create_connection(lambda: BasicClientProtocol(loop), host, port)
             break
         except Exception:
-            print("Connection Refused: {}:{}".format(host, port))
+            logger.exception("Connection Refused: {}:{}".format(host, port))
             await asyncio.sleep(5)
 
 
@@ -31,9 +30,9 @@ async def watch_queue(node, transport):
             break
         try:
             msg = buffer_obj.pop()
-            transport.write(msg.serialize().encode('utf8'))
+            transport.write(msg.serialize().encode('utf8') + DELIM)
         except IndexError:
-            pass
+            logger.debug(f'Buffer for {node} is empty.')
         except Exception as e:
             logger.exception("Error received trying to write to {}: {}".format(node, e))
             buffer_obj.push(msg)
@@ -65,6 +64,8 @@ class DataBuffer:
 
 
 class BaseProtocol(asyncio.Protocol):
+    def __init__(self, loop):
+        self.loop = loop
 
     def connection_made(self, transport):
         self.peername = transport.get_extra_info('peername')
@@ -73,13 +74,15 @@ class BaseProtocol(asyncio.Protocol):
         self._buf = DataBuffer()
 
     def data_received(self, data):
-        logger.info(data)
+        logger.debug(data)
         self._buf.add(data)
         for d in self._buf.get():
             if not self.greeted:
+                logger.debug('Looking for handshake...')
                 self.handle_handshake(d)
             else:
-                loop().create_task(handle_msg(d))
+                logger.debug('Passing to task handler...')
+                self.loop.create_task(handle_msg(d))
 
     def handle_handshake(self, data):
         data = data.decode("utf-8")
@@ -92,7 +95,7 @@ class BaseProtocol(asyncio.Protocol):
     def handshake(self, id_, edges):
         self.greeted = True
         join_router(id_, edges)
-        loop().create_task(watch_queue(id_, self.transport))
+        self.loop.create_task(watch_queue(id_, self.transport))
 
     def send_handshake(self):
         self.transport.write(f"HI:{get_node_id()}:{router.get_edges()}".encode("utf-8") + DELIM)
@@ -101,7 +104,7 @@ class BaseProtocol(asyncio.Protocol):
 class BasicProtocol(BaseProtocol):
     def connection_made(self, transport):
         super().connection_made(transport)
-        print('Connection from {}'.format(self.peername))
+        logger.info('Connection from {}'.format(self.peername))
 
     def handshake(self, id_, edges):
         super().handshake(id_, edges)
@@ -119,7 +122,7 @@ class BasicClientProtocol(BaseProtocol):
     def connection_lost(self, exc):
         logger.info('Connection lost with the client...')
         info = self.transport.get_extra_info('peername')
-        loop().create_task(create_peer(info[0], info[1]))
+        self.loop.create_task(create_peer(info[0], info[1], self.loop))
 
     def handshake(self, id_, edges):
         super().handshake(id_, edges)

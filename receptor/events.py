@@ -14,12 +14,12 @@ def mainloop(config):
     loop = asyncio.get_event_loop()
     if not config.server.server_disable:
         listener = loop.create_server(
-            BasicProtocol,
+            lambda: BasicProtocol(loop),
             config.server.address, config.server.port)
         loop.create_task(listener)
         logger.info("Serving on %s:%s", config.server.address, config.server.port)
     for peer in config.peers:
-        loop.create_task(create_peer(peer.split(":")[0], peer.split(":")[1]))
+        loop.create_task(create_peer(*peer.split(":", 1), loop))
     ping_time = (((int(loop.time()) + 1) // PING_INTERVAL) + 1) * PING_INTERVAL
     loop.call_at(ping_time, loop.create_task, send_pings_and_reschedule(loop, ping_time))
     try:
