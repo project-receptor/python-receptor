@@ -15,7 +15,7 @@ async def handle_msg(msg):
         await outer_env.deserialize_inner()
         if outer_env.inner_obj.message_type == 'directive':
             namespace, _ = outer_env.inner_obj.directive.split(':', 1)
-            if namespace == 'receptor':
+            if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
                 await directive.control(outer_env.inner_obj)
             else:
                 # other namespace/work directives
