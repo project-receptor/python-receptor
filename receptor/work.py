@@ -6,6 +6,7 @@ from .messages import envelope
 from . import router
 logger = logging.getLogger(__name__)
 
+
 class WorkManager:
     async def handle(self, inner_env):
         logger.info(f'Handling work for {inner_env.message_id} as {inner_env.directive}')
@@ -32,5 +33,6 @@ class WorkManager:
                 serial=serial
             )
             await router.send(enveloped_response)
+
 
 work_manager = WorkManager()

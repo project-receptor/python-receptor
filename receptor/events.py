@@ -1,5 +1,4 @@
 import asyncio
-import functools
 import logging
 
 from .protocol import BasicProtocol, create_peer

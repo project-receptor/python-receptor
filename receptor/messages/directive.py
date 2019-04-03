@@ -38,4 +38,5 @@ class Control:
         logger.info(f'Received ping from {inner_env.sender}')
         yield f'{inner_env.raw_payload}|{datetime.datetime.utcnow().isoformat()}'
 
+
 control = Control()

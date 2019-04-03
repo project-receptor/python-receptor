@@ -73,7 +73,9 @@ class ReceptorConfig:
             return list(dict(self._parser.items(key)).keys())
         return ReceptorConfigSection(self._parser, key)
 
+
 config = ReceptorConfig()
+
 
 def get_node_id():
     if config.receptor.node_id:

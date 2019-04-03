@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 response_callback_registry = {}
 
+
 async def forward(outer_envelope, next_hop):
     """
     Forward a message on to the next hop closer to its destination
@@ -25,6 +26,7 @@ async def forward(outer_envelope, next_hop):
     outer_envelope.route_list.append(get_node_id())
     logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
     buffer_obj.push(outer_envelope)
+
 
 def next_hop(recipient):
     """
@@ -37,6 +39,7 @@ def next_hop(recipient):
     path = router.find_shortest_path(recipient)
     if path:
         return path[-2]
+
 
 async def send(inner_envelope, callback=None):
     """
@@ -58,14 +61,16 @@ async def send(inner_envelope, callback=None):
         response_callback_registry[inner_envelope.message_id] = callback
     await forward(outer_envelope, next_node_id)
 
+
 async def log_ping(response):
     pong_received = datetime.datetime.utcnow()
     ping_sent, ping_received = response.raw_payload.split('|')
-    ping_time =  parser.parse(ping_received) - parser.parse(ping_sent)
-    pong_time =  pong_received - parser.parse(ping_received)
+    ping_time = parser.parse(ping_received) - parser.parse(ping_sent)
+    pong_time = pong_received - parser.parse(ping_received)
     logger.info(f'Ping report for {response.sender}: '
                 f'ping={ping_time.total_seconds()}s; '
                 f'pong={pong_time.total_seconds()}s')
+
 
 class MeshRouter:
     _nodes = set()
@@ -129,5 +134,6 @@ class MeshRouter:
                     if min_so_far is None or next_total_cost < min_so_far:
                         mins[next_vertex] = next_total_cost
                         heapq.heappush(heap, (next_total_cost, next_vertex, path))
-    
+
+
 router = MeshRouter()

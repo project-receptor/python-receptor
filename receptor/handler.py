@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 
+
 async def handle_msg(msg):
     outer_env = envelope.OuterEnvelope.from_raw(msg)
     next_hop = router.next_hop(outer_env.recipient)

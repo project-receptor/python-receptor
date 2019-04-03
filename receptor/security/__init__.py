@@ -23,8 +23,8 @@ class MallCop:
     async def sign_response(self, inner_envelope):
         return json.dumps(
             {attr: getattr(inner_envelope, attr)
-            for attr in ['message_id', 'sender', 'recipient', 'message_type',
-                         'timestamp', 'raw_payload', 'directive',
-                         'in_response_to', 'ttl', 'serial']}
+             for attr in ['message_id', 'sender', 'recipient', 'message_type',
+                          'timestamp', 'raw_payload', 'directive',
+                          'in_response_to', 'ttl', 'serial']}
         )
 
