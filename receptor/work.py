@@ -3,11 +3,13 @@ import logging
 
 from . import exceptions
 from .messages import envelope
-from . import router
 logger = logging.getLogger(__name__)
 
 
 class WorkManager:
+    def __init__(self, receptor):
+        self.receptor = receptor
+
     async def handle(self, inner_env):
         logger.info(f'Handling work for {inner_env.message_id} as {inner_env.directive}')
         namespace, action = inner_env.directive.split(':', 1)
@@ -27,12 +29,12 @@ class WorkManager:
             serial += 1
             logger.debug(f'Response emitted for {inner_env.message_id}, serial {serial}')
             enveloped_response = envelope.InnerEnvelope.make_response(
+                receptor=self.receptor,
                 recipient=inner_env.sender,
                 payload=response,
                 in_response_to=inner_env.message_id,
                 serial=serial
             )
-            await router.send(enveloped_response)
+            await self.receptor.router.send(enveloped_response)
 
 
-work_manager = WorkManager()

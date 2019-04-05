@@ -2,7 +2,6 @@ import datetime
 import logging
 
 from ..exceptions import UnknownDirective
-from .. import router
 from . import envelope
 
 logger = logging.getLogger(__name__)
@@ -17,7 +16,7 @@ class Directive:
 class Control:
     CONTROL_DIRECTIVES = ['ping']
 
-    async def __call__(self, inner_env):
+    async def __call__(self, router, inner_env):
         _, action = inner_env.directive.split(':', 1)
         if action not in self.CONTROL_DIRECTIVES:
             raise UnknownDirective(f'Unknown control directive: {action}')
@@ -27,6 +26,7 @@ class Control:
         async for response in responses:
             serial += 1
             enveloped_response = envelope.InnerEnvelope.make_response(
+                receptor=router.receptor,
                 recipient=inner_env.sender,
                 payload=response,
                 in_response_to=inner_env.message_id,

@@ -1,8 +1,9 @@
 import argparse
 import logging
 import logging.config
+from .config import ReceptorConfig
 from .events import mainloop
-import receptor
+from receptor import Receptor
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +58,10 @@ def main(args=None):
             },
         }
     )
-    receptor.config = receptor.ReceptorConfig(args.config, map_args_to_config(args))
-    logger.info("Node Id: {}".format(receptor.get_node_id()))
-    mainloop(receptor.config)
+    config = ReceptorConfig(args.config, map_args_to_config(args))
+    receptor = Receptor(config)
+    logger.info("Node Id: {}".format(receptor.node_id))
+    mainloop(receptor)
 
 
 main()

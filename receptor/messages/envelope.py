@@ -4,8 +4,6 @@ import json
 import logging
 import uuid
 
-import receptor
-
 logger = logging.getLogger(__name__)
 
 
@@ -18,8 +16,8 @@ class OuterEnvelope:
         self.inner = inner
         self.inner_obj = None
 
-    async def deserialize_inner(self):
-        self.inner_obj = await InnerEnvelope.deserialize(self.inner)
+    async def deserialize_inner(self, receptor):
+        self.inner_obj = await InnerEnvelope.deserialize(receptor, self.inner)
 
     @classmethod
     def from_raw(cls, raw):
@@ -37,9 +35,10 @@ class OuterEnvelope:
 
 
 class InnerEnvelope:
-    def __init__(self, message_id, sender, recipient, message_type, timestamp,
+    def __init__(self, receptor, message_id, sender, recipient, message_type, timestamp,
                  raw_payload, directive=None, in_response_to=None, ttl=None,
                  serial=1):
+        self.receptor = receptor
         self.message_id = message_id
         self.sender = sender
         self.recipient = recipient
@@ -52,21 +51,22 @@ class InnerEnvelope:
         self.serial = serial # serial index of responses
 
     @classmethod
-    async def deserialize(cls, msg):
+    async def deserialize(cls, receptor, msg):
         payload = await receptor.config.components.security_manager.verify_msg(msg)
         # validate msg
         # msg+sig
-        return cls(**json.loads(payload))
+        return cls(receptor=receptor, **json.loads(payload))
 
     @classmethod
-    def make_response(cls, recipient, payload, in_response_to, serial, ttl=None):
+    def make_response(cls, receptor, recipient, payload, in_response_to, serial, ttl=None):
         if isinstance(payload, bytes):
             encoded_payload = base64.encodebytes(payload)
         else:
             encoded_payload = payload
         return cls(
+            receptor=receptor,
             message_id=str(uuid.uuid4()),
-            sender=receptor.get_node_id(),
+            sender=receptor.node_id,
             recipient=recipient,
             message_type='response',
             timestamp=datetime.datetime.utcnow().isoformat(),
@@ -78,4 +78,4 @@ class InnerEnvelope:
         )
 
     def sign_and_serialize(self):
-        return receptor.config.components.security_manager.sign_response(self)
+        return self.receptor.config.components.security_manager.sign_response(self)

@@ -8,58 +8,10 @@ import random
 import uuid
 
 from dateutil import parser
-from receptor import get_node_id, config
 from .messages import envelope
 from .exceptions import UnrouteableError
 
 logger = logging.getLogger(__name__)
-
-response_callback_registry = {}
-
-
-async def forward(outer_envelope, next_hop):
-    """
-    Forward a message on to the next hop closer to its destination
-    """
-    buffer_mgr = config.components.buffer_manager
-    buffer_obj = buffer_mgr.get_buffer_for_node(next_hop)
-    outer_envelope.route_list.append(get_node_id())
-    logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
-    buffer_obj.push(outer_envelope)
-
-
-def next_hop(recipient):
-    """
-    Return the node ID of the next hop for routing a message to the
-    given recipient. If the current node is the recipient or there is
-    no path, then return None.
-    """
-    if recipient == get_node_id():
-        return None
-    path = router.find_shortest_path(recipient)
-    if path:
-        return path[-2]
-
-
-async def send(inner_envelope, callback=None):
-    """
-    Send a new message with the given outer envelope.
-    """
-    next_node_id = next_hop(inner_envelope.recipient)
-    if not next_node_id:
-        raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
-    signed = await inner_envelope.sign_and_serialize()
-    outer_envelope = envelope.OuterEnvelope(
-        frame_id=str(uuid.uuid4()),
-        sender=get_node_id(),
-        recipient=inner_envelope.recipient,
-        route_list=[get_node_id()],
-        inner=signed
-    )
-    logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
-    if callback and inner_envelope.message_type == 'directive':
-        response_callback_registry[inner_envelope.message_id] = callback
-    await forward(outer_envelope, next_node_id)
 
 
 async def log_ping(response):
@@ -75,14 +27,19 @@ async def log_ping(response):
 class MeshRouter:
     _nodes = set()
     _edges = set()
+    response_callback_registry = {}
+
+    def __init__(self, receptor):
+        self.receptor = receptor
+        self.node_id = receptor.node_id
 
     def node_is_known(self, node_id):
-        return node_id in self._nodes or node_id == get_node_id()
+        return node_id in self._nodes or node_id == self.node_id
     
     def register_edge(self, left, right, cost):
-        if left != get_node_id():
+        if left != self.node_id:
             self._nodes.add(left)
-        if right != get_node_id():
+        if right != self.node_id:
             self._nodes.add(right)
         self._edges.add((*sorted([left, right]), cost))
 
@@ -97,8 +54,9 @@ class MeshRouter:
         logger.info(f'Sending ping to node {node_id}')
         now = datetime.datetime.utcnow().isoformat()
         ping_envelope = envelope.InnerEnvelope(
+            receptor=self.receptor,
             message_id=str(uuid.uuid4()),
-            sender=get_node_id(),
+            sender=self.node_id,
             recipient=node_id,
             message_type='directive',
             timestamp=now,
@@ -106,7 +64,7 @@ class MeshRouter:
             directive='receptor:ping',
             ttl=15
         )
-        await send(ping_envelope, callback)
+        await self.send(ping_envelope, callback)
 
     def find_shortest_path(self, to_node_id):
         """Implementation of Dijkstra algorithm"""
@@ -115,7 +73,7 @@ class MeshRouter:
             cost_map[left].append((cost, right))
             cost_map[right].append((cost, left))
 
-        heap, seen, mins = [(0, get_node_id(), [])], set(), {get_node_id(): 0}
+        heap, seen, mins = [(0, self.node_id, [])], set(), {self.node_id: 0}
         while heap:
             (cost, vertex, path) = heapq.heappop(heap)
             if vertex not in seen:
@@ -135,5 +93,49 @@ class MeshRouter:
                         mins[next_vertex] = next_total_cost
                         heapq.heappush(heap, (next_total_cost, next_vertex, path))
 
+    async def forward(self, outer_envelope, next_hop):
+        """
+        Forward a message on to the next hop closer to its destination
+        """
+        buffer_mgr = self.receptor.config.components.buffer_manager
+        buffer_obj = buffer_mgr.get_buffer_for_node(next_hop)
+        outer_envelope.route_list.append(self.node_id)
+        logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
+        buffer_obj.push(outer_envelope)
 
-router = MeshRouter()
+
+    def next_hop(self, recipient):
+        """
+        Return the node ID of the next hop for routing a message to the
+        given recipient. If the current node is the recipient or there is
+        no path, then return None.
+        """
+        if recipient == self.node_id:
+            return None
+        path = self.find_shortest_path(recipient)
+        if path:
+            return path[-2]
+
+
+    async def send(self, inner_envelope, callback=None):
+        """
+        Send a new message with the given outer envelope.
+        """
+        next_node_id = self.next_hop(inner_envelope.recipient)
+        if not next_node_id:
+            raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
+        signed = await inner_envelope.sign_and_serialize()
+        outer_envelope = envelope.OuterEnvelope(
+            frame_id=str(uuid.uuid4()),
+            sender=self.node_id,
+            recipient=inner_envelope.recipient,
+            route_list=[self.node_id],
+            inner=signed
+        )
+        logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
+        if callback and inner_envelope.message_type == 'directive':
+            self.response_callback_registry[inner_envelope.message_id] = callback
+        await self.forward(outer_envelope, next_node_id)
+
+
+
