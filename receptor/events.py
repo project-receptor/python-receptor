@@ -18,7 +18,7 @@ def mainloop(receptor):
         loop.create_task(listener)
         logger.info("Serving on %s:%s", config.server.address, config.server.port)
     for peer in config.peers:
-        loop.create_task(create_peer(receptor, *peer.split(":", 1), loop))
+        loop.create_task(create_peer(receptor, loop, *peer.split(":", 1)))
     ping_time = (((int(loop.time()) + 1) // PING_INTERVAL) + 1) * PING_INTERVAL
     loop.call_at(ping_time, loop.create_task, send_pings_and_reschedule(receptor, loop, ping_time))
     try:

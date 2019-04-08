@@ -34,17 +34,6 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor = receptor
         self.loop = loop
 
-    async def create_peer(self, host, port):
-        while True:
-            try:
-                await self.loop.create_connection(
-                    lambda: BasicClientProtocol(self.receptor, self.loop), host, port)
-                break
-            except Exception:
-                logger.exception("Connection Refused: {}:{}".format(host, port))
-                await asyncio.sleep(5)
-
-
     async def watch_queue(self, node, transport):
         buffer_mgr = self.receptor.config.components.buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(node)
@@ -142,6 +131,17 @@ class BasicProtocol(BaseProtocol):
         self.send_handshake()
 
 
+async def create_peer(receptor, loop, host, port):
+    while True:
+        try:
+            await loop.create_connection(
+                lambda: BasicClientProtocol(receptor, loop), host, port)
+            break
+        except Exception:
+            logger.exception("Connection Refused: {}:{}".format(host, port))
+            await asyncio.sleep(5)
+
+
 class BasicClientProtocol(BaseProtocol):
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -152,7 +152,7 @@ class BasicClientProtocol(BaseProtocol):
     def connection_lost(self, exc):
         logger.info('Connection lost with the client...')
         info = self.transport.get_extra_info('peername')
-        self.loop.create_task(self.create_peer(info[0], info[1]))
+        self.loop.create_task(create_peer(self.receptor, self.loop, info[0], info[1]))
 
     def handshake(self, id_, edges):
         super().handshake(id_, edges)
