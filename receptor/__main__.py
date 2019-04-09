@@ -171,4 +171,6 @@ def main(args=None):
     args.func(args)
 
 
-main()
+if __name__ == '__main__':
+    # We were run with python -m
+    main()
