@@ -5,10 +5,8 @@ from .protocol import BasicProtocol, create_peer
 
 logger = logging.getLogger(__name__)
 
-PING_INTERVAL = 15
 
-
-def mainloop(receptor):
+def mainloop(receptor, ping_interval=None):
     loop = asyncio.get_event_loop()
     config = receptor.config
     if not config.server.server_disable:
@@ -19,8 +17,9 @@ def mainloop(receptor):
         logger.info("Serving on %s:%s", config.server.address, config.server.port)
     for peer in config.peers:
         loop.create_task(create_peer(receptor, loop, *peer.split(":", 1)))
-    ping_time = (((int(loop.time()) + 1) // PING_INTERVAL) + 1) * PING_INTERVAL
-    loop.call_at(ping_time, loop.create_task, send_pings_and_reschedule(receptor, loop, ping_time))
+    if ping_interval:
+        ping_time = (((int(loop.time()) + 1) // ping_interval) + 1) * ping_interval
+        loop.call_at(ping_time, loop.create_task, send_pings_and_reschedule(receptor, loop, ping_time, ping_interval))
     try:
         loop.run_forever()
     except KeyboardInterrupt:
@@ -29,10 +28,10 @@ def mainloop(receptor):
         loop.stop()
 
 
-async def send_pings_and_reschedule(receptor, loop, ping_time):
+async def send_pings_and_reschedule(receptor, loop, ping_time, ping_interval):
     logger.debug(f'Scheduling mesh ping.')
     for node_id in receptor.router.get_nodes():
         await receptor.router.ping_node(node_id)
-    loop.call_at(ping_time + PING_INTERVAL, 
+    loop.call_at(ping_time + ping_interval, 
                  loop.create_task, send_pings_and_reschedule(
-                     receptor, loop, ping_time + PING_INTERVAL))
+                     receptor, loop, ping_time + ping_interval, ping_interval))
