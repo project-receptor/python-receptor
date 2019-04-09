@@ -1,48 +1,16 @@
 import asyncio
 import logging
 import json
-from .handler import handle_msg
 from collections import deque
+
+from . import exceptions
+from .messages import envelope, directive
 
 logger = logging.getLogger(__name__)
 
 DELIM = b"\x1b[K"
 SIZEB = b"\x1b[%dD"
-
-
-async def create_peer(receptor, host, port, loop):
-    while True:
-        try:
-            await loop.create_connection(lambda: BasicClientProtocol(receptor, loop), host, port)
-            break
-        except Exception:
-            logger.exception("Connection Refused: {}:{}".format(host, port))
-            await asyncio.sleep(5)
-
-
-async def watch_queue(receptor, node, transport):
-    buffer_mgr = receptor.config.components.buffer_manager
-    buffer_obj = buffer_mgr.get_buffer_for_node(node)
-    while True:
-        if transport.is_closing():
-            break
-        try:
-            msg = buffer_obj.pop()
-            transport.write(msg.serialize().encode('utf8') + DELIM)
-        except IndexError:
-            logger.debug(f'Buffer for {node} is empty.')
-            await asyncio.sleep(1)
-        except Exception as e:
-            logger.exception("Error received trying to write to {}: {}".format(node, e))
-            buffer_obj.push(msg)
-            transport.close()
-            break
-
-
-def join_router(receptor, id_, edges):
-    receptor.router.register_edge(id_, receptor.node_id, 1)
-    for edge in json.loads(edges):
-        receptor.router.register_edge(*edge)
+RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 
 
 class DataBuffer:
@@ -66,6 +34,31 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor = receptor
         self.loop = loop
 
+    async def watch_queue(self, node, transport):
+        buffer_mgr = self.receptor.config.components.buffer_manager
+        buffer_obj = buffer_mgr.get_buffer_for_node(node)
+        while True:
+            if transport.is_closing():
+                break
+            try:
+                msg = buffer_obj.pop()
+                transport.write(msg.serialize().encode('utf8') + DELIM)
+            except IndexError:
+                logger.debug(f'Buffer for {node} is empty.')
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.exception("Error received trying to write to {}: {}".format(node, e))
+                buffer_obj.push(msg)
+                transport.close()
+                break
+
+
+    def join_router(self, id_, edges):
+        self.receptor.router.register_edge(id_, self.receptor.node_id, 1)
+        for edge in json.loads(edges):
+            self.receptor.router.register_edge(*edge)
+
+
     def connection_made(self, transport):
         self.peername = transport.get_extra_info('peername')
         self.transport = transport
@@ -81,7 +74,7 @@ class BaseProtocol(asyncio.Protocol):
                 self.handle_handshake(d)
             else:
                 logger.debug('Passing to task handler...')
-                self.loop.create_task(handle_msg(self.receptor, d))
+                self.loop.create_task(self.handle_msg(d))
 
     def handle_handshake(self, data):
         data = data.decode("utf-8")
@@ -90,11 +83,38 @@ class BaseProtocol(asyncio.Protocol):
             self.handshake(id_, edges)
         else:
             logger.error("Handshake failed!")
+    
+    async def handle_msg(self, msg):
+        outer_env = envelope.OuterEnvelope.from_raw(msg)
+        next_hop = self.receptor.router.next_hop(outer_env.recipient)
+        if next_hop is None:
+            await outer_env.deserialize_inner(self.receptor)
+            if outer_env.inner_obj.message_type == 'directive':
+                namespace, _ = outer_env.inner_obj.directive.split(':', 1)
+                if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
+                    await directive.control(self.receptor.router, outer_env.inner_obj)
+                else:
+                    # other namespace/work directives
+                    await self.receptor.work_manager.handle(outer_env.inner_obj)
+            elif outer_env.inner_obj.message_type == 'response':
+                in_response_to = outer_env.inner_obj.in_response_to
+                if in_response_to in self.receptor.router.response_callback_registry:
+                    logger.info(f'Handling response to {in_response_to} with callback.')
+                    callback = self.receptor.router.response_callback_registry[in_response_to]
+                    await callback(outer_env.inner_obj)
+                else:
+                    logger.warning(f'Received response to {in_response_to} but no callback registered!')
+            else:
+                raise exceptions.UnknownMessageType(
+                    f'Unknown message type: {outer_env.inner_obj.message_type}')
+        else:
+            await self.receptor.router.forward(outer_env, next_hop)
+
 
     def handshake(self, id_, edges):
         self.greeted = True
-        join_router(self.receptor, id_, edges)
-        self.loop.create_task(watch_queue(self.receptor, id_, self.transport))
+        self.join_router(id_, edges)
+        self.loop.create_task(self.watch_queue(id_, self.transport))
 
     def send_handshake(self):
         self.transport.write(f"HI:{self.receptor.node_id}:{self.receptor.router.get_edges()}".encode("utf-8") + DELIM)
@@ -111,6 +131,17 @@ class BasicProtocol(BaseProtocol):
         self.send_handshake()
 
 
+async def create_peer(receptor, loop, host, port):
+    while True:
+        try:
+            await loop.create_connection(
+                lambda: BasicClientProtocol(receptor, loop), host, port)
+            break
+        except Exception:
+            logger.exception("Connection Refused: {}:{}".format(host, port))
+            await asyncio.sleep(5)
+
+
 class BasicClientProtocol(BaseProtocol):
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -121,7 +152,7 @@ class BasicClientProtocol(BaseProtocol):
     def connection_lost(self, exc):
         logger.info('Connection lost with the client...')
         info = self.transport.get_extra_info('peername')
-        self.loop.create_task(create_peer(self.receptor, info[0], info[1], self.loop))
+        self.loop.create_task(create_peer(self.receptor, self.loop, info[0], info[1]))
 
     def handshake(self, id_, edges):
         super().handshake(id_, edges)
