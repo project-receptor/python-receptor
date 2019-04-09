@@ -132,7 +132,7 @@ def main(args=None):
         help='Directive to send'
     )
     subparser_send.add_argument(
-        '--destination',
+        '--recipient',
         help='Node ID of the Receptor node or controller to direct'
     )
     subparser_send.add_argument(
