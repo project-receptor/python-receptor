@@ -10,13 +10,13 @@ class InMemoryBufferManager(BaseBufferManager):
     _buffers = {}
 
     def get_buffer_for_node(self, node_id):
-        return self._buffers.setdefault(node_id, InMemoryBuffer(node_id))
+        return self._buffers.setdefault(node_id, InMemoryBuffer(self, node_id))
 
 
 # NOTE: This is not thread safe
 class InMemoryBuffer(BaseBuffer):
-    def __init__(self, node_id):
-        super().__init__(node_id)
+    def __init__(self, buffer_manager, node_id):
+        super().__init__(buffer_manager, node_id)
         self._buffer = collections.deque()
 
     def push(self, message):

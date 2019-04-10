@@ -52,7 +52,7 @@ class InnerEnvelope:
 
     @classmethod
     async def deserialize(cls, receptor, msg):
-        payload = await receptor.config.components.security_manager.verify_msg(msg)
+        payload = await receptor.security_manager.verify_msg(msg)
         # validate msg
         # msg+sig
         return cls(receptor=receptor, **json.loads(payload))
@@ -78,4 +78,4 @@ class InnerEnvelope:
         )
 
     def sign_and_serialize(self):
-        return self.receptor.config.components.security_manager.sign_response(self)
+        return self.receptor.security_manager.sign_response(self)

@@ -10,21 +10,20 @@ DEFAULT_CONFIG = dict(
     ),
     peers=dict(),
     components=dict(
+        router='receptor.router.MeshRouter',
+        work_manager='receptor.work.WorkManager',
         security_manager='receptor.security.MallCop',
         buffer_manager='receptor.buffers.memory.InMemoryBufferManager'
     ),
 )
 VALUELESS_SECTIONS = ['peers']
-SINGLETONS = {}
 
 
 def py_class(class_spec):
-    if class_spec not in SINGLETONS:
-        module_name, class_name = class_spec.rsplit('.', 1)
-        module_obj = importlib.import_module(module_name)
-        class_obj = getattr(module_obj, class_name)
-        SINGLETONS[class_spec] = class_obj()
-    return SINGLETONS[class_spec]
+    module_name, class_name = class_spec.rsplit('.', 1)
+    module_obj = importlib.import_module(module_name)
+    class_obj = getattr(module_obj, class_name)
+    return class_obj
 
 
 CAST_MAP = dict(
@@ -35,6 +34,8 @@ CAST_MAP = dict(
     ),
     peers=dict(),
     components=dict(
+        router=py_class,
+        work_manager=py_class,
         security_manager=py_class,
         buffer_manager=py_class
     )

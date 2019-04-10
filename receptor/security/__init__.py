@@ -1,9 +1,12 @@
 import json
 import logging
+
+from .base import BaseSecurityManager
+
 logger = logging.getLogger(__name__)
 
 
-class MallCop:
+class MallCop(BaseSecurityManager):
 
     async def verify_node(self, node):
         return True

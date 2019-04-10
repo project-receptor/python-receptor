@@ -35,7 +35,7 @@ class BaseProtocol(asyncio.Protocol):
         self.loop = loop
 
     async def watch_queue(self, node, transport):
-        buffer_mgr = self.receptor.config.components.buffer_manager
+        buffer_mgr = self.receptor.buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(node)
         while True:
             if transport.is_closing():

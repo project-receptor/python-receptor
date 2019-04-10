@@ -4,15 +4,14 @@ import asyncio
 import logging
 
 from .config import ReceptorConfig
-from .router import MeshRouter
-from .work import WorkManager
 
 logger = logging.getLogger(__name__)
 
 
 class Receptor:
     def __init__(self, config=None, node_id=None, router_cls=None, 
-                 work_manager_cls=None):
+                 work_manager_cls=None, buffer_manager_cls=None,
+                 security_manager_cls=None):
         self.config = config or ReceptorConfig()
         self.node_id = node_id or config.receptor.node_id or self._find_node_id()
         self.router = (router_cls or MeshRouter)(self)
