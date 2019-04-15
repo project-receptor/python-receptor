@@ -6,8 +6,7 @@ from .protocol import BasicProtocol, create_peer
 logger = logging.getLogger(__name__)
 
 
-def mainloop(receptor, ping_interval=None):
-    loop = asyncio.get_event_loop()
+def mainloop(receptor, ping_interval=None, loop=asyncio.get_event_loop()):
     config = receptor.config
     if not config.server.server_disable:
         listener = loop.create_server(
@@ -21,7 +20,7 @@ def mainloop(receptor, ping_interval=None):
         ping_time = (((int(loop.time()) + 1) // ping_interval) + 1) * ping_interval
         loop.call_at(ping_time, loop.create_task, send_pings_and_reschedule(receptor, loop, ping_time, ping_interval))
     try:
-        loop.run_forever()
+        loop.run_until_complete(receptor.shutdown_handler())
     except KeyboardInterrupt:
         pass
     finally:

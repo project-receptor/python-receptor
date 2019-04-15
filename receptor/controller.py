@@ -28,8 +28,7 @@ def send_directive(directive, recipient, payload, socket_path):
     sys.stdout.buffer.write(response + b"\n")
 
 
-def mainloop(receptor, address, port, socket_path):
-    loop = asyncio.get_event_loop()
+def mainloop(receptor, address, port, socket_path, loop=asyncio.get_event_loop()):
     listener = loop.create_server(
         lambda: protocol.BasicProtocol(receptor, loop),
         address, port)
