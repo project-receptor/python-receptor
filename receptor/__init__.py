@@ -9,6 +9,7 @@ from .work import WorkManager
 
 logger = logging.getLogger(__name__)
 
+
 class Receptor:
     def __init__(self, config=None, node_id=None, router_cls=None, 
                  work_manager_cls=None):

@@ -44,7 +44,6 @@ class BaseProtocol(asyncio.Protocol):
                 msg = buffer_obj.pop()
                 transport.write(msg.serialize().encode('utf8') + DELIM)
             except IndexError:
-                logger.debug(f'Buffer for {node} is empty.')
                 await asyncio.sleep(1)
             except Exception as e:
                 logger.exception("Error received trying to write to {}: {}".format(node, e))
