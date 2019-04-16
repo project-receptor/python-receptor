@@ -74,17 +74,29 @@ class BaseProtocol(asyncio.Protocol):
             if not self.greeted:
                 logger.debug('Looking for handshake...')
                 self.handle_handshake(d)
+            elif d[:5] == b'ROUTE':
+                logger.debug('Received Route Advertisement')
+                self.handle_route_advertisement(d)
             else:
                 logger.debug('Passing to task handler...')
                 self.loop.create_task(self.handle_msg(d))
 
     def handle_handshake(self, data):
         data = data.decode("utf-8")
-        cmd, id_, edges = data.split(":", 2)
+        cmd, id_, edges = data.split(";", 2)
         if cmd == "HI":
             self.handshake(id_, edges)
         else:
             logger.error("Handshake failed!")
+
+    def handle_route_advertisement(self, data):
+        data = data.decode("utf-8")
+        cmd, id_, edges, seen = data.split(";", 3)
+        edges_actual = json.loads(edges)
+        seen_actual = json.loads(seen)
+        for edge in edges_actual:
+            self.receptor.router.register_edge(*edge)
+        self.send_route_advertisement(edges, seen_actual)
     
     async def handle_msg(self, msg):
         outer_env = envelope.OuterEnvelope.from_raw(msg)
@@ -119,11 +131,17 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor.add_connection(id_, self)
         self.loop.create_task(self.watch_queue(id_, self.transport))
 
-    def broadcast_handshake(self, exclude=[]):
-        pass
+    def send_route_advertisement(self, edges, exclude=[]):
+        logger.debug("Emitting Route Advertisements, excluding {}".format(exclude))
+        destinations = list(filter(lambda x: x not in exclude, self.receptor.connections.keys()))
+        new_excludes = json.dumps(exclude + destinations + [self.receptor.node_id])
+        for target in destinations:
+            connection_list = self.receptor.connections[target]
+            if connection_list:
+                connection_list[0].transport.write(f"ROUTE;{self.receptor.node_id};{edges};{new_excludes}".encode("utf-8") + DELIM)
 
     def send_handshake(self):
-        self.transport.write(f"HI:{self.receptor.node_id}:{self.receptor.router.get_edges()}".encode("utf-8") + DELIM)
+        self.transport.write(f"HI;{self.receptor.node_id};{self.receptor.router.get_edges()}".encode("utf-8") + DELIM)
 
 
 class BasicProtocol(BaseProtocol):
@@ -135,6 +153,8 @@ class BasicProtocol(BaseProtocol):
         super().handshake(id_, edges)
         logger.debug("Received handshake from client with id %s, responding...", id_)
         self.send_handshake()
+        self.send_route_advertisement(self.receptor.router.get_edges(), exclude=[id_])
+
 
 
 async def create_peer(receptor, loop, host, port):
@@ -164,3 +184,4 @@ class BasicClientProtocol(BaseProtocol):
     def handshake(self, id_, edges):
         super().handshake(id_, edges)
         logger.debug("Received handshake from server with id %s", id_)
+        self.send_route_advertisement(self.receptor.router.get_edges(), exclude=[id_])
