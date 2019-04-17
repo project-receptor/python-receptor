@@ -42,6 +42,14 @@ class MeshRouter:
         if right != self.node_id:
             self._nodes.add(right)
         self._edges.add((*sorted([left, right]), cost))
+        logger.debug("Receptor Edges: {}".format(self._edges))
+        if self.receptor.config.server.debug:
+            fd = open("graph_{}.dot".format(self.receptor.node_id), "w")
+            fd.write("graph {")
+            for left, right, weight in self._edges:
+                fd.write("{} -- {};".format(left, right))
+            fd.write("}")
+            fd.close()
 
     def get_edges(self):
         """Returns serialized (as json) list of edges"""

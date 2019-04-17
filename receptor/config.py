@@ -6,6 +6,7 @@ DEFAULT_CONFIG = dict(
         port=8888,
         address='0.0.0.0',
         server_disable=False,
+        debug=False,
     ),
     peers=dict(),
     components=dict(
@@ -30,6 +31,7 @@ CAST_MAP = dict(
     server=dict(
         port=int,
         server_disable=lambda val: val == "True",
+        debug=lambda val: val == "True",
     ),
     peers=dict(),
     components=dict(
