@@ -153,7 +153,7 @@ class BasicProtocol(BaseProtocol):
         super().handshake(id_, edges)
         logger.debug("Received handshake from client with id %s, responding...", id_)
         self.send_handshake()
-        self.send_route_advertisement(self.receptor.router.get_edges(), exclude=[id_])
+        self.send_route_advertisement(self.receptor.router.get_edges())
 
 
 
@@ -184,4 +184,4 @@ class BasicClientProtocol(BaseProtocol):
     def handshake(self, id_, edges):
         super().handshake(id_, edges)
         logger.debug("Received handshake from server with id %s", id_)
-        self.send_route_advertisement(self.receptor.router.get_edges(), exclude=[id_])
+        self.send_route_advertisement(self.receptor.router.get_edges())
