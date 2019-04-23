@@ -24,7 +24,6 @@ class InMemoryBuffer(BaseBuffer):
         self._buffer.append(message)
     
     def pop(self):
-        logger.debug(f'Popping a message from {self.node_id} buffer.')
         return self._buffer.popleft()
     
     def flush(self):
