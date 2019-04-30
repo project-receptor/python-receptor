@@ -33,15 +33,7 @@ class MeshRouter:
         self.receptor = receptor
         self.node_id = receptor.node_id
 
-    def node_is_known(self, node_id):
-        return node_id in self._nodes or node_id == self.node_id
-    
-    def register_edge(self, left, right, cost):
-        if left != self.node_id:
-            self._nodes.add(left)
-        if right != self.node_id:
-            self._nodes.add(right)
-        self._edges.add((*sorted([left, right]), cost))
+    def debug_router(self):
         logger.debug("Receptor Edges: {}".format(self._edges))
         if self.receptor.config.server.debug:
             fd = open("graph_{}.dot".format(self.receptor.node_id), "w")
@@ -50,6 +42,40 @@ class MeshRouter:
                 fd.write("{} -- {};".format(left, right))
             fd.write("}")
             fd.close()
+
+    def node_is_known(self, node_id):
+        return node_id in self._nodes or node_id == self.node_id
+
+    def find_edge(self, left, right):
+        node_actual = sorted([left, right])
+        for edge in self._edges:
+            if node_actual[0] == edge[0] and node_actual[1] == edge[1]:
+                return edge
+        return None
+
+    def register_edge(self, left, right, cost):
+        if left != self.node_id:
+            self._nodes.add(left)
+        if right != self.node_id:
+            self._nodes.add(right)
+        edge = self.update_node(left, right, cost)
+        if not edge:
+            self._edges.add((*sorted([left, right]), cost))
+        self.debug_router()
+
+    def update_node(self, left,  right, cost):
+        edge = self.find_edge(left, right)
+        if edge:
+            edge[2] = cost
+            return edge
+        return None
+
+    def remove_node(self, node):
+        edge = self.find_edge(self.node_id, node)
+        if edge:
+            self._edges.delete(edge)
+            return edge
+        return None
 
     def get_edges(self):
         """Returns serialized (as json) list of edges"""
