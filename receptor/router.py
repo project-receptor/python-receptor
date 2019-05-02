@@ -66,14 +66,16 @@ class MeshRouter:
     def update_node(self, left,  right, cost):
         edge = self.find_edge(left, right)
         if edge:
-            edge[2] = cost
+            new_edge = (edge[0], edge[1], cost)
+            self._edges.remove(edge)
+            self._edges.add(new_edge)
             return edge
         return None
 
     def remove_node(self, node):
         edge = self.find_edge(self.node_id, node)
         if edge:
-            self._edges.delete(edge)
+            self._edges.remove(edge)
             return edge
         return None
 
