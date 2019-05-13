@@ -54,8 +54,9 @@ class BaseProtocol(asyncio.Protocol):
 
     def join_router(self, id_, edges):
         self.receptor.router.register_edge(id_, self.receptor.node_id, 1)
-        for edge in json.loads(edges):
-            self.receptor.router.register_edge(*edge)
+        # TODO: Verify this isn't needed with route advertisements
+        # for edge in json.loads(edges):
+        #     self.receptor.router.register_edge(*edge)
 
 
     def connection_made(self, transport):
@@ -95,7 +96,11 @@ class BaseProtocol(asyncio.Protocol):
         edges_actual = json.loads(edges)
         seen_actual = json.loads(seen)
         for edge in edges_actual:
-            self.receptor.router.register_edge(*edge)
+            existing_edge = self.receptor.router.find_edge(edge[0], edge[1])
+            if existing_edge and existing_edge[2] > edge[2]:
+                self.receptor.router.update_node(edge[0], edge[1], edge[2])
+            else:
+                self.receptor.router.register_edge(*edge)
         self.send_route_advertisement(edges, seen_actual)
     
     async def handle_msg(self, msg):
@@ -154,7 +159,6 @@ class BasicProtocol(BaseProtocol):
         logger.debug("Received handshake from client with id %s, responding...", id_)
         self.send_handshake()
         self.send_route_advertisement(self.receptor.router.get_edges())
-
 
 
 async def create_peer(receptor, loop, host, port):

@@ -36,13 +36,17 @@ class Receptor:
             self.connections[id_] = [protocol_obj]
 
     def remove_connection(self, protocol_obj):
+        notify_protocols = []
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
                 logger.info("Removing connection {} for node {}".format(protocol_obj, connection_node))
                 self.connections[connection_node].remove(protocol_obj)
                 self.router.update_node(self.node_id, connection_node, 100)
                 self.router.debug_router()
-                # TODO: Broadcast update, set timer for full expiration
+            notify_protocols += self.connections[connection_node]
+        # TODO: Broadcast update, set timer for full expiration
+        for active_protocol in notify_protocols:
+            active_protocol.send_route_advertisement(self.router.get_edges())
 
     async def shutdown_handler(self):
         while True:
