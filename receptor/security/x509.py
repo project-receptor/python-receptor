@@ -1,4 +1,6 @@
+import base64
 import datetime
+import json
 import logging
 import uuid
 
@@ -100,7 +102,13 @@ class CertificateSecurityManager(BaseSecurityManager):
         return True
 
     async def verify_msg(self, msg):
-        return msg
+        msg_obj = json.loads(msg)
+        signing_node = self.verify_signature(msg_obj['m'], msg_obj['s'], msg_obj['c'])
+        decoded_msg = json.loads(msg_obj['message'])
+        if decoded_msg['sender'] != signing_node:
+            raise SecurityError('Message signer was %s but sender was %s', 
+                                signing_node, decoded_msg['sender'])
+        return decoded_msg
 
     async def verify_directive(self, directive):
         return True
@@ -109,12 +117,16 @@ class CertificateSecurityManager(BaseSecurityManager):
         return True
     
     async def sign_response(self, inner_envelope):
-        return json.dumps(
+        message = json.dumps(
             {attr: getattr(inner_envelope, attr)
              for attr in ['message_id', 'sender', 'recipient', 'message_type',
                           'timestamp', 'raw_payload', 'directive',
                           'in_response_to', 'ttl', 'serial']}
-        )
+        ).encode('utf8')
+        signature = base64.encodebytes(self.generate_signature(message))
+        cert_pem = self.cert.public_bytes(encoding=serialization.Encoding.PEM)
+        return json.dumps(dict(m=message, s=signature, c=cert_pem))
+
 
     # x509 implementation
     # Largely inspired by https://github.com/openstack/cursive
@@ -227,8 +239,9 @@ class CertificateSecurityManager(BaseSecurityManager):
             )
         except cryptography_exceptions.InvalidSignature:
             raise SecurityError('Message signature verification failed!')
+        return self.get_node_id_from_cert(cert_obj)
     
-    def sign_message(self, message):
+    def generate_signature(self, message):
         return self.key.sign(
             message,
             padding.PSS(

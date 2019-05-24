@@ -55,7 +55,7 @@ class InnerEnvelope:
         payload = await receptor.security_manager.verify_msg(msg)
         # validate msg
         # msg+sig
-        return cls(receptor=receptor, **json.loads(payload))
+        return cls(receptor=receptor, **payload)
 
     @classmethod
     def make_response(cls, receptor, recipient, payload, in_response_to, serial, ttl=None):

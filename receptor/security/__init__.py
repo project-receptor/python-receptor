@@ -15,7 +15,7 @@ class MallCop(BaseSecurityManager):
         return True
 
     async def verify_msg(self, msg):
-        return msg
+        return json.loads(msg)
 
     async def verify_directive(self, directive):
         return True

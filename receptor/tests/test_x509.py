@@ -128,6 +128,6 @@ def test_basic_cert_sanity(ca, node):
 def test_message_signing(node):
     csm = x509.CertificateSecurityManager(node['receptor'])
     message = b'Project Receptor'
-    signature = csm.sign_message(message)
+    signature = csm.generate_signature(message)
     cert_as_pem = node['cert'].public_bytes(encoding=serialization.Encoding.PEM)
-    csm.verify_signature(message, signature, cert_as_pem)
+    assert csm.verify_signature(message, signature, cert_as_pem) == node['node_id']
