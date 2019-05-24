@@ -125,3 +125,9 @@ def test_basic_cert_sanity(ca, node):
     assert csm_key_bytes == node_key_bytes
 
 
+def test_message_signing(node):
+    csm = x509.CertificateSecurityManager(node['receptor'])
+    message = b'Project Receptor'
+    signature = csm.sign_message(message)
+    cert_as_pem = node['cert'].public_bytes(encoding=serialization.Encoding.PEM)
+    csm.verify_signature(message, signature, cert_as_pem)

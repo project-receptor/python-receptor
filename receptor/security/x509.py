@@ -4,7 +4,7 @@ import uuid
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import serialization, hashes
 from cryptography import x509
 from cryptography.x509.name import _NAMEOID_TO_NAME
 from cryptography import exceptions as cryptography_exceptions
@@ -207,6 +207,39 @@ class CertificateSecurityManager(BaseSecurityManager):
         except ValueError:
             raise SecurityError('Certificate subject is not a valid node identifier.')
         return str(node_id)
+    
+    def verify_signature(self, message, signature, cert_pem):
+        try:
+            cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        except ValueError:
+            raise SecurityError('Invalid certificate provided.')
+        self.verify_chain_of_trust(cert_obj)
+        public_key = cert_obj.public_key()
+        try:
+            public_key.verify(
+                signature,
+                message,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+        except cryptography_exceptions.InvalidSignature:
+            raise SecurityError('Message signature verification failed!')
+    
+    def sign_message(self, message):
+        return self.key.sign(
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+
+        
+
         
 
     
