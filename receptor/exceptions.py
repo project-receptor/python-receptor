@@ -24,3 +24,6 @@ class UnknownMessageType(ReceptorMessageError):
 
 class UnrouteableError(ReceptorMessageError):
     pass
+
+class SecurityError(ReceptorMessageError):
+    pass

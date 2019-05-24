@@ -10,9 +10,11 @@ pytest = "*"
 pytest-asyncio = "*"
 mock = "*"
 flake8 = "*"
+more-itertools = "*"
 
 [packages]
 python-dateutil = "*"
+cryptography = "*"
 
 [requires]
 python_version = "3.6"
