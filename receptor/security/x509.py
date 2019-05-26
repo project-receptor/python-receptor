@@ -251,7 +251,51 @@ class CertificateSecurityManager(BaseSecurityManager):
             hashes.SHA256()
         )
 
-        
+
+class CSRGenerator:
+    def __init__(self, receptor, controller=False):
+        self.receptor = receptor
+        self.controller = controller
+    
+    def generate_private_key(self, ofs):
+        private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=4096,
+            backend=default_backend()
+        )
+        ofs.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+        )
+        return private_key
+    
+    def generate_csr(self, key, ofs):
+        csr = x509.CertificateSigningRequestBuilder()
+        csr = csr.subject_name(
+            parse_dn(f'{self.receptor.config.x509.base_dn}/CN={self.receptor.node_id}')
+        )   
+        csr = csr.add_extension(
+            x509.BasicConstraints(ca=False, path_length=None), critical=True
+        )
+        csr = csr.add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=self.controller,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False
+            ), critical=True
+        )
+        csr = csr.sign(key, hashes.SHA256(), default_backend())
+        ofs.write(csr.public_bytes(serialization.Encoding.PEM))
+
 
         
 

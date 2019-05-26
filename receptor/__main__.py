@@ -2,9 +2,11 @@ import argparse
 import datetime
 import logging
 import logging.config
+import os
 from .config import ReceptorConfig, DEFAULT_CONFIG
 from . import node
 from . import controller
+from .security.x509 import CSRGenerator
 from receptor import Receptor
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,20 @@ def run_as_node(args):
     receptor = Receptor(config)
     logger.info("Running as Receptor node with ID: {}".format(receptor.node_id))
     node.mainloop(receptor, args.ping_interval)
+
+
+def run_as_csr(args):
+    config = ReceptorConfig(args.config, map_args_to_config(args))
+    receptor = Receptor(config)
+    csr_generator = CSRGenerator(receptor)
+    os.umask(0)
+    with open(os.open(args.key_output, os.O_CREAT | os.O_WRONLY, 0o600), 'wb') as ofs:
+        key = csr_generator.generate_private_key(ofs)
+        logger.info('Generated private key.')
+    with open(os.open(args.output, os.O_CREAT | os.O_WRONLY, 0o644), 'wb') as ofs:
+        csr_generator.generate_csr(key, ofs)
+        logger.info('Generated certificate signing request.')
+    logger.info('Key written to %s; CSR written to %s', args.key_output, args.output)        
 
 
 def main(args=None):
@@ -142,7 +158,20 @@ def main(args=None):
         help='Payload of the directive to send. Use - for stdin.'
     )
     subparser_send.set_defaults(func=run_as_send)
-   
+
+    subparser_csr = subparsers.add_parser(
+        'csr',
+        help='Generate a CSR for this node for your mesh\'s CA to sign' 
+    )
+    subparser_csr.add_argument(
+        '--output', required=True,
+        help='Write the CSR to the named file.'
+    )
+    subparser_csr.add_argument(
+        '--key-output', required=True,
+        help='Write the private key to the named file.'
+    )
+    subparser_csr.set_defaults(func=run_as_csr)
 
     args = parser.parse_args(args)
     
