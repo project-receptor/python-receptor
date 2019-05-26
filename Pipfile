@@ -11,6 +11,7 @@ pytest-asyncio = "*"
 mock = "*"
 flake8 = "*"
 more-itertools = "*"
+freezegun = "*"
 
 [packages]
 python-dateutil = "*"

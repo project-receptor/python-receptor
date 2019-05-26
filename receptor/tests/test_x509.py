@@ -7,9 +7,11 @@ from cryptography import x509 as c_x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from freezegun import freeze_time
 
 import receptor
 from receptor.config import ReceptorConfig
+from receptor.exceptions import ReceptorConfigError, SecurityError
 from receptor.security import x509
 
 
@@ -58,6 +60,27 @@ def ca():
     cert = cert_generator(distinguished_name, distinguished_name, 
                           public_key, private_key, True, True)
     return dict(node_id=node_id, cert=cert, key=private_key)
+
+@pytest.fixture
+def different_ca(tmp_path):
+    node_id = str(uuid.uuid4())
+    logger.info('CA node id: %s', node_id)
+    distinguished_name = x509.parse_dn(f'/O=receptor/OU=nodes/CN={node_id}')
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    public_key = private_key.public_key()
+    cert = cert_generator(distinguished_name, distinguished_name, 
+                          public_key, private_key, True, True)
+    ca_cert_path = tmp_path / 'alt_ca_cert.pem'
+    ca_cert_path.write_bytes(
+        cert.public_bytes(
+            encoding=serialization.Encoding.PEM
+        )
+    )
+    return dict(node_id=node_id, cert=cert, key=private_key, cert_path=ca_cert_path)
 
 
 @pytest.fixture
@@ -108,7 +131,7 @@ def node(ca, tmp_path):
                                            config=config))
 
 
-def test_basic_cert_sanity(ca, node):
+def test_happy_path_config(ca, node):
     csm = x509.CertificateSecurityManager(node['receptor'])
     assert csm.ca_certs == [ca['cert']]
     assert csm.cert == node['cert']
@@ -131,3 +154,79 @@ def test_message_signing(node):
     signature = csm.generate_signature(message)
     cert_as_pem = node['cert'].public_bytes(encoding=serialization.Encoding.PEM)
     assert csm.verify_signature(message, signature, cert_as_pem) == node['node_id']
+
+
+def test_cert_config_sanity_checks(ca, different_ca, node):
+    base_x509 = dict(
+        ca_cert_path=node['receptor'].config.x509.ca_cert_path,
+        cert_path=node['receptor'].config.x509.cert_path,
+        key_path=node['receptor'].config.x509.key_path
+    )
+
+    # Missing config for ca cert, cert, or key should throw config errors
+    for key_to_remove in ['ca_cert_path', 'cert_path', 'key_path']:
+        partial_x509 = base_x509.copy()
+        del partial_x509[key_to_remove]
+        config = ReceptorConfig(cmdline_args=dict(x509=partial_x509))
+        receptor_obj = receptor.Receptor(node_id=node['node_id'],
+                                         config=config)
+        with pytest.raises(ReceptorConfigError, match=r'.*defined in configuration.*'):
+            x509.CertificateSecurityManager(receptor_obj)
+    
+    # Bad path for ca cert, cert, or key should throw config errors
+    for key_to_alter in ['ca_cert_path', 'cert_path', 'key_path']:
+        altered_x509 = base_x509.copy()
+        altered_x509[key_to_alter] += 'x'
+        config = ReceptorConfig(cmdline_args=dict(x509=altered_x509))
+        receptor_obj = receptor.Receptor(node_id=node['node_id'],
+                                         config=config)
+        with pytest.raises(ReceptorConfigError, match=r'.*not found or not readable.*'):
+            x509.CertificateSecurityManager(receptor_obj)
+    
+    # Invalid ca cert, cert, or key should throw config errors
+    for key_to_alter in ['ca_cert_path', 'cert_path', 'key_path']:
+        altered_x509 = base_x509.copy()
+        with open(altered_x509[key_to_alter] + 'x', 'w') as ofs:
+            with open(altered_x509[key_to_alter]) as ifs:
+                ofs.write(ifs.read().replace('-', '='))
+        altered_x509[key_to_alter] += 'x'
+        config = ReceptorConfig(cmdline_args=dict(x509=altered_x509))
+        receptor_obj = receptor.Receptor(node_id=node['node_id'],
+                                         config=config)
+        with pytest.raises(ReceptorConfigError, match=r'Invalid.*'):
+            x509.CertificateSecurityManager(receptor_obj)
+    
+    # Configured ca_cert or cert out of validity should throw config errors
+    one_week_ago = datetime.datetime.utcnow() - datetime.timedelta(days=7)
+    one_week_later = datetime.datetime.utcnow() + datetime.timedelta(days=7)
+    with freeze_time(str(one_week_ago)):
+        with pytest.raises(ReceptorConfigError, match=r'.*valid date range.*'):
+            x509.CertificateSecurityManager(receptor_obj)
+    with freeze_time(str(one_week_later)):
+        with pytest.raises(ReceptorConfigError, match=r'.*valid date range.*'):
+            x509.CertificateSecurityManager(receptor_obj)
+    # ... unless ignore_cert_dates is set
+    altered_x509 = base_x509.copy()
+    altered_x509['ignore_cert_dates'] = True
+    config = ReceptorConfig(cmdline_args=dict(x509=altered_x509))
+    receptor_obj = receptor.Receptor(node_id=node['node_id'],
+                                     config=config)
+    _ = x509.CertificateSecurityManager(receptor_obj)
+
+    # TODO: Confirm configured CA cert is a signing cert
+
+    # Cert has to be signed by configured CA
+    altered_x509 = base_x509.copy()
+    altered_x509['ca_cert_path'] = different_ca['cert_path']
+    config = ReceptorConfig(cmdline_args=dict(x509=altered_x509))
+    receptor_obj = receptor.Receptor(node_id=node['node_id'],
+                                     config=config)
+    with pytest.raises(ReceptorConfigError, match=r'.*not signed by.*'):
+        x509.CertificateSecurityManager(receptor_obj)
+    
+    # Cert has to match configured node ID
+    node_id = str(uuid.uuid4())
+    receptor_obj = receptor.Receptor(node_id=node_id, config=node['receptor'].config)
+    with pytest.raises(ReceptorConfigError, match=r'.*does not match.*'):
+        x509.CertificateSecurityManager(receptor_obj)
+    
