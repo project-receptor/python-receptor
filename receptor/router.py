@@ -27,7 +27,7 @@ async def log_ping(response):
 class MeshRouter:
     _nodes = set()
     _edges = set()
-    response_callback_registry = {}
+    response_registry = dict()
 
     def __init__(self, receptor):
         self.receptor = receptor
@@ -153,7 +153,7 @@ class MeshRouter:
             return path[-2]
 
 
-    async def send(self, inner_envelope, callback=None):
+    async def send(self, inner_envelope, expected_response=False):
         """
         Send a new message with the given outer envelope.
         """
@@ -169,8 +169,8 @@ class MeshRouter:
             inner=signed
         )
         logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
-        if callback and inner_envelope.message_type == 'directive':
-            self.response_callback_registry[inner_envelope.message_id] = callback
+        if expected_response and inner_envelope.message_type == 'directive':
+            self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
         await self.forward(outer_envelope, next_node_id)
 
 

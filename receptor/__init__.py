@@ -18,6 +18,7 @@ class Receptor:
         self.router = (router_cls or MeshRouter)(self)
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
+        self.controller_connections = []
         self.stop = False
 
     def _find_node_id(self):

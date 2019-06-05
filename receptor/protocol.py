@@ -1,6 +1,8 @@
+import datetime
 import asyncio
 import logging
 import json
+import uuid
 from collections import deque
 
 from . import exceptions
@@ -117,12 +119,12 @@ class BaseProtocol(asyncio.Protocol):
                     await self.receptor.work_manager.handle(outer_env.inner_obj)
             elif outer_env.inner_obj.message_type == 'response':
                 in_response_to = outer_env.inner_obj.in_response_to
-                if in_response_to in self.receptor.router.response_callback_registry:
+                if in_response_to in self.receptor.router.response_registry:
                     logger.info(f'Handling response to {in_response_to} with callback.')
-                    callback = self.receptor.router.response_callback_registry[in_response_to]
-                    await callback(outer_env.inner_obj)
+                    for connection in self.receptor.controller_connections:
+                        connection.emit_response(outer_env.inner_obj)
                 else:
-                    logger.warning(f'Received response to {in_response_to} but no callback registered!')
+                    logger.warning(f'Received response to {in_response_to} but no record of sent message.')
             else:
                 raise exceptions.UnknownMessageType(
                     f'Unknown message type: {outer_env.inner_obj.message_type}')
@@ -189,3 +191,46 @@ class BasicClientProtocol(BaseProtocol):
         super().handshake(id_, edges)
         logger.debug("Received handshake from server with id %s", id_)
         self.send_route_advertisement(self.receptor.router.get_edges())
+
+
+class BasicControllerProtocol(asyncio.Protocol):
+
+    def __init__(self, receptor, loop):
+        self.receptor = receptor
+        self.loop = loop
+
+    def connection_made(self, transport):
+        self.transport = transport
+        if self not in self.receptor.controller_connections:
+            self.receptor.controller_connections.append(self)
+
+    def connection_lost(self, exc):
+        if self in self.receptor.controller_connections:
+            self.receptor.controller_connections.remove(self)
+
+    def emit_response(self, response):
+        self.transport.write(json.dumps(
+            dict(timestamp=response.timestamp,
+                 in_response_to=response.in_response_to,
+                 payload=response.raw_payload)
+        ).encode())
+
+    def data_received(self, data):
+        recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)
+        message_id = str(uuid.uuid4())
+        logger.info(f'{message_id}: Sending {directive} to {recipient}')
+        sent_timestamp = datetime.datetime.utcnow()
+        inner_env = envelope.InnerEnvelope(
+            receptor=self.receptor,
+            message_id=message_id,
+            sender=self.receptor.node_id,
+            recipient=recipient,
+            message_type='directive',
+            timestamp=sent_timestamp.isoformat(),
+            raw_payload=payload,
+            directive=directive
+        )
+        # TODO: Response expiration task?
+        # TODO: Persistent registry?
+        self.loop.create_task(self.receptor.router.send(inner_env,
+                                                        expected_response=True))
