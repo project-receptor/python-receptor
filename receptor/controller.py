@@ -17,12 +17,8 @@ def send_directive(directive, recipient, payload, socket_path):
     sock.sendall(f"{recipient}\n{directive}\n{payload}".encode('utf-8') + protocol.DELIM)
     response = b''
     while True:
-        part = sock.recv(4096)
-        response += part
-        if len(part) < 4096:
-            # either 0 or end of data
-            break
-    sys.stdout.buffer.write(response + b"\n")
+        response = sock.recv(4096)
+        sys.stdout.buffer.write(response + b"\n")
 
 
 def mainloop(receptor, address, port, socket_path, loop=asyncio.get_event_loop()):

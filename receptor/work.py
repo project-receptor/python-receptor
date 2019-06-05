@@ -14,7 +14,7 @@ class WorkManager:
         entry_points = [x for x in filter(lambda x: x.name == name,
                                           pkg_resources.iter_entry_points("receptor.worker"))]
         if not entry_points:
-            raise exceptions.UnknownDirective("Error loading directive handlers for {name}")
+            raise exceptions.UnknownDirective(f"Error loading directive handlers for {name}")
         return entry_points[0].load()
 
     async def handle(self, inner_env):
