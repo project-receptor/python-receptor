@@ -129,15 +129,22 @@ class MeshRouter:
                         mins[next_vertex] = next_total_cost
                         heapq.heappush(heap, (next_total_cost, next_vertex, path))
 
-    async def forward(self, outer_envelope, next_hop):
+    async def forward(self, outer_envelope, next_hop=None):
         """
         Forward a message on to the next hop closer to its destination
         """
+        if next_hop is None:
+            next_hop = self.next_hop(outer_envelope.recipient)
+
+        if not next_hop:
+            return False
+
         buffer_mgr = self.receptor.config.components.buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(next_hop)
         outer_envelope.route_list.append(self.node_id)
         logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
         buffer_obj.push(outer_envelope)
+        return True
 
 
     def next_hop(self, recipient):

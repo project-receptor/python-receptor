@@ -18,6 +18,7 @@ class OuterEnvelope:
 
     async def deserialize_inner(self, receptor):
         self.inner_obj = await InnerEnvelope.deserialize(receptor, self.inner)
+        return self.inner_obj
 
     @classmethod
     def from_raw(cls, raw):

@@ -105,26 +105,32 @@ class BaseProtocol(asyncio.Protocol):
                 self.receptor.router.register_edge(*edge)
         self.send_route_advertisement(edges, seen_actual)
     
+    async def _handle_directive(self, obj):
+        namespace, _ = obj.directive.split(':', 1)
+        if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
+            await directive.control(self.receptor.router, obj)
+        else:
+            # other namespace/work directives
+            await self.receptor.work_manager.handle(obj)
+
+    async def _handle_response(self, obj):
+        in_response_to = obj.in_response_to
+        if in_response_to in self.receptor.router.response_registry:
+            logger.info(f'Handling response to {in_response_to} with callback.')
+            for connection in self.receptor.controller_connections:
+                connection.emit_response(obj)
+        else:
+            logger.warning(f'Received response to {in_response_to} but no record of sent message.')
+
     async def handle_msg(self, msg):
         outer_env = envelope.OuterEnvelope.from_raw(msg)
         next_hop = self.receptor.router.next_hop(outer_env.recipient)
         if next_hop is None:
             await outer_env.deserialize_inner(self.receptor)
             if outer_env.inner_obj.message_type == 'directive':
-                namespace, _ = outer_env.inner_obj.directive.split(':', 1)
-                if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
-                    await directive.control(self.receptor.router, outer_env.inner_obj)
-                else:
-                    # other namespace/work directives
-                    await self.receptor.work_manager.handle(outer_env.inner_obj)
+                self._handle_directive(outer_env.inner_obj)
             elif outer_env.inner_obj.message_type == 'response':
-                in_response_to = outer_env.inner_obj.in_response_to
-                if in_response_to in self.receptor.router.response_registry:
-                    logger.info(f'Handling response to {in_response_to} with callback.')
-                    for connection in self.receptor.controller_connections:
-                        connection.emit_response(outer_env.inner_obj)
-                else:
-                    logger.warning(f'Received response to {in_response_to} but no record of sent message.')
+                self._handle_response(outer_env.inner_obj)
             else:
                 raise exceptions.UnknownMessageType(
                     f'Unknown message type: {outer_env.inner_obj.message_type}')
