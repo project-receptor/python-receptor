@@ -35,6 +35,20 @@ class OuterEnvelope:
         ))
 
 
+class Directive(object):
+    def __init__(self, namespace, action):
+        self.namespace = namespace
+        self.action = action
+
+    @classmethod
+    def from_str(cls, s):
+        namespace, action = s.split(":", 1)
+        return cls(namespace=namespace, action=action)
+
+    def __str__(self):
+        return f"{self.namespace}:{self.action}"
+
+
 class InnerEnvelope:
     def __init__(self, receptor, message_id, sender, recipient, message_type, timestamp,
                  raw_payload, directive=None, in_response_to=None, ttl=None,
@@ -46,10 +60,18 @@ class InnerEnvelope:
         self.message_type = message_type # 'directive' or 'response'
         self.timestamp = timestamp # ISO format
         self.raw_payload = raw_payload
-        self.directive = directive # None if response, 'namespace:action' if not
+        self._directive = directive # None if response, 'namespace:action' if not
         self.in_response_to = in_response_to # None if directive, a message_id if not
         self.ttl = ttl # Optional
         self.serial = serial # serial index of responses
+
+    @property
+    def directive(self):
+        return Directive.from_str(self._directive)
+
+    @directive.setter
+    def directive(self, s):
+        self._directive = s
 
     @classmethod
     async def deserialize(cls, receptor, msg):

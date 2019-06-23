@@ -82,7 +82,8 @@ class BaseProtocol(asyncio.Protocol):
                 self.handle_route_advertisement(d)
             else:
                 logger.debug('Passing to task handler...')
-                self.loop.create_task(self.handle_msg(d))
+                outer = envelope.OuterEnvelope.from_raw(d)
+                self.loop.create_task(self.handle_msg(outer))
 
     def handle_handshake(self, data):
         data = data.decode("utf-8")
@@ -106,21 +107,20 @@ class BaseProtocol(asyncio.Protocol):
         self.send_route_advertisement(edges, seen_actual)
     
     async def _handle_directive(self, obj):
-        namespace, _ = obj.directive.split(':', 1)
-        if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
+        if obj.directive.namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
             await directive.control(self.receptor.router, obj)
         else:
             # other namespace/work directives
             await self.receptor.work_manager.handle(obj)
 
     async def _handle_response(self, obj):
-        in_response_to = obj.in_response_to
-        if in_response_to in self.receptor.router.response_registry:
-            logger.info(f'Handling response to {in_response_to} with callback.')
-            for connection in self.receptor.controller_connections:
-                connection.emit_response(obj)
-        else:
-            logger.warning(f'Received response to {in_response_to} but no record of sent message.')
+        if obj.in_response_to not in self.receptor.router.response_registry:
+            logger.warning(f'Received response to {obj.in_response_to} but no record of sent message.')
+            return
+
+        logger.info(f'Handling response to {obj.in_response_to} with callback.')
+        for connection in self.receptor.controller_connections:
+            connection.emit_response(obj)
 
     handlers = {
         "directive": _handle_directive,
@@ -128,14 +128,17 @@ class BaseProtocol(asyncio.Protocol):
     }
 
     async def handle_msg(self, msg):
-        outer_env = envelope.OuterEnvelope.from_raw(msg)
-        if not self.receptor.router.forward(outer_env):
-            obj = await outer_env.deserialize_inner(self.receptor)
-            try:
-                self.handlers[obj.message_type](obj)
-            except KeyError:
-                raise exceptions.UnknownMessageType(
-                    f'Unknown message type: {obj.message_type}')
+        if await self.receptor.router.forward(msg):
+            return
+
+        obj = await msg.deserialize_inner(self.receptor)
+        try:
+            await self.handlers[obj.message_type](obj)
+        except KeyError:
+            # TODO: Nothing is going to catch this right now
+            #       Should we respond to the caller with the error?
+            raise exceptions.UnknownMessageType(
+                f'Unknown message type: {obj.message_type}')
 
 
     def handshake(self, id_, edges):
