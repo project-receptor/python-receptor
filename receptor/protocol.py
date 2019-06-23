@@ -122,20 +122,20 @@ class BaseProtocol(asyncio.Protocol):
         else:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
 
+    handlers = {
+        "directive": _handle_directive,
+        "response": _handle_response,
+    }
+
     async def handle_msg(self, msg):
         outer_env = envelope.OuterEnvelope.from_raw(msg)
-        next_hop = self.receptor.router.next_hop(outer_env.recipient)
-        if next_hop is None:
-            await outer_env.deserialize_inner(self.receptor)
-            if outer_env.inner_obj.message_type == 'directive':
-                self._handle_directive(outer_env.inner_obj)
-            elif outer_env.inner_obj.message_type == 'response':
-                self._handle_response(outer_env.inner_obj)
-            else:
+        if not self.receptor.router.forward(outer_env):
+            obj = await outer_env.deserialize_inner(self.receptor)
+            try:
+                self.handlers[obj.message_type](obj)
+            except KeyError:
                 raise exceptions.UnknownMessageType(
-                    f'Unknown message type: {outer_env.inner_obj.message_type}')
-        else:
-            await self.receptor.router.forward(outer_env, next_hop)
+                    f'Unknown message type: {obj.message_type}')
 
 
     def handshake(self, id_, edges):
