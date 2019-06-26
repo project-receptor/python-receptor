@@ -136,7 +136,7 @@ class MeshRouter:
         buffer_obj = buffer_mgr.get_buffer_for_node(next_hop)
         outer_envelope.route_list.append(self.node_id)
         logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
-        buffer_obj.push(outer_envelope)
+        buffer_obj.push(outer_envelope.serialize().encode("utf-8"))
 
 
     def next_hop(self, recipient):
