@@ -48,8 +48,9 @@ class Connection:
         logger.debug("Emitting Route Advertisements, excluding {}".format(seen))
         destinations = set(self.receptor.connections) - seen
         seens = list(seen | destinations | {self.receptor.node_id})
+
+        # TODO: This should be a broadcast call to the connection manager
         for target in destinations:
-            # TODO: This should be a broadcast call to the connection manager
             buf = self.buffer_mgr.get_buffer_for_node(target)
             buf.push(json.dumps({
                 "cmd": "ROUTE",
@@ -58,7 +59,7 @@ class Connection:
                 "seen": seens
             }).encode("utf-8"))
 
-    async def handle_msg(self, msg):
+    async def handle_message(self, msg):
         outer_env = envelope.OuterEnvelope.from_raw(msg)
         next_hop = self.receptor.router.next_hop(outer_env.recipient)
         if next_hop is None:
