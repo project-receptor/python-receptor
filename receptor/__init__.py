@@ -28,10 +28,10 @@ class Connection:
     async def handle_loop(self, buf):
         while True:
             for data in buf.get():
-                if data["cmd"] == "ROUTE":
+                if "cmd" in data and data["cmd"] == "ROUTE":
                     self.handle_route_advertisement(data)
                 else:
-                    self.handle_message(data)
+                    await self.handle_message(data)
             await asyncio.sleep(.1)
 
     def handle_route_advertisement(self, data):
@@ -61,7 +61,7 @@ class Connection:
             }).encode("utf-8"))
 
     async def handle_message(self, msg):
-        outer_env = envelope.OuterEnvelope.from_raw(msg)
+        outer_env = envelope.OuterEnvelope(**msg)
         next_hop = self.receptor.router.next_hop(outer_env.recipient)
         if next_hop is None:
             await outer_env.deserialize_inner(self.receptor)
