@@ -21,8 +21,7 @@ class DataBuffer:
     def add(self, data):
         self._buf = self._buf + data
         *ready, self._buf = self._buf.rsplit(DELIM)
-        for chunk in ready:
-            self.q.append(chunk)
+        self.q.extend(ready)
 
     def get(self):
         while self.q:

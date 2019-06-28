@@ -3,7 +3,6 @@ import uuid
 import asyncio
 import logging
 import json
-from collections import deque
 
 from .config import ReceptorConfig
 from .router import MeshRouter
@@ -20,9 +19,11 @@ class Connection:
     def __init__(self, id_, protocol_obj, buffer_mgr, receptor):
         self.id_ = id_
         self.protocol_obj = protocol_obj
-        self.write_buf = deque()
         self.buffer_mgr = buffer_mgr
         self.receptor = receptor
+
+    def __str__(self):
+        return f"<Connection {self.id_} {self.protocol_obj}>"
 
     async def handle_loop(self, buf):
         while True:
@@ -110,9 +111,9 @@ class Receptor:
     def update_connections(self, connection):
         self.router.register_edge(connection.id_, self.node_id, 1)
         if connection.id_ in self.connections:
-            self.connections[connection.id_].append(connection.protocol_obj)
+            self.connections[connection.id_].append(connection)
         else:
-            self.connections[connection.id_] = [connection.protocol_obj]
+            self.connections[connection.id_] = [connection]
 
     def add_connection(self, id_, protocol_obj):
         buffer_mgr = self.config.components.buffer_manager
@@ -120,12 +121,12 @@ class Receptor:
         self.update_connections(conn)
         return conn
 
-    def remove_connection(self, protocol_obj):
+    def remove_connection(self, conn):
         notify_protocols = []
         for connection_node in self.connections:
-            if protocol_obj in self.connections[connection_node]:
-                logger.info("Removing connection {} for node {}".format(protocol_obj, connection_node))
-                self.connections[connection_node].remove(protocol_obj)
+            if conn in self.connections[connection_node]:
+                logger.info("Removing connection {} for node {}".format(conn, connection_node))
+                self.connections[connection_node].remove(conn)
                 self.router.update_node(self.node_id, connection_node, 100)
                 self.router.debug_router()
             notify_protocols += self.connections[connection_node]
