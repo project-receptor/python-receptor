@@ -167,7 +167,7 @@ async def create_peer(receptor, loop, host, port):
     while True:
         try:
             await loop.create_connection(
-                lambda: BasicClientProtocol(receptor, loop), host, port)
+                lambda: BasicClientProtocol(receptor, loop), host, port, ssl=receptor.config.get_client_ssl_context())
             break
         except Exception:
             logger.exception("Connection Refused: {}:{}".format(host, port))

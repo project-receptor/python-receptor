@@ -1,5 +1,9 @@
 import importlib
 import configparser
+import ssl
+import logging
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG = dict(
     server=dict(
@@ -7,6 +11,8 @@ DEFAULT_CONFIG = dict(
         address='0.0.0.0',
         server_disable=False,
         debug=False,
+        ssl_certificate='',
+        ssl_key='',
     ),
     peers=dict(),
     components=dict(
@@ -64,6 +70,22 @@ class ReceptorConfig:
             self._parser.read([config_path])
         if cmdline_args:
             self._parser.read_dict(cmdline_args)
+
+    def get_client_ssl_context(self):
+        if self.server.ssl_certificate:
+            logger.debug("Loading SSL Client Context")
+            return ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self.server.ssl_certificate)
+        else:
+            return None
+
+    def get_server_ssl_context(self):
+        if self.server.ssl_certificate and self.server.ssl_key:
+            sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            sc.load_cert_chain(self.server.ssl_certificate, self.server.ssl_key)
+            logger.debug("Loading SSL Server Context")
+            return sc
+        else:
+            return None
     
     def __getattr__(self, key):
         if key in VALUELESS_SECTIONS:
