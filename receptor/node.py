@@ -11,7 +11,7 @@ def mainloop(receptor, ping_interval=None, loop=asyncio.get_event_loop(), skip_r
     if not config.server.server_disable:
         listener = loop.create_server(
             lambda: BasicProtocol(receptor, loop),
-            config.server.address, config.server.port)
+            config.server.address, config.server.port, ssl=config.get_server_ssl_context())
         loop.create_task(listener)
         logger.info("Serving on %s:%s", config.server.address, config.server.port)
     for peer in config.peers:

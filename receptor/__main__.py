@@ -20,6 +20,10 @@ def map_args_to_config(args):
         to_return.setdefault('server', {})['server_disable'] = args.server_disable
     if getattr(args, 'debug', None):
         to_return.setdefault('server', {})['debug'] = args.debug
+    if getattr(args, 'ssl_certificate', None):
+        to_return.setdefault('server', {})['ssl_certificate'] = args.ssl_certificate
+    if getattr(args, 'ssl_key', None):
+        to_return.setdefault('server', {})['ssl_key'] = args.ssl_key
     if getattr(args, 'peer', None):
         to_return['peers'] = {peer: '' for peer in args.peer}
     if getattr(args, 'node_id', None):
@@ -60,7 +64,14 @@ def main(args=None):
     parser.add_argument(
         "--debug", action="store_true", default=False,
         help='Emit debugging output')
-
+    parser.add_argument(
+        '--ssl_certificate',
+        help="Certificate Chain File"
+    )
+    parser.add_argument(
+        '--ssl_key',
+        help="Certificate Key File"
+    )
     subparsers = parser.add_subparsers(
         title='subcommands')
     

@@ -24,7 +24,7 @@ def send_directive(directive, recipient, payload, socket_path):
 def mainloop(receptor, address, port, socket_path, loop=asyncio.get_event_loop()):
     listener = loop.create_server(
         lambda: protocol.BasicProtocol(receptor, loop),
-        address, port)
+        address, port, ssl=receptor.config.get_server_ssl_context())
     logger.info("Serving on %s:%s", address, port)
     loop.create_task(listener)
     control_listener = loop.create_unix_server(
