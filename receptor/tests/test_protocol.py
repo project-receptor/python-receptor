@@ -2,8 +2,12 @@ import pytest
 from receptor import protocol
 
 
+def deser(x):
+    return x
+
+
 def test_databuffer():
-    b = protocol.DataBuffer()
+    b = protocol.DataBuffer(deserializer=deser)
     msg = b"this is a test"
     s = protocol.DELIM + msg + protocol.DELIM
     b.add(s)
@@ -13,7 +17,7 @@ def test_databuffer():
 
 
 def test_databuffer_no_delim():
-    b = protocol.DataBuffer()
+    b = protocol.DataBuffer(deserializer=deser)
     msg = b"this is a test"
     b.add(msg)
     with pytest.raises(StopIteration):
@@ -21,7 +25,7 @@ def test_databuffer_no_delim():
 
 
 def test_databuffer_many_msgs():
-    b = protocol.DataBuffer()
+    b = protocol.DataBuffer(deserializer=deser)
     msg = [b"first bit", b"second bit", b"third bit unfinished"]
     b.add(protocol.DELIM.join(msg))
     it = b.get()

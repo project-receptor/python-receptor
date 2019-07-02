@@ -1,7 +1,6 @@
 import logging
 
 import datetime
-import json
 from collections import defaultdict
 import heapq
 import random
@@ -63,7 +62,7 @@ class MeshRouter:
             self._edges.add((*sorted([left, right]), cost))
         self.debug_router()
 
-    def update_node(self, left,  right, cost):
+    def update_node(self, left, right, cost):
         edge = self.find_edge(left, right)
         if edge:
             new_edge = (edge[0], edge[1], cost)
@@ -80,8 +79,8 @@ class MeshRouter:
         return None
 
     def get_edges(self):
-        """Returns serialized (as json) list of edges"""
-        return json.dumps(list(self._edges))
+        """Returns set of edges"""
+        return list(self._edges)
     
     def get_nodes(self):
         return self._nodes
@@ -137,7 +136,7 @@ class MeshRouter:
         buffer_obj = buffer_mgr.get_buffer_for_node(next_hop)
         outer_envelope.route_list.append(self.node_id)
         logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
-        buffer_obj.push(outer_envelope)
+        buffer_obj.push(outer_envelope.serialize().encode("utf-8"))
 
 
     def next_hop(self, recipient):
