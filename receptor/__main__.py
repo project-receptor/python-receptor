@@ -59,7 +59,7 @@ def run_as_node(args):
 def main(args=None):
     parser = argparse.ArgumentParser("receptor")
     parser.add_argument(
-        "-c", "--config", default="./receptor.conf",
+        "-c", "--config", default="/etc/receptor/receptor.conf",
         help='Path to configuration file')
     parser.add_argument(
         "--debug", action="store_true", default=False,
@@ -104,7 +104,7 @@ def main(args=None):
         help='Run a Receptor controller'
     )
     subparser_controller.add_argument(
-        '--socket-path', default='./controller.sock',
+        '--socket-path', default='/var/run/receptor_controller.sock',
         help='Path to control socket'
     )
     subparser_controller.add_argument(
@@ -123,7 +123,7 @@ def main(args=None):
         help='Tell the local controller to ping a node'
     )
     subparser_ping.add_argument(
-        '--socket-path', default='./controller.sock',
+        '--socket-path', default='/var/run/receptor_controller.sock',
         help='Path to control socket'
     )
     subparser_ping.add_argument(
@@ -137,7 +137,7 @@ def main(args=None):
         help='Send a directive to a node'
     )
     subparser_send.add_argument(
-        '--socket-path', default='./controller.sock',
+        '--socket-path', default='/var/run/receptor_controller.sock',
         help='Path to control socket'
     )
     subparser_send.add_argument(
