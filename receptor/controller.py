@@ -19,13 +19,15 @@ def send_directive(directive, recipient, payload, socket_path):
     while True:
         response = sock.recv(4096)
         sys.stdout.buffer.write(response + b"\n")
+        sys.stdout.flush()
 
 
-def mainloop(receptor, address, port, socket_path, loop=asyncio.get_event_loop()):
+def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):
+    config = receptor.config
     listener = loop.create_server(
         lambda: protocol.BasicProtocol(receptor, loop),
-        address, port, ssl=receptor.config.get_server_ssl_context())
-    logger.info("Serving on %s:%s", address, port)
+        config.server.address, config.server.port)
+    logger.info("Serving on %s:%s", config.server.address, config.server.port)
     loop.create_task(listener)
     control_listener = loop.create_unix_server(
         lambda: protocol.BasicControllerProtocol(receptor, loop),

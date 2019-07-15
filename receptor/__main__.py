@@ -32,10 +32,10 @@ def map_args_to_config(args):
 
 
 def run_as_controller(args):
-    config = ReceptorConfig(cmdline_args=map_args_to_config(args))
+    config = ReceptorConfig(args.config, map_args_to_config(args))
     receptor = Receptor(config)
     logger.info(f'Starting up as node ID {receptor.node_id}')
-    controller.mainloop(receptor, args.listen_address, args.listen_port, args.socket_path)
+    controller.mainloop(receptor, args.socket_path)
 
 
 def run_as_ping(args):

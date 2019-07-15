@@ -1,0 +1,8 @@
+[Unit]
+Description=Receptor Relay Service
+
+[Service]
+ExecStart=/usr/local/bin/receptor node
+
+[Install]
+WantedBy=multi-user.target

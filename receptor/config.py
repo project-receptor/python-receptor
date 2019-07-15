@@ -14,6 +14,9 @@ DEFAULT_CONFIG = dict(
         ssl_certificate='',
         ssl_key='',
     ),
+    receptor=dict(
+        node_id=None,
+    ),
     peers=dict(),
     components=dict(
         security_manager='receptor.security.MallCop',
@@ -40,6 +43,7 @@ CAST_MAP = dict(
         debug=lambda val: val == "True",
     ),
     peers=dict(),
+    receptor=dict(),
     components=dict(
         security_manager=py_class,
         buffer_manager=py_class
