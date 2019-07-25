@@ -17,14 +17,27 @@ perform the work, typically because that work needs to be done closer to the
 target of the work which might not be directly accessible to the systems
 producing the work.
 
+There are 3 major components to a Receptor network, any node can act as one of
+these components
+
+* Controller: Accepts work from an external system in order to be delivered to
+  the Receptor network
+* Router: Routes work between nodes. It starts a server in order for nodes to
+  connect directly to it, it also makes direct connection to peers. These
+  connections work the same and messages can be passed over them in any
+  direction to other nodes as needed.
+* Worker: Uses plugins that match the message type, the payload is delivered to
+  the execution plugin and any output is delivered back into the Receptor
+  network.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-    intro
-    install
-    interface
-    plugins
+   intro
+   install
+   interface
+   plugins
 
 
 Indices and tables

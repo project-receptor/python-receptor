@@ -14,7 +14,9 @@
 #
 # import os
 # import sys
+# sys.path.insert(0, os.path.abspath('../'))
 # sys.path.insert(0, os.path.abspath('.'))
+# sys.path.insert(0, os.path.abspath('./'))
 
 
 # -- Project information -----------------------------------------------------
@@ -26,7 +28,7 @@ author = u'Matthew Jones, Jesse Jaggars, Joshua Ginsberg'
 # The short X.Y version
 version = u''
 # The full version, including alpha/beta/rc tags
-release = u''
+release = u'0.1.0'
 
 
 # -- General configuration ---------------------------------------------------
@@ -42,6 +44,9 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
+    'sphinx.ext.doctest',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.viewcode',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
