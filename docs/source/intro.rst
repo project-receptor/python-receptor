@@ -33,10 +33,25 @@ isn't configured with one then one will be generated for it.
 Controllers
 -----------
 
-
+A **Receptor** Controller exposes an interface on a port that allows other
+services to communicate with the Receptor network in order to distribute work
+and receive replies.
 
 Routers
 -------
 
-Executors
+**Receptor** Routers manage connections between nodes. Almost all Receptor
+nodes are also routers that can participate in directing traffic to where
+it needs to go. Even leaf nodes that only have a single connection will
+broadcast their availability to perform work out to the larger mesh of
+receptors.
+
+Workers
 ---------
+
+**Receptor** Worker nodes are nodes that have been configured to perform work.
+These nodes have plugins installed alongside them that allow them to execute
+tasks and respond with status and results. These plugins, when installed,
+inform the Receptor network about the node's capabilities and any extra
+metadata that may aid the Receptor network in routing work to them. This
+information is automatically broadcast to the rest of the Receptor network.

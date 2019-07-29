@@ -18,7 +18,8 @@ target of the work which might not be directly accessible to the systems
 producing the work.
 
 There are 3 major components to a Receptor network, any node can act as one of
-these components
+these components. Each node can also act as more than one of these components.
+For instance, a node can act as both a Router and a Worker.
 
 * Controller: Accepts work from an external system in order to be delivered to
   the Receptor network
@@ -36,6 +37,7 @@ these components
 
    intro
    install
+   running
    interface
    plugins
 
