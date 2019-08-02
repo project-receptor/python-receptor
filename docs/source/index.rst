@@ -39,8 +39,6 @@ For instance, a node can act as both a Router and a Worker.
    install
    running
    interface
-   plugins
-
 
 Indices and tables
 ==================

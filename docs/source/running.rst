@@ -100,8 +100,8 @@ The **Receptor** Node is launched using the ``node`` subcommand::
 Other Launch Modes
 ------------------
 
-Command Line Configuration
---------------------------
-
-Disabling The Node Server
--------------------------
+* ``ping``: This sends a ping message to the target node and waits for a
+  response.
+* ``send``: Given the path to the **Controller** socket file this will send the
+  raw payload to a given node along with the plugin to execute it and wait for
+  the response.
