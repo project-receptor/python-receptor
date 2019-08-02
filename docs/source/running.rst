@@ -82,9 +82,23 @@ are responsible for connecting other systems to the network in order to
 distribute work. They do this by starting a local unix socket that other
 services can connect to in order to send that work and receive results.
 
+The **Receptor** Controller is launched using the ``controller`` subcommand::
+
+  $ receptor controller <optionalargs>
+
 
 Receptor Node Launch
 --------------------
+
+**Receptor** nodes participate in routing and/or execute work performed that
+has been routed to them.
+
+The **Receptor** Node is launched using the ``node`` subcommand::
+
+  $ receptor node <optionalargs>
+
+Other Launch Modes
+------------------
 
 Command Line Configuration
 --------------------------
