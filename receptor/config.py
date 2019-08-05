@@ -9,7 +9,7 @@ DEFAULT_CONFIG = dict(
     server=dict(
         port=8888,
         address='0.0.0.0',
-        server_disable=False,
+        server_enable=True,
         debug=False,
         ssl_certificate='',
         ssl_key='',
@@ -39,7 +39,7 @@ def py_class(class_spec):
 CAST_MAP = dict(
     server=dict(
         port=int,
-        server_disable=lambda val: val == "True",
+        server_enable=lambda val: val == "True",
         debug=lambda val: val == "True",
     ),
     peers=dict(),

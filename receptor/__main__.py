@@ -16,8 +16,8 @@ def map_args_to_config(args):
         to_return.setdefault('server', {})['address'] = args.listen_address
     if getattr(args, 'listen_port', None):
         to_return.setdefault('server', {})['port'] = args.listen_port
-    if getattr(args, 'server_disable', None):
-        to_return.setdefault('server', {})['server_disable'] = args.server_disable
+    if getattr(args, 'server_enable', None):
+        to_return.setdefault('server', {})['server_enable'] = args.server_enable
     if getattr(args, 'debug', None):
         to_return.setdefault('server', {})['debug'] = args.debug
     if getattr(args, 'ssl_certificate', None):

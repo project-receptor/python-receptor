@@ -19,7 +19,7 @@ Example Controller Configuration File::
   [server]
   port=8888             # Port to bind listening service to
   address=0.0.0.0       # Interface to bind listening service to
-  server_disable=False  # Should the listening service be disabled?
+  server_enable=True    # Should the listening service be enabled?
   debug=False           # Much verbose logging!
   ssl_certificate=/path # Path to the certificate chain
   ssl_key=/path         # Path to the ssl key
@@ -36,15 +36,16 @@ Example Controller Configuration File::
 ``port`` and ``address``
 -------------------------
 
- When ``server_disable`` is ``False`` and the server is enabled, the Receptor
+ When ``server_enable`` is ``True`` and the server is enabled, the Receptor
  node will accept connections from other nodes on this interface and port.
 
  
-``server_disable``
+``server_enable``
 ------------------
 
-This disables the incoming connection server entirely. Typically you would use
-this if you only intended this nodes to establish connections to other nodes.
+When set to **False** this disables the incoming connection server entirely.
+Typically you would use this if you only intended this nodes to establish
+connections to other peer nodes directly.
 
 ``debug``
 ---------
