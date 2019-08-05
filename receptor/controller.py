@@ -26,7 +26,7 @@ def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):
     config = receptor.config
     listener = loop.create_server(
         lambda: protocol.BasicProtocol(receptor, loop),
-        config.server.address, config.server.port)
+        config.server.address, config.server.port, ssl=config.get_server_ssl_context())
     logger.info("Serving on %s:%s", config.server.address, config.server.port)
     loop.create_task(listener)
     control_listener = loop.create_unix_server(
