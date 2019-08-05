@@ -1,0 +1,13 @@
+[server]
+port={{ server_port }}
+address={{ server_address }}
+server_enable={{ server_enable|bool }}
+debug={{ server_debug|bool }}
+
+[receptor]
+node_id={{ node_id }}
+
+[peers]
+{% for node in node_peers|default([]) %}
+{{ node }}
+{% endfor %}

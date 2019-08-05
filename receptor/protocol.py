@@ -148,11 +148,9 @@ class BasicControllerProtocol(asyncio.Protocol):
             self.receptor.controller_connections.remove(self)
 
     def emit_response(self, response):
-        self.transport.write(json.dumps(
-            dict(timestamp=response.timestamp,
-                 in_response_to=response.in_response_to,
-                 payload=response.raw_payload)
-        ).encode())
+        self.transport.write(json.dumps(dict(timestamp=response.timestamp,
+                                             in_response_to=response.in_response_to,
+                                             payload=response.raw_payload)).encode())
 
     def data_received(self, data):
         recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)

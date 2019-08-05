@@ -1,0 +1,19 @@
+controllers:
+  hosts:
+    1.2.3.4:
+      node_id: controller
+
+nodes:
+  hosts:
+    5.6.7.8:
+      node_id: hostA
+      node_peers:
+        - 1.2.3.4:8888
+    9.10.11.12:
+      node_id: hostB
+      node_peers:
+        - 5.6.7.8:8888
+    13.14.15.16:
+      node_id: hostC
+      node_peers:
+        - 9.10.11.12:8888

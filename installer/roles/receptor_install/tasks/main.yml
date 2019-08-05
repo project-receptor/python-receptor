@@ -1,0 +1,60 @@
+- name: Make sure Python 3 is installed
+  package:
+    name: python3
+    state: present
+
+- name: Install git if needed
+  package:
+    name: git
+    state: present
+  when: "'git' in receptor_version"
+
+- name: Install Receptor Package
+  pip:
+    name: "{{ receptor_version }}"
+    state: forcereinstall
+
+- name: Add receptor user
+  user:
+    name: "{{ receptor_user }}"
+
+- name: Ensure /etc/receptor exists
+  file:
+    path: /etc/receptor
+    state: directory
+    owner: "{{ receptor_user }}"
+    mode: 0640
+
+- name: Install Receptor Configuration File
+  template:
+    src: receptor_node.conf.j2
+    dest: /etc/receptor/receptor.conf
+    owner: "{{ receptor_user }}"
+    mode: 0640
+
+- name: Install systemd units
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: 0644
+  with_items:
+    - receptor_controller.service
+    - receptor_node.service
+
+- name: Reload systemd units
+  systemd:
+    daemon_reload: yes
+
+- name: Start and enable receptor controller if host is a controller
+  systemd:
+    name: receptor_controller
+    state: started
+    enabled: yes
+  when: "'controllers' in group_names"
+
+- name: Start and enable receptor node
+  systemd:
+    name: receptor_node
+    state: started
+    enabled: yes
+  when: "'controllers' not in group_names"

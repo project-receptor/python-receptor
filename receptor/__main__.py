@@ -16,8 +16,8 @@ def map_args_to_config(args):
         to_return.setdefault('server', {})['address'] = args.listen_address
     if getattr(args, 'listen_port', None):
         to_return.setdefault('server', {})['port'] = args.listen_port
-    if getattr(args, 'server_disable', None):
-        to_return.setdefault('server', {})['server_disable'] = args.server_disable
+    if getattr(args, 'server_enable', None):
+        to_return.setdefault('server', {})['server_enable'] = args.server_enable
     if getattr(args, 'debug', None):
         to_return.setdefault('server', {})['debug'] = args.debug
     if getattr(args, 'ssl_certificate', None):
@@ -32,10 +32,10 @@ def map_args_to_config(args):
 
 
 def run_as_controller(args):
-    config = ReceptorConfig(cmdline_args=map_args_to_config(args))
+    config = ReceptorConfig(args.config, map_args_to_config(args))
     receptor = Receptor(config)
     logger.info(f'Starting up as node ID {receptor.node_id}')
-    controller.mainloop(receptor, args.listen_address, args.listen_port, args.socket_path)
+    controller.mainloop(receptor, args.socket_path)
 
 
 def run_as_ping(args):
@@ -59,7 +59,7 @@ def run_as_node(args):
 def main(args=None):
     parser = argparse.ArgumentParser("receptor")
     parser.add_argument(
-        "-c", "--config", default="./receptor.conf",
+        "-c", "--config", default="/etc/receptor/receptor.conf",
         help='Path to configuration file')
     parser.add_argument(
         "--debug", action="store_true", default=False,
@@ -104,7 +104,7 @@ def main(args=None):
         help='Run a Receptor controller'
     )
     subparser_controller.add_argument(
-        '--socket-path', default='./controller.sock',
+        '--socket-path', default='/var/run/receptor_controller.sock',
         help='Path to control socket'
     )
     subparser_controller.add_argument(
@@ -123,7 +123,7 @@ def main(args=None):
         help='Tell the local controller to ping a node'
     )
     subparser_ping.add_argument(
-        '--socket-path', default='./controller.sock',
+        '--socket-path', default='/var/run/receptor_controller.sock',
         help='Path to control socket'
     )
     subparser_ping.add_argument(
@@ -137,7 +137,7 @@ def main(args=None):
         help='Send a directive to a node'
     )
     subparser_send.add_argument(
-        '--socket-path', default='./controller.sock',
+        '--socket-path', default='/var/run/receptor_controller.sock',
         help='Path to control socket'
     )
     subparser_send.add_argument(

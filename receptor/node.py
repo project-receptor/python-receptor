@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 def mainloop(receptor, ping_interval=None, loop=asyncio.get_event_loop(), skip_run=False):
     config = receptor.config
-    if not config.server.server_disable:
+    if config.server.server_enable:
         listener = loop.create_server(
             lambda: BasicProtocol(receptor, loop),
             config.server.address, config.server.port, ssl=config.get_server_ssl_context())
