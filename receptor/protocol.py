@@ -15,12 +15,12 @@ SIZEB = b"\x1b[%dD"
 class DataBuffer:
     def __init__(self, deserializer=json.loads):
         self.q = deque()
-        self._buf = b""
+        self.data_buffer = b""
         self.deserializer = deserializer
 
     def add(self, data):
-        self._buf = self._buf + data
-        *ready, self._buf = self._buf.rsplit(DELIM)
+        self.data_buffer = self.data_buffer + data
+        *ready, self.data_buffer = self.data_buffer.rsplit(DELIM)
         self.q.extend(ready)
 
     def get(self):
@@ -52,7 +52,7 @@ class BaseProtocol(asyncio.Protocol):
         self.peername = transport.get_extra_info('peername')
         self.transport = transport
         self.greeted = False
-        self._buf = DataBuffer()
+        self.incoming_buffer = DataBuffer()
         self.loop.create_task(self.consume())
 
     def connection_lost(self, exc):
@@ -60,27 +60,28 @@ class BaseProtocol(asyncio.Protocol):
 
     def data_received(self, data):
         logger.debug(data)
-        self._buf.add(data)
+        self.incoming_buffer.add(data)
 
     async def consume(self):
         while not self.greeted:
             logger.debug('Looking for handshake...')
-            for data in self._buf.get():
+            for data in self.incoming_buffer.get():
                 logger.debug(data)
                 if data["cmd"] == "HI":
                     self.handle_handshake(data)
                     break
                 else:
                     logger.error("Handshake failed!")
+                    # TODO: Trigger disconnection
             await asyncio.sleep(.1)
         logger.debug("handshake complete, starting normal handle loop")
-        self.loop.create_task(self.connection.handle_loop(self._buf))
+        self.loop.create_task(self.connection.handle_loop(self.incoming_buffer))
 
     def handle_handshake(self, data):
         self.greeted = True
         self.connection = self.receptor.add_connection(data["id"], self)
         self.loop.create_task(self.watch_queue(data["id"], self.transport))
-        self.loop.create_task(self.connection.handle_loop(self._buf))
+        self.loop.create_task(self.connection.handle_loop(self.incoming_buffer))
 
     def send_handshake(self):
         msg = json.dumps({
