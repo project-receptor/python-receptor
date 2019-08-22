@@ -46,7 +46,7 @@ class Connection:
 
         # TODO: This should be a broadcast call to the connection manager
         for target in destinations:
-            buf = self.buffer_mgr.get_buffer_for_node(target)
+            buf = self.buffer_mgr.get_buffer_for_node(target, self.receptor.config)
             buf.push(json.dumps({
                 "cmd": "ROUTE",
                 "id": self.receptor.node_id,

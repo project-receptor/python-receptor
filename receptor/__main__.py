@@ -3,9 +3,9 @@ import datetime
 import logging
 import logging.config
 from .config import ReceptorConfig, DEFAULT_CONFIG
+from .receptor import Receptor
 from . import node
 from . import controller
-from receptor import Receptor
 
 logger = logging.getLogger(__name__)
 
