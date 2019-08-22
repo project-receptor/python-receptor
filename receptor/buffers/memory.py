@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 class InMemoryBufferManager(BaseBufferManager):
     _buffers = {}
 
-    def get_buffer_for_node(self, node_id):
+    def get_buffer_for_node(self, node_id, config):
         return self._buffers.setdefault(node_id, InMemoryBuffer(node_id))
 
 
 # NOTE: This is not thread safe
 class InMemoryBuffer(BaseBuffer):
-    def __init__(self, node_id):
-        super().__init__(node_id)
+    def __init__(self, node_id, config):
+        super().__init__(node_id, config)
         self._buffer = collections.deque()
 
     def push(self, message):

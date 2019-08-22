@@ -13,6 +13,7 @@ DEFAULT_CONFIG = dict(
         debug=False,
         ssl_certificate='',
         ssl_key='',
+        data_dir='/var/lib/receptor'
     ),
     receptor=dict(
         node_id=None,
@@ -20,7 +21,7 @@ DEFAULT_CONFIG = dict(
     peers=dict(),
     components=dict(
         security_manager='receptor.security.MallCop',
-        buffer_manager='receptor.buffers.memory.InMemoryBufferManager'
+        buffer_manager='receptor.buffers.file.FileBufferManager'
     ),
 )
 VALUELESS_SECTIONS = ['peers']

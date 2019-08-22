@@ -53,7 +53,7 @@ class BaseProtocol(asyncio.Protocol):
         self.transport = transport
         self.greeted = False
         self.incoming_buffer = DataBuffer()
-        self.loop.create_task(self.consume())
+        self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
         self.receptor.remove_connection(self)
@@ -62,7 +62,7 @@ class BaseProtocol(asyncio.Protocol):
         logger.debug(data)
         self.incoming_buffer.add(data)
 
-    async def consume(self):
+    async def wait_greeting(self):
         while not self.greeted:
             logger.debug('Looking for handshake...')
             for data in self.incoming_buffer.get():
@@ -75,13 +75,13 @@ class BaseProtocol(asyncio.Protocol):
                     # TODO: Trigger disconnection
             await asyncio.sleep(.1)
         logger.debug("handshake complete, starting normal handle loop")
-        self.loop.create_task(self.connection.handle_loop(self.incoming_buffer))
+        self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
 
     def handle_handshake(self, data):
         self.greeted = True
         self.connection = self.receptor.add_connection(data["id"], self)
         self.loop.create_task(self.watch_queue(data["id"], self.transport))
-        self.loop.create_task(self.connection.handle_loop(self.incoming_buffer))
+        self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
         msg = json.dumps({

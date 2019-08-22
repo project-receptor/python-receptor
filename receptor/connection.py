@@ -19,7 +19,7 @@ class Connection:
     def __str__(self):
         return f"<Connection {self.id_} {self.protocol_obj}>"
 
-    async def handle_loop(self, buf):
+    async def message_handler(self, buf):
         while True:
             for data in buf.get():
                 if "cmd" in data and data["cmd"] == "ROUTE":
