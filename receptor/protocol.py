@@ -5,6 +5,7 @@ import json
 import uuid
 from collections import deque
 from .messages import envelope
+from .exceptions import ReceptorBufferError
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,12 @@ class BaseProtocol(asyncio.Protocol):
                 transport.write(msg + DELIM)
             except IndexError:
                 await asyncio.sleep(1)
+            except ReceptorBufferError as e:
+                logger.exception("Receptor Buffer Read Error: {}".format(e))
+                # TODO: We need to try to send this message along somewhere else
+                # and record the failure somewhere
+                transport.close()
+                return
             except Exception as e:
                 logger.exception("Error received trying to write to {}: {}".format(node, e))
                 buffer_obj.push(msg)

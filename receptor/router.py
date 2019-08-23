@@ -8,7 +8,7 @@ import uuid
 
 from dateutil import parser
 from .messages import envelope
-from .exceptions import UnrouteableError
+from .exceptions import UnrouteableError, ReceptorBufferError
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +136,13 @@ class MeshRouter:
         buffer_obj = buffer_mgr.get_buffer_for_node(next_hop, self.receptor.config)
         outer_envelope.route_list.append(self.node_id)
         logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
-        buffer_obj.push(outer_envelope.serialize().encode("utf-8"))
+        try:
+            buffer_obj.push(outer_envelope.serialize().encode("utf-8"))
+        except ReceptorBufferError as e:
+            logger.exception("Receptor Buffer Write Error forwarding message to {}: {}".format(next_hop, e))
+            # TODO: Possible to find another route? This might be a hard failure
+        except Exception as e:
+            logger.exception("Error trying to forward message to {}: {}".format(next_hop, e))
 
 
     def next_hop(self, recipient):

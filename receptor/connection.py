@@ -3,6 +3,7 @@ import logging
 import json
 from . import exceptions
 from .messages import envelope, directive
+from .exceptions import ReceptorBufferError
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +48,19 @@ class Connection:
         # TODO: This should be a broadcast call to the connection manager
         for target in destinations:
             buf = self.buffer_mgr.get_buffer_for_node(target, self.receptor.config)
-            buf.push(json.dumps({
-                "cmd": "ROUTE",
-                "id": self.receptor.node_id,
-                "edges": edges,
-                "seen": seens
-            }).encode("utf-8"))
+            try:
+                buf.push(json.dumps({
+                    "cmd": "ROUTE",
+                    "id": self.receptor.node_id,
+                    "edges": edges,
+                    "seen": seens
+                }).encode("utf-8"))
+            except ReceptorBufferError as e:
+                logger.exception("Receptor Buffer Write Error broadcasting routes and capabilities: {}".format(e))
+                # TODO: This might should be a hard shutdown event
+            except Exception as e:
+                logger.exception("Error trying to broadcast routes and capabilities: {}".format(e))
+                
 
     async def handle_message(self, msg):
         outer_env = envelope.OuterEnvelope(**msg)
