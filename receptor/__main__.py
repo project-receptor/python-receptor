@@ -3,9 +3,9 @@ import datetime
 import logging
 import logging.config
 from .config import ReceptorConfig, DEFAULT_CONFIG
+from .receptor import Receptor
 from . import node
 from . import controller
-from receptor import Receptor
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,8 @@ def map_args_to_config(args):
         to_return.setdefault('server', {})['ssl_certificate'] = args.ssl_certificate
     if getattr(args, 'ssl_key', None):
         to_return.setdefault('server', {})['ssl_key'] = args.ssl_key
+    if getattr(args, 'data_dir', None):
+        to_return.setdefault('server', {})['data_dir'] = args.data_dir
     if getattr(args, 'peer', None):
         to_return['peers'] = {peer: '' for peer in args.peer}
     if getattr(args, 'node_id', None):
@@ -68,6 +70,9 @@ def main(args=None):
         '--ssl_certificate',
         help="Certificate Chain File"
     )
+    parser.add_argument(
+        "-d", "--data_dir", default="/var/lib/receptor",
+        help='Path to the directory where Receptor stores its database and metadata')
     parser.add_argument(
         '--ssl_key',
         help="Certificate Key File"

@@ -5,6 +5,7 @@ import json
 import uuid
 from collections import deque
 from .messages import envelope
+from .exceptions import ReceptorBufferError
 
 logger = logging.getLogger(__name__)
 
@@ -15,12 +16,12 @@ SIZEB = b"\x1b[%dD"
 class DataBuffer:
     def __init__(self, deserializer=json.loads):
         self.q = deque()
-        self._buf = b""
+        self.data_buffer = b""
         self.deserializer = deserializer
 
     def add(self, data):
-        self._buf = self._buf + data
-        *ready, self._buf = self._buf.rsplit(DELIM)
+        self.data_buffer = self.data_buffer + data
+        *ready, self.data_buffer = self.data_buffer.rsplit(DELIM)
         self.q.extend(ready)
 
     def get(self):
@@ -35,13 +36,19 @@ class BaseProtocol(asyncio.Protocol):
 
     async def watch_queue(self, node, transport):
         buffer_mgr = self.receptor.config.components.buffer_manager
-        buffer_obj = buffer_mgr.get_buffer_for_node(node)
+        buffer_obj = buffer_mgr.get_buffer_for_node(node, self.receptor.config)
         while not transport.is_closing():
             try:
                 msg = buffer_obj.pop()
                 transport.write(msg + DELIM)
             except IndexError:
                 await asyncio.sleep(1)
+            except ReceptorBufferError as e:
+                logger.exception("Receptor Buffer Read Error: {}".format(e))
+                # TODO: We need to try to send this message along somewhere else
+                # and record the failure somewhere
+                transport.close()
+                return
             except Exception as e:
                 logger.exception("Error received trying to write to {}: {}".format(node, e))
                 buffer_obj.push(msg)
@@ -52,35 +59,36 @@ class BaseProtocol(asyncio.Protocol):
         self.peername = transport.get_extra_info('peername')
         self.transport = transport
         self.greeted = False
-        self._buf = DataBuffer()
-        self.loop.create_task(self.consume())
+        self.incoming_buffer = DataBuffer()
+        self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
         self.receptor.remove_connection(self)
 
     def data_received(self, data):
         logger.debug(data)
-        self._buf.add(data)
+        self.incoming_buffer.add(data)
 
-    async def consume(self):
+    async def wait_greeting(self):
         while not self.greeted:
             logger.debug('Looking for handshake...')
-            for data in self._buf.get():
+            for data in self.incoming_buffer.get():
                 logger.debug(data)
                 if data["cmd"] == "HI":
                     self.handle_handshake(data)
                     break
                 else:
                     logger.error("Handshake failed!")
+                    # TODO: Trigger disconnection
             await asyncio.sleep(.1)
         logger.debug("handshake complete, starting normal handle loop")
-        self.loop.create_task(self.connection.handle_loop(self._buf))
+        self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
 
     def handle_handshake(self, data):
         self.greeted = True
         self.connection = self.receptor.add_connection(data["id"], self)
         self.loop.create_task(self.watch_queue(data["id"], self.transport))
-        self.loop.create_task(self.connection.handle_loop(self._buf))
+        self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
         msg = json.dumps({

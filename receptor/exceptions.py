@@ -2,6 +2,10 @@ class ReceptorRuntimeError(RuntimeError):
     pass
 
 
+class ReceptorBufferError(ReceptorRuntimeError):
+    pass
+
+
 class ReceptorMessageError(ValueError):
     pass
 
