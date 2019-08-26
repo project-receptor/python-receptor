@@ -133,7 +133,7 @@ class MeshRouter:
         Forward a message on to the next hop closer to its destination
         """
         buffer_mgr = self.receptor.config.components.buffer_manager
-        buffer_obj = buffer_mgr.get_buffer_for_node(next_hop, self.receptor.config)
+        buffer_obj = buffer_mgr.get_buffer_for_node(next_hop, self.receptor)
         outer_envelope.route_list.append(self.node_id)
         logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
         try:

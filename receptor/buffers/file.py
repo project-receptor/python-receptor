@@ -5,7 +5,7 @@ import json
 import os
 
 from .base import BaseBufferManager, BaseBuffer
-from .exceptions import ReceptorBufferError
+from ..exceptions import ReceptorBufferError
 
 logger = logging.getLogger(__name__)
 
@@ -13,18 +13,18 @@ logger = logging.getLogger(__name__)
 class FileBufferManager(BaseBufferManager):
     _buffers = {}
 
-    def get_buffer_for_node(self, node_id, config):
-        return self._buffers.setdefault(node_id, FileBuffer(node_id, config))
+    def get_buffer_for_node(self, node_id, receptor):
+        return self._buffers.setdefault(node_id, FileBuffer(node_id, receptor))
 
 
 class FileBuffer(BaseBuffer):
 
-    def __init__(self, node_id, config):
-        super().__init__(node_id, config)
+    def __init__(self, node_id, receptor):
+        super().__init__(node_id, receptor)
         self.node_id = node_id
-        self.base_path = os.path.join(os.path.expanduser(self.config.server.data_dir))
-        self.message_path = os.path.join(self.base_path, "messages")
-        self.manifest_path = os.path.join(self.base_path, "manifest-{}".format(node_id))
+        self.base_path = os.path.join(os.path.expanduser(self.receptor.config.server.data_dir))
+        self.message_path = os.path.join(self.base_path, self.receptor.node_id, "messages")
+        self.manifest_path = os.path.join(self.base_path, self.receptor.node_id, "manifest-{}".format(node_id))
         if not os.path.exists(self.message_path):
             os.makedirs(self.message_path, mode=0o700)
 

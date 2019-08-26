@@ -36,13 +36,13 @@ class BaseProtocol(asyncio.Protocol):
 
     async def watch_queue(self, node, transport):
         buffer_mgr = self.receptor.config.components.buffer_manager
-        buffer_obj = buffer_mgr.get_buffer_for_node(node, self.receptor.config)
+        buffer_obj = buffer_mgr.get_buffer_for_node(node, self.receptor)
         while not transport.is_closing():
             try:
                 msg = buffer_obj.pop()
                 transport.write(msg + DELIM)
             except IndexError:
-                await asyncio.sleep(1)
+                await asyncio.sleep(0.1)
             except ReceptorBufferError as e:
                 logger.exception("Receptor Buffer Read Error: {}".format(e))
                 # TODO: We need to try to send this message along somewhere else
@@ -82,7 +82,7 @@ class BaseProtocol(asyncio.Protocol):
                     # TODO: Trigger disconnection
             await asyncio.sleep(.1)
         logger.debug("handshake complete, starting normal handle loop")
-        self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
+        self.loop.create_task(self.connection.message_handler(self.incoming_buffer)) # Duplicated?
 
     def handle_handshake(self, data):
         self.greeted = True
