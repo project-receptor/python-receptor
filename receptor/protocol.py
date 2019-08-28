@@ -34,6 +34,9 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor = receptor
         self.loop = loop
 
+    async def watch_message_expire(self):
+        pass
+
     async def watch_queue(self, node, transport):
         buffer_mgr = self.receptor.config.components.buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(node, self.receptor)

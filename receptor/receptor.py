@@ -1,5 +1,7 @@
 import os
+import json
 import uuid
+import time
 import asyncio
 import logging
 
@@ -20,6 +22,9 @@ class Receptor:
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
         self.controller_connections = []
+        self.connection_manifest_path = os.path.join(self.config.server.data_dir,
+                                                     self.node_id,
+                                                     "connection_manifest")
         self.stop = False
 
     def _find_node_id(self):
@@ -32,12 +37,40 @@ class Receptor:
                 ofs.write(f'\nRECEPTOR_NODE_ID={node_id}\n')
         return str(node_id)
 
+    def get_connection_manifest(self):
+        if not os.path.exists(self.connection_manifest_path):
+            return []
+        try:
+            fd = open(self.connection_manifest_path, "r")
+            manifest = json.load(fd)
+            return manifest
+        except Exception as e:
+            logger.warn("Failed to read connection manifest: {}".format(e))
+            return []
+
+    def update_connection_manifest(self, connection):
+        manifest = self.get_connection_manifest()
+        found = False
+        for node in manifest:
+            if node["id"] == connection.id_:
+                node["last"] = time.time()
+                found = True
+                break
+        if not found:
+            node.append(dict(id=connection.id_,
+                             last=time.time()))
+        fd = open(self.connection_manifest_path, "w")
+        json.dump(manifest, fd)
+        fd.close()
+                        
+
     def update_connections(self, connection):
         self.router.register_edge(connection.id_, self.node_id, 1)
         if connection.id_ in self.connections:
             self.connections[connection.id_].append(connection)
         else:
             self.connections[connection.id_] = [connection]
+        self.update_connection_manifest(connection)
 
     def add_connection(self, id_, protocol_obj):
         buffer_mgr = self.config.components.buffer_manager
@@ -47,6 +80,7 @@ class Receptor:
 
     def remove_connection(self, conn):
         notify_protocols = []
+        self.update_connection_manifest(conn)
         for connection_node in self.connections:
             if conn in self.connections[connection_node]:
                 logger.info("Removing connection {} for node {}".format(conn, connection_node))

@@ -3,6 +3,7 @@ import datetime
 import json
 import logging
 import uuid
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,7 @@ class OuterEnvelope:
 class InnerEnvelope:
     def __init__(self, receptor, message_id, sender, recipient, message_type, timestamp,
                  raw_payload, directive=None, in_response_to=None, ttl=None,
-                 serial=1):
+                 serial=1, expire_time_delta=300):
         self.receptor = receptor
         self.message_id = message_id
         self.sender = sender
@@ -48,6 +49,9 @@ class InnerEnvelope:
         self.directive = directive # None if response, 'namespace:action' if not
         self.in_response_to = in_response_to # None if directive, a message_id if not
         self.ttl = ttl # Optional
+        if not expire_time_delta:
+            self.expire_time = None
+        self.expire_time = time.time() + expire_time_delta
         self.serial = serial # serial index of responses
 
     @classmethod
