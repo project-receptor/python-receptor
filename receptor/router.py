@@ -34,7 +34,7 @@ class MeshRouter:
 
     def debug_router(self):
         logger.debug("Receptor Edges: {}".format(self._edges))
-        if self.receptor.config.server.debug:
+        if self.receptor.config.default_debug:
             fd = open("graph_{}.dot".format(self.receptor.node_id), "w")
             fd.write("graph {")
             for left, right, weight in self._edges:
@@ -132,7 +132,7 @@ class MeshRouter:
         """
         Forward a message on to the next hop closer to its destination
         """
-        buffer_mgr = self.receptor.config.components.buffer_manager
+        buffer_mgr = self.receptor.config.components_buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(next_hop, self.receptor)
         outer_envelope.route_list.append(self.node_id)
         logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')

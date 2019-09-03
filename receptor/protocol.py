@@ -41,7 +41,7 @@ class BaseProtocol(asyncio.Protocol):
         parts of Receptor (forwarded messages for example) for messages to send
         over the connection.
         '''
-        buffer_mgr = self.receptor.config.components.buffer_manager
+        buffer_mgr = self.receptor.config.components_buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(node, self.receptor)
         while not transport.is_closing():
             try:
@@ -125,7 +125,7 @@ async def create_peer(receptor, loop, host, port):
     while True:
         try:
             await loop.create_connection(
-                lambda: BasicClientProtocol(receptor, loop), host, port, ssl=receptor.config.get_client_ssl_context())
+                lambda: BasicClientProtocol(receptor, loop), host, port, ssl=receptor.config.get_client_tls_context())
             break
         except Exception:
             logger.exception("Connection Refused: {}:{}".format(host, port))

@@ -6,7 +6,6 @@ import asyncio
 import logging
 import copy
 
-from .config import ReceptorConfig
 from .router import MeshRouter
 from .work import WorkManager
 from .connection import Connection
@@ -15,10 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class Receptor:
-    def __init__(self, config=None, node_id=None, router_cls=None,
+    def __init__(self, config, node_id=None, router_cls=None,
                  work_manager_cls=None):
-        self.config = config or ReceptorConfig()
-        self.node_id = node_id or self.config.receptor.node_id or self._find_node_id()
+        self.config = config
+        self.node_id = node_id or self.config.node_id or self._find_node_id()
         self.router = (router_cls or MeshRouter)(self)
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
@@ -94,7 +93,7 @@ class Receptor:
         self.update_connection_manifest(connection.id_)
 
     def add_connection(self, id_, protocol_obj):
-        buffer_mgr = self.config.components.buffer_manager
+        buffer_mgr = self.config.components_buffer_manager
         conn = Connection(id_, protocol_obj, buffer_mgr, self)
         self.update_connections(conn)
         return conn
