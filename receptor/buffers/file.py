@@ -28,6 +28,18 @@ class FileBuffer(BaseBuffer):
         if not os.path.exists(self.message_path):
             os.makedirs(self.message_path, mode=0o700)
 
+    def __iter__(self):
+        self.current = 0
+        return self
+
+    def __next__(self):
+        manifest = self.read_manifest()
+        if len(manifest) <= self.current:
+            raise StopIteration
+        ident = manifest[self.current]
+        current_payload = self.read(ident)
+        self.current += 1
+        return ident, current_payload
 
     def new_message(self):
         ident = str(uuid.uuid4())
@@ -37,10 +49,11 @@ class FileBuffer(BaseBuffer):
             raise ReceptorBufferError("Failed to generate new message file for {}: {}".format(self.node_id, e))
         return (ident, handle)
 
-    def read_message(self, ident):
+    def read_message(self, ident, remove=True):
         try:
             message_data = open(os.path.join(self.message_path, ident), "rb").read()
-            os.remove(os.path.join(self.message_path, ident))
+            if remove:
+                os.remove(os.path.join(self.message_path, ident))
         except Exception as e:
             raise ReceptorBufferError("Failed to handle message data file for {} {}: {}".format(self.node_id, ident, e))
         return message_data
@@ -74,6 +87,14 @@ class FileBuffer(BaseBuffer):
             raise ReceptorBufferError("Failed to write message file for {} {}: {}".format(self.node_id, ident, e))
         manifest.append(ident)
         self.write_manifest(manifest)
+
+    def read(self, ident, remove=False):
+        manifest = self.read_manifest()
+        message = self.read_message(ident, remove=remove)
+        if remove:
+            manifest.remove(ident)
+            self.write_manifest(manifest)
+        return message
 
     def pop(self):
         manifest = self.read_manifest()

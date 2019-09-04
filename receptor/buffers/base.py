@@ -14,6 +14,12 @@ class BaseBuffer:
         self.node_id = node_id
         self.receptor = receptor
 
+    def __iter__(self):
+        raise NotImplementedError
+
+    def __next__(self):
+        raise NotImplementedError
+
     def push(self, message):
         raise NotImplementedError()
     

@@ -4,6 +4,7 @@ import uuid
 import time
 import asyncio
 import logging
+import copy
 
 from .config import ReceptorConfig
 from .router import MeshRouter
@@ -37,6 +38,26 @@ class Receptor:
                 ofs.write(f'\nRECEPTOR_NODE_ID={node_id}\n')
         return str(node_id)
 
+    async def watch_expire(self):
+        while True:
+            logger.info("Checking expirations")
+            current_manifest = self.get_connection_manifest()
+            for connection in current_manifest:
+                buffer = self.config.components.buffer_manager.get_buffer_for_node(connection["id"], self)
+                for ident, message in buffer:
+                    message_actual = json.loads(message)
+                    logger.info("Examining {}".format(message_data))
+                    if "expire_time" in message_data and message_data['expire_time'] < time.time():
+                        logger.info("Expiring message {}:{}".format(ident, connection["id"]))
+                        expired_message = buffer.read_message(ident, remove=True)
+                        # TODO: Do something with expired message
+                if connection["last"] + 86400 < time.time():
+                    logger.info("Expiring connection {}".format(connection["id"]))
+                    write_manifest = copy.copy(current_manifest)
+                    write_manifest.remove(connection)
+                    self.write_connection_manifest(write_manifest)
+            await asyncio.sleep(600)
+
     def get_connection_manifest(self):
         if not os.path.exists(self.connection_manifest_path):
             return []
@@ -48,29 +69,31 @@ class Receptor:
             logger.warn("Failed to read connection manifest: {}".format(e))
             return []
 
+    def write_connection_manifest(self, manifest):
+        fd = open(self.connection_manifest_path, "w")
+        json.dump(manifest, fd)
+        fd.close()
+
     def update_connection_manifest(self, connection):
         manifest = self.get_connection_manifest()
         found = False
         for node in manifest:
-            if node["id"] == connection.id_:
+            if node["id"] == connection:
                 node["last"] = time.time()
                 found = True
                 break
         if not found:
-            node.append(dict(id=connection.id_,
-                             last=time.time()))
-        fd = open(self.connection_manifest_path, "w")
-        json.dump(manifest, fd)
-        fd.close()
+            manifest.append(dict(id=connection.id_,
+                            last=time.time()))
+        self.write_connection_manifest(manifest)
                         
-
     def update_connections(self, connection):
         self.router.register_edge(connection.id_, self.node_id, 1)
         if connection.id_ in self.connections:
             self.connections[connection.id_].append(connection)
         else:
             self.connections[connection.id_] = [connection]
-        self.update_connection_manifest(connection)
+        self.update_connection_manifest(connection.id_)
 
     def add_connection(self, id_, protocol_obj):
         buffer_mgr = self.config.components.buffer_manager
@@ -78,13 +101,14 @@ class Receptor:
         self.update_connections(conn)
         return conn
 
-    def remove_connection(self, conn):
+    def remove_connection(self, protocol_obj):
         notify_protocols = []
-        self.update_connection_manifest(conn)
+        #self.update_connection_manifest(conn)
         for connection_node in self.connections:
-            if conn in self.connections[connection_node]:
-                logger.info("Removing connection {} for node {}".format(conn, connection_node))
-                self.connections[connection_node].remove(conn)
+            if protocol_obj in self.connections[connection_node]:
+                logger.info("Removing connection {} for node {}".format(protocol_obj, connection_node))
+                self.update_connection_manifest(connection_node)
+                self.connections[connection_node].remove(protocol_obj)
                 self.router.update_node(self.node_id, connection_node, 100)
                 self.router.debug_router()
             notify_protocols += self.connections[connection_node]
