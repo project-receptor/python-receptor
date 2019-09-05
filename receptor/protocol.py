@@ -35,6 +35,11 @@ class BaseProtocol(asyncio.Protocol):
         self.loop = loop
 
     async def watch_queue(self, node, transport):
+        '''
+        Watches the buffer for this connection for messages delivered from other
+        parts of Receptor (forwarded messages for example) for messages to send
+        over the connection.
+        '''
         buffer_mgr = self.receptor.config.components.buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(node, self.receptor)
         while not transport.is_closing():
@@ -63,13 +68,17 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
-        self.receptor.remove_connection(self)
+        self.receptor.remove_connection(self.connection)
 
     def data_received(self, data):
         logger.debug(data)
         self.incoming_buffer.add(data)
 
     async def wait_greeting(self):
+        '''
+        Initialized when the connection is established to handle the greeting
+        before transitioning to message processing.
+        '''
         while not self.greeted:
             logger.debug('Looking for handshake...')
             for data in self.incoming_buffer.get():
@@ -80,9 +89,10 @@ class BaseProtocol(asyncio.Protocol):
                 else:
                     logger.error("Handshake failed!")
                     # TODO: Trigger disconnection
+                    # otherwise we could get stuck here
             await asyncio.sleep(.1)
         logger.debug("handshake complete, starting normal handle loop")
-        self.loop.create_task(self.connection.message_handler(self.incoming_buffer)) # Duplicated?
+        self.loop.create_task(self.connection.message_handler(self.incoming_buffer)) # Duplicated (see handle_handshake)?
 
     def handle_handshake(self, data):
         self.greeted = True

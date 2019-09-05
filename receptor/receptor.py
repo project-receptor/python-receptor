@@ -40,14 +40,12 @@ class Receptor:
 
     async def watch_expire(self):
         while True:
-            logger.info("Checking expirations")
             current_manifest = self.get_connection_manifest()
             for connection in current_manifest:
                 buffer = self.config.components.buffer_manager.get_buffer_for_node(connection["id"], self)
                 for ident, message in buffer:
                     message_actual = json.loads(message)
-                    logger.info("Examining {}".format(message_data))
-                    if "expire_time" in message_data and message_data['expire_time'] < time.time():
+                    if "expire_time" in message_actual and message_actual['expire_time'] < time.time():
                         logger.info("Expiring message {}:{}".format(ident, connection["id"]))
                         expired_message = buffer.read_message(ident, remove=True)
                         # TODO: Do something with expired message
@@ -83,7 +81,7 @@ class Receptor:
                 found = True
                 break
         if not found:
-            manifest.append(dict(id=connection.id_,
+            manifest.append(dict(id=connection,
                             last=time.time()))
         self.write_connection_manifest(manifest)
                         
@@ -102,8 +100,7 @@ class Receptor:
         return conn
 
     def remove_connection(self, protocol_obj):
-        notify_protocols = []
-        #self.update_connection_manifest(conn)
+        notify_connections = []
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
                 logger.info("Removing connection {} for node {}".format(protocol_obj, connection_node))
@@ -111,10 +108,11 @@ class Receptor:
                 self.connections[connection_node].remove(protocol_obj)
                 self.router.update_node(self.node_id, connection_node, 100)
                 self.router.debug_router()
-            notify_protocols += self.connections[connection_node]
+                self.update_connection_manifest(connection_node)
+            notify_connections += self.connections[connection_node]
         # TODO: Broadcast update, set timer for full expiration
-        for active_protocol in notify_protocols:
-            active_protocol.send_route_advertisement(self.router.get_edges())
+        for active_connection in notify_connections:
+            active_connection.send_route_advertisement(self.router.get_edges())
 
     async def shutdown_handler(self):
         while True:
