@@ -37,8 +37,8 @@ class OuterEnvelope:
 
 class InnerEnvelope:
     def __init__(self, receptor, message_id, sender, recipient, message_type, timestamp,
-                 raw_payload, directive=None, in_response_to=None, ttl=None,
-                 serial=1, expire_time_delta=300):
+                 raw_payload, directive=None, in_response_to=None, ttl=None, serial=1,
+                 code=0, expire_time_delta=300):
         self.receptor = receptor
         self.message_id = message_id
         self.sender = sender
@@ -53,6 +53,7 @@ class InnerEnvelope:
             self.expire_time = None
         self.expire_time = time.time() + expire_time_delta
         self.serial = serial # serial index of responses
+        self.code = code # optional code indicating an error
 
     @classmethod
     async def deserialize(cls, receptor, msg):
@@ -62,7 +63,7 @@ class InnerEnvelope:
         return cls(receptor=receptor, **json.loads(payload))
 
     @classmethod
-    def make_response(cls, receptor, recipient, payload, in_response_to, serial, ttl=None):
+    def make_response(cls, receptor, recipient, payload, in_response_to, serial, ttl=None, code=0):
         if isinstance(payload, bytes):
             encoded_payload = base64.encodebytes(payload)
         else:
@@ -78,7 +79,8 @@ class InnerEnvelope:
             directive=None,
             in_response_to=in_response_to,
             ttl=ttl,
-            serial=serial
+            serial=serial,
+            code=code,
         )
 
     def sign_and_serialize(self):
