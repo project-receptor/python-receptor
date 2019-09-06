@@ -169,7 +169,8 @@ class BasicControllerProtocol(asyncio.Protocol):
     def emit_response(self, response):
         self.transport.write(json.dumps(dict(timestamp=response.timestamp,
                                              in_response_to=response.in_response_to,
-                                             payload=response.raw_payload)).encode())
+                                             payload=response.raw_payload,
+                                             code=response.code)).encode())
 
     def data_received(self, data):
         recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)
@@ -184,7 +185,7 @@ class BasicControllerProtocol(asyncio.Protocol):
             message_type='directive',
             timestamp=sent_timestamp.isoformat(),
             raw_payload=payload,
-            directive=directive
+            directive=directive,
         )
         # TODO: Persistent registry?
         self.loop.create_task(self.receptor.router.send(inner_env,
