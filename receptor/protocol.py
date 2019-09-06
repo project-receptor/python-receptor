@@ -1,6 +1,7 @@
 import datetime
 import asyncio
 import logging
+import time
 import json
 import uuid
 from collections import deque
@@ -88,8 +89,7 @@ class BaseProtocol(asyncio.Protocol):
                     break
                 else:
                     logger.error("Handshake failed!")
-                    # TODO: Trigger disconnection
-                    # otherwise we could get stuck here
+                    self.transport.close()
             await asyncio.sleep(.1)
         logger.debug("handshake complete, starting normal handle loop")
         self.loop.create_task(self.connection.message_handler(self.incoming_buffer)) # Duplicated (see handle_handshake)?
@@ -104,6 +104,7 @@ class BaseProtocol(asyncio.Protocol):
         msg = json.dumps({
             "cmd": "HI",
             "id": self.receptor.node_id,
+            "expire_time": time.time() + 10,
         }).encode("utf-8")
         self.transport.write(msg + DELIM)
 
@@ -185,7 +186,6 @@ class BasicControllerProtocol(asyncio.Protocol):
             raw_payload=payload,
             directive=directive
         )
-        # TODO: Response expiration task?
         # TODO: Persistent registry?
         self.loop.create_task(self.receptor.router.send(inner_env,
                                                         expected_response=True))

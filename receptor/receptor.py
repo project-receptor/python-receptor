@@ -46,8 +46,8 @@ class Receptor:
                 for ident, message in buffer:
                     message_actual = json.loads(message)
                     if "expire_time" in message_actual and message_actual['expire_time'] < time.time():
+                        buffer.read_message(ident, remove=True)
                         logger.info("Expiring message {}:{}".format(ident, connection["id"]))
-                        expired_message = buffer.read_message(ident, remove=True)
                         # TODO: Do something with expired message
                 if connection["last"] + 86400 < time.time():
                     logger.info("Expiring connection {}".format(connection["id"]))
@@ -110,7 +110,6 @@ class Receptor:
                 self.router.debug_router()
                 self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
-        # TODO: Broadcast update, set timer for full expiration
         for active_connection in notify_connections:
             active_connection.send_route_advertisement(self.router.get_edges())
 
