@@ -35,6 +35,7 @@ def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):
     )
     logger.info(f'Opening control socket on {socket_path}')
     loop.create_task(control_listener)
+    loop.create_task(receptor.watch_expire())
     try:
         loop.run_forever()
     except KeyboardInterrupt:
