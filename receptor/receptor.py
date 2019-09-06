@@ -17,12 +17,12 @@ class Receptor:
     def __init__(self, config, node_id=None, router_cls=None,
                  work_manager_cls=None):
         self.config = config
-        self.node_id = node_id or self.config.node_id or self._find_node_id()
+        self.node_id = node_id or self.config.default_node_id or self._find_node_id()
         self.router = (router_cls or MeshRouter)(self)
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
         self.controller_connections = []
-        self.connection_manifest_path = os.path.join(self.config.server.data_dir,
+        self.connection_manifest_path = os.path.join(self.config.default_data_dir,
                                                      self.node_id,
                                                      "connection_manifest")
         self.stop = False
@@ -41,7 +41,7 @@ class Receptor:
         while True:
             current_manifest = self.get_connection_manifest()
             for connection in current_manifest:
-                buffer = self.config.components.buffer_manager.get_buffer_for_node(connection["id"], self)
+                buffer = self.config.components_buffer_manager.get_buffer_for_node(connection["id"], self)
                 for ident, message in buffer:
                     message_actual = json.loads(message)
                     if "expire_time" in message_actual and message_actual['expire_time'] < time.time():

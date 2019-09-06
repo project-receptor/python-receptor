@@ -27,5 +27,5 @@ def run_as_send(config):
 
 def run_as_node(config):
     receptor = Receptor(config)
-    logger.info("Running as Receptor node with ID: {}".format(receptor.node_id))
+    logger.info(f'Running as Receptor node with ID: {receptor.node_id}')
     node.mainloop(receptor, config.node_ping_interval)

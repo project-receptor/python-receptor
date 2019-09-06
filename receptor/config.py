@@ -57,6 +57,14 @@ class ReceptorConfig:
         # Default options, which apply to all sub-commands.
         self.add_config_option(
             section='default',
+            key='node_id',
+            #long_option='--node-id',
+            default_value='',
+            value_type='str',
+            hint='Set/override node identifier. If unspecified here or in a config file, one will be automatically generated.',
+        )
+        self.add_config_option(
+            section='default',
             key='config',
             short_option='-c',
             default_value='/etc/receptor/receptor.conf',
@@ -111,14 +119,6 @@ class ReceptorConfig:
             default_value=8888,
             value_type='int',
             hint='Set/override TCP port to listen on. If not set here or in a config file, the default is 8888.',
-        )
-        self.add_config_option(
-            section='node',
-            key='id',
-            long_option='--node-id',
-            default_value='',
-            value_type='str',
-            hint='Set/override node identifier. If unspecified here or in a config file, one will be automatically generated.',
         )
         self.add_config_option(
             section='node',
