@@ -32,7 +32,7 @@ def main(args=None):
             'loggers': {
                 'receptor': {
                     'handlers': ['console'],
-                    'level': 'DEBUG' if config.default_debug else 'INFO',
+                    'level': 'DEBUG' if config.default_debug else 'WARN',
                 },
             },
         }

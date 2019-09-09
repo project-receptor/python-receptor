@@ -377,7 +377,7 @@ class ReceptorConfig:
                     raise Exception("could not convert '%s' (type: %s) to a boolean value" % (value, type(value)))
             elif value_type == 'path':
                 # FIXME: implement, or do we care if it's really a path and not just a string?
-                return value
+                return os.path.expanduser(value)
             else:
                 return value
         except Exception as e:

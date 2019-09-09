@@ -1,4 +1,5 @@
 import logging
+import traceback
 import pkg_resources
 
 from . import exceptions
@@ -44,6 +45,7 @@ class WorkManager:
         except Exception as e:
             serial += 1
             logger.error(f'Error encountered while handling the response, replying with an error message ({e})')
+            logger.error(traceback.format_tb(e.__traceback__))
             enveloped_response = envelope.InnerEnvelope.make_response(
                 receptor=self.receptor,
                 recipient=inner_env.sender,
