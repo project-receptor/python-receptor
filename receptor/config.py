@@ -3,7 +3,7 @@ import configparser
 import importlib
 import logging
 import os
-import ssl as tls
+import ssl
 
 from .entrypoints import run_as_node, run_as_controller, run_as_ping, run_as_send
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
@@ -58,7 +58,6 @@ class ReceptorConfig:
         self.add_config_option(
             section='default',
             key='node_id',
-            #long_option='--node-id',
             default_value='',
             value_type='str',
             hint='Set/override node identifier. If unspecified here or in a config file, one will be automatically generated.',
@@ -91,19 +90,19 @@ class ReceptorConfig:
         # so all of these options use `subparse=False`.
         self.add_config_option(
             section='auth',
-            key='tls_cert',
+            key='ssl_cert',
             default_value='',
             value_type='str',
             subparse=False,
-            hint='Path to the TLS certificate chain file.',
+            hint='Path to the SSL/TLS certificate chain file.',
         )
         self.add_config_option(
             section='auth',
-            key='tls_key',
+            key='ssl_key',
             default_value='',
             value_type='str',
             subparse=False,
-            hint='Path to the TLS certificate key file.',
+            hint='Path to the SSL/TLS certificate key file.',
         )
         # Receptor node options
         self.add_config_option(
@@ -375,18 +374,18 @@ class ReceptorConfig:
         self._parsed_args.func(self)
 
 
-    def get_client_tls_context(self):
-        if self.auth_tls_cert:
+    def get_client_ssl_context(self):
+        if self.auth_ssl_cert:
             logger.debug("Loading SSL Client Context")
-            return tls.create_default_context(tls.Purpose.SERVER_AUTH, cafile=self.auth_tls_cert)
+            return ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self.auth_ssl_cert)
         else:
             return None
 
-    def get_server_tls_context(self):
-        if self.auth_tls_cert and self.auth_tls_key:
+    def get_server_ssl_context(self):
+        if self.auth_ssl_cert and self.auth_ssl_key:
             logger.debug("Loading SSL Server Context")
-            sc = tls.create_default_context(tls.Purpose.CLIENT_AUTH)
-            sc.load_cert_chain(self.auth_tls_cert, self.auth_tls_key)
+            sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            sc.load_cert_chain(self.auth_ssl_cert, self.auth_ssl_key)
             return sc
         else:
             return None
