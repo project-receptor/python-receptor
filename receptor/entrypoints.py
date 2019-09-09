@@ -1,5 +1,6 @@
 import datetime
 import logging
+import time
 
 from .receptor import Receptor
 from . import node
@@ -17,7 +18,14 @@ def run_as_controller(config):
 def run_as_ping(config):
     logger.info(f'Sending ping to {config.ping_recipient}.')
     now = datetime.datetime.utcnow()
-    controller.send_directive('receptor:ping', config.ping_recipient, now.isoformat(), config.ping_socket_path)
+    pings_sent = 0
+    while True:
+        controller.send_directive('receptor:ping', config.ping_recipient, now.isoformat(), config.ping_socket_path)
+        pings_sent += 1
+        if config.ping_count != 0 and pings_sent >= config.ping_count:
+            break
+        elif config.ping_delay > 0.0:
+            time.sleep(config.ping_delay)
 
 
 def run_as_send(config):

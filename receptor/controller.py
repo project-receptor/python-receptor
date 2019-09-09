@@ -1,25 +1,27 @@
 import asyncio
 import logging
+import os
 import socket
 import sys
-import os
 
 from . import protocol
 
 logger = logging.getLogger(__name__)
 
 
-def send_directive(directive, recipient, payload, socket_path):
+def send_directive(directive, recipient, payload, socket_path, expected_responses=1):
     if payload == '-':
         payload = sys.stdin.read()
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(socket_path)
     sock.sendall(f"{recipient}\n{directive}\n{payload}".encode('utf-8') + protocol.DELIM)
     response = b''
-    while True:
+    response_count = 0
+    while response_count < expected_responses:
         response = sock.recv(4096)
         sys.stdout.buffer.write(response + b"\n")
         sys.stdout.flush()
+        response_count += 1
 
 # FIXME: the socket path is in the config, it shouldn't need to be passed as an arg here
 def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):

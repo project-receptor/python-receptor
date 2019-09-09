@@ -183,6 +183,20 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section='ping',
+            key='count',
+            default_value=0,
+            value_type='int',
+            hint='Number of pings to send. If unspecified here or in a config file pings will be continuously sent until interrupted.',
+        )
+        self.add_config_option(
+            section='ping',
+            key='delay',
+            default_value=0,
+            value_type='float',
+            hint='The delay (in seconds) to wait between pings. If unspecified here or in a config file pings will be sent as soon as the previous response is received.',
+        )
+        self.add_config_option(
+            section='ping',
             key='recipient',
             long_option='ping_recipient',
             default_value='',
@@ -360,6 +374,8 @@ class ReceptorConfig:
                 return value_type(value)
             elif value_type == 'int' and not isinstance(value, int):
                 return int(value)
+            elif value_type == 'float' and not isinstance(value, float):
+                return float(value)
             elif value_type == 'str' and not isinstance(value, str):
                 return '%s' % (value,)
             elif value_type == 'bool' and not isinstance(value, bool):
