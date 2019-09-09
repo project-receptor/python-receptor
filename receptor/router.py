@@ -164,6 +164,7 @@ class MeshRouter:
         """
         next_node_id = self.next_hop(inner_envelope.recipient)
         if not next_node_id:
+            #TODO: This probably needs to emit an error response
             raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
         signed = await inner_envelope.sign_and_serialize()
         outer_envelope = envelope.OuterEnvelope(
