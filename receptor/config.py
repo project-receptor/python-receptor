@@ -222,12 +222,29 @@ class ReceptorConfig:
         )
         # Component options. These are also only used in a config section
         # like auth, so they also set `subparse=False`.
-        self.add_config_option('components', 'security_manager', default_value='receptor.security.MallCop', value_type=py_class, subparse=False, hint='')
-        self.add_config_option('components', 'buffer_manager', default_value='receptor.buffers.file.FileBufferManager', value_type=py_class, subparse=False, hint='')
+        self.add_config_option(
+            'components',
+            'security_manager',
+            default_value='receptor.security.MallCop',
+            value_type=py_class,
+            subparse=False,
+            hint='',
+        )
+        self.add_config_option(
+            'components',
+            'buffer_manager',
+            default_value='receptor.buffers.file.FileBufferManager',
+            value_type=py_class,
+            subparse=False,
+            hint='',
+        )
 
         self.parse_options(args)
 
-    def add_config_option(self, section, key, cli=True, short_option='', long_option='', default_value=None, set_value=None, value_type=None, listof=None, subparse=True, hint=None):
+    def add_config_option(self, section, key, cli=True, short_option='', long_option='',
+            default_value=None, set_value=None, value_type=None, listof=None, subparse=True,
+            hint=None):
+
         config_entry = '%s_%s' % (section, key)
         if cli:
             # for lists, we switch the action from 'store' to 'append'
