@@ -82,9 +82,9 @@ following configuration:
 In the video below you'll see these 3 nodes launched in a ``tmux`` 4-pane layout
 with the following commands::
 
-  $ receptor controller --socket-path=/tmp/receptor.sock --listen-port=8888 --node-id=controller
-  $ receptor node --listen-port=8889 --peer=localhost:8888 --node-id=node-a
-  $ receptor node --listen-port=8890 --peer=localhost:8889 --node-id=node-b
+  $ receptor --node-id=controller -d /tmp/controller controller --socket-path=/tmp/receptor.sock --listen-port=8888
+  $ receptor --node-id=node-a -d /tmp/node-a node --listen-port=8889 --peer=localhost:8888
+  $ receptor --node-id=node-b -d /tmp/node-b node --listen-port=8890 --peer=localhost:8889
 
 In the last pane we execute the ``ping`` command::
 

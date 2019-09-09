@@ -21,13 +21,13 @@ def send_directive(directive, recipient, payload, socket_path):
         sys.stdout.buffer.write(response + b"\n")
         sys.stdout.flush()
 
-
+# FIXME: the socket path is in the config, it shouldn't need to be passed as an arg here
 def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):
     config = receptor.config
     listener = loop.create_server(
         lambda: protocol.BasicProtocol(receptor, loop),
-        config.server.address, config.server.port, ssl=config.get_server_ssl_context())
-    logger.info("Serving on %s:%s", config.server.address, config.server.port)
+        config.controller_listen_address, config.controller_listen_port, ssl=config.get_server_ssl_context())
+    logger.info("Serving on %s:%s", config.controller_listen_address, config.controller_listen_port)
     loop.create_task(listener)
     control_listener = loop.create_unix_server(
         lambda: protocol.BasicControllerProtocol(receptor, loop),

@@ -21,7 +21,7 @@ class FileBuffer(BaseBuffer):
     def __init__(self, node_id, receptor):
         super().__init__(node_id, receptor)
         self.node_id = node_id
-        self.base_path = os.path.join(os.path.expanduser(self.receptor.config.server.data_dir))
+        self.base_path = os.path.join(os.path.expanduser(self.receptor.config.default_data_dir))
         self.message_path = os.path.join(self.base_path, self.receptor.node_id, "messages")
         self.manifest_path = os.path.join(self.base_path, self.receptor.node_id, "manifest-{}".format(node_id))
         if not os.path.exists(self.message_path):
