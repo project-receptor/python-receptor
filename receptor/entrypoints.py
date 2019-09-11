@@ -28,7 +28,7 @@ def run_as_ping(config):
             response = controller.send_directive('receptor:ping', config.ping_recipient, now.isoformat(), sock)
             resp_json = json.loads(response)
             if 'code' in resp_json and resp_json['code'] != 0:
-                sys.stdout.buffer.write(b"Failed to ping node.\n")
+                sys.stdout.buffer.write(b"Failed to ping node: %b\n" % (resp_json['payload'].encode('utf-8'),))
             else:
                 sys.stdout.buffer.write(response + b"\n")
             sys.stdout.flush()

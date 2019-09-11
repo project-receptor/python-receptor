@@ -1,9 +1,11 @@
-import datetime
 import asyncio
+import datetime
+import functools
+import json
 import logging
 import time
-import json
 import uuid
+
 from collections import deque
 from .messages import envelope
 from .exceptions import ReceptorBufferError
@@ -188,5 +190,28 @@ class BasicControllerProtocol(asyncio.Protocol):
             directive=directive,
         )
         # TODO: Persistent registry?
-        self.loop.create_task(self.receptor.router.send(inner_env,
-                                                        expected_response=True))
+        send_task = self.loop.create_task(
+            self.receptor.router.send(
+                inner_env,
+                expected_response=True
+            )
+        )
+        send_task.add_done_callback(
+            functools.partial(self.data_received_callback, inner_env)
+        )
+
+    def data_received_callback(self, inner_env, fut):
+        try:
+            fut.result()
+        except Exception as e:
+            self.transport.write(
+                json.dumps(
+                    dict(
+                        timestamp=datetime.datetime.utcnow().isoformat(),
+                        in_response_to=inner_env.message_id,
+                        payload=str(e),
+                        code=1,
+                    )
+                ).encode()
+            )
+
