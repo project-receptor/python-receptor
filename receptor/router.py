@@ -1,12 +1,13 @@
-import logging
-
+import asyncio
 import datetime
-from collections import defaultdict
 import heapq
+import logging
 import random
 import uuid
 
+from collections import defaultdict
 from dateutil import parser
+
 from .messages import envelope
 from .exceptions import UnrouteableError, ReceptorBufferError
 
@@ -27,6 +28,8 @@ class MeshRouter:
     _nodes = set()
     _edges = set()
     response_registry = dict()
+    forwarding_table = {}
+    forwarding_lock = asyncio.Lock()
 
     def __init__(self, receptor):
         self.receptor = receptor
@@ -43,7 +46,7 @@ class MeshRouter:
             fd.close()
 
     def node_is_known(self, node_id):
-        return node_id in self._nodes or node_id == self.node_id
+        return node_id == self.node_id or node_id in self._nodes
 
     def find_edge(self, left, right):
         node_actual = sorted([left, right])
@@ -128,6 +131,15 @@ class MeshRouter:
                         mins[next_vertex] = next_total_cost
                         heapq.heappush(heap, (next_total_cost, next_vertex, path))
 
+    async def build_forwarding_table(self, changed_nodes=None):
+        try:
+            await self.forwarding_lock.acquire()
+            for node in self._nodes:
+                if changed_nodes is None or node in changed_nodes:
+                    self.forwarding_table[node] = self.find_shortest_path(node)
+        finally:
+            self.forwarding_lock.release()
+
     async def forward(self, outer_envelope, next_hop):
         """
         Forward a message on to the next hop closer to its destination
@@ -153,9 +165,16 @@ class MeshRouter:
         """
         if recipient == self.node_id:
             return None
-        path = self.find_shortest_path(recipient)
-        if path:
-            return path[-2]
+
+        recipient_lookup = self.forwarding_table.get(recipient, None)
+        if recipient_lookup:
+            return recipient_lookup[-2]
+        else:
+            path = self.find_shortest_path(recipient)
+            if path:
+                return path[-2]
+            else:
+                raise UnrouteableError(f'{recipient} is not in the forwarding table, nor could any path to it be found')
 
 
     async def send(self, inner_envelope, expected_response=False):

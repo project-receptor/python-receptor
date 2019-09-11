@@ -26,6 +26,7 @@ class Connection:
             for data in buf.get():
                 if "cmd" in data and data["cmd"] == "ROUTE":
                     self.handle_route_advertisement(data)
+                    await self.receptor.router.build_forwarding_table()
                 else:
                     await self.handle_message(data)
             await asyncio.sleep(.1)
