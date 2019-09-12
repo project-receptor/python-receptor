@@ -19,7 +19,13 @@ def send_directive(directive, recipient, payload, sock):
         payload = sys.stdin.read()
     sock.sendall(f"{recipient}\n{directive}\n{payload}".encode('utf-8') + protocol.DELIM)
     response = b''
-    response = sock.recv(4096)
+    while True:
+        received = sock.recv(1024)
+        done = protocol.DELIM in received
+        response += received.rstrip(protocol.DELIM)
+        if done:
+            break
+            
     return response
 
 # FIXME: the socket path is in the config, it shouldn't need to be passed as an arg here

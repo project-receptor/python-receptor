@@ -7,6 +7,7 @@ import time
 import uuid
 
 from collections import deque
+
 from .messages import envelope
 from .exceptions import ReceptorBufferError
 
@@ -172,7 +173,7 @@ class BasicControllerProtocol(asyncio.Protocol):
         self.transport.write(json.dumps(dict(timestamp=response.timestamp,
                                              in_response_to=response.in_response_to,
                                              payload=response.raw_payload,
-                                             code=response.code)).encode())
+                                             code=response.code)).encode() + DELIM)
 
     def data_received(self, data):
         recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)
@@ -212,6 +213,6 @@ class BasicControllerProtocol(asyncio.Protocol):
                         payload=str(e),
                         code=1,
                     )
-                ).encode()
+                ).encode() + DELIM
             )
 
