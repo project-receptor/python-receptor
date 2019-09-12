@@ -170,10 +170,14 @@ class BasicControllerProtocol(asyncio.Protocol):
             self.receptor.controller_connections.remove(self)
 
     def emit_response(self, response):
-        self.transport.write(json.dumps(dict(timestamp=response.timestamp,
-                                             in_response_to=response.in_response_to,
-                                             payload=response.raw_payload,
-                                             code=response.code)).encode() + DELIM)
+        emit_task = self.loop.create_task(response.sign_and_serialize())
+        emit_task.add_done_callback(
+            functools.partial(self._do_emit_callback)
+        )
+
+    def _do_emit_callback(self, fut):
+        res = fut.result()
+        self.transport.write(res.encode() + DELIM)
 
     def data_received(self, data):
         recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)
@@ -198,21 +202,21 @@ class BasicControllerProtocol(asyncio.Protocol):
             )
         )
         send_task.add_done_callback(
-            functools.partial(self.data_received_callback, inner_env)
+            functools.partial(self._data_received_callback, inner_env)
         )
 
-    def data_received_callback(self, inner_env, fut):
+    def _data_received_callback(self, inner_env, fut):
         try:
             fut.result()
         except Exception as e:
-            self.transport.write(
-                json.dumps(
-                    dict(
-                        timestamp=datetime.datetime.utcnow().isoformat(),
-                        in_response_to=inner_env.message_id,
-                        payload=str(e),
-                        code=1,
-                    )
-                ).encode() + DELIM
+            err_resp = envelope.InnerEnvelope.make_response(
+                receptor=self.receptor,
+                recipient=inner_env.sender,
+                payload=str(e),
+                in_response_to=inner_env.message_id,
+                ttl=inner_env.ttl,
+                serial=inner_env.serial,
+                code=1,
             )
+            self.emit_response(err_resp)
 
