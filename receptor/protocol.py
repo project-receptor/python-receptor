@@ -1,10 +1,13 @@
-import datetime
 import asyncio
+import datetime
+import functools
+import json
 import logging
 import time
-import json
 import uuid
+
 from collections import deque
+
 from .messages import envelope
 from .exceptions import ReceptorBufferError
 
@@ -169,10 +172,14 @@ class BasicControllerProtocol(asyncio.Protocol):
             self.receptor.controller_connections.remove(self)
 
     def emit_response(self, response):
-        self.transport.write(json.dumps(dict(timestamp=response.timestamp,
-                                             in_response_to=response.in_response_to,
-                                             payload=response.raw_payload,
-                                             code=response.code)).encode())
+        emit_task = self.loop.create_task(response.sign_and_serialize())
+        emit_task.add_done_callback(
+            functools.partial(self._do_emit_callback)
+        )
+
+    def _do_emit_callback(self, fut):
+        res = fut.result()
+        self.transport.write(res.encode() + DELIM)
 
     def data_received(self, data):
         recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)
@@ -190,5 +197,28 @@ class BasicControllerProtocol(asyncio.Protocol):
             directive=directive,
         )
         # TODO: Persistent registry?
-        self.loop.create_task(self.receptor.router.send(inner_env,
-                                                        expected_response=True))
+        send_task = self.loop.create_task(
+            self.receptor.router.send(
+                inner_env,
+                expected_response=True
+            )
+        )
+        send_task.add_done_callback(
+            functools.partial(self._data_received_callback, inner_env)
+        )
+
+    def _data_received_callback(self, inner_env, fut):
+        try:
+            fut.result()
+        except Exception as e:
+            err_resp = envelope.InnerEnvelope.make_response(
+                receptor=self.receptor,
+                recipient=inner_env.sender,
+                payload=str(e),
+                in_response_to=inner_env.message_id,
+                ttl=inner_env.ttl,
+                serial=inner_env.serial,
+                code=1,
+            )
+            self.emit_response(err_resp)
+

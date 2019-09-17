@@ -68,12 +68,24 @@ class Connection:
         if next_hop is None:
             await outer_env.deserialize_inner(self.receptor)
             if outer_env.inner_obj.message_type == 'directive':
-                namespace, _ = outer_env.inner_obj.directive.split(':', 1)
-                if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
-                    await directive.control(self.receptor.router, outer_env.inner_obj)
-                else:
-                    # other namespace/work directives
-                    await self.receptor.work_manager.handle(outer_env.inner_obj)
+                try:
+                    namespace, _ = outer_env.inner_obj.directive.split(':', 1)
+                    if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
+                        await directive.control(self.receptor.router, outer_env.inner_obj)
+                    else:
+                        # other namespace/work directives
+                        await self.receptor.work_manager.handle(outer_env.inner_obj)
+                except Exception as e:
+                    err_resp = outer_env.inner_obj.make_response(
+                        receptor=self.receptor,
+                        recipient=outer_env.inner_obj.sender,
+                        payload=str(e),
+                        in_response_to=outer_env.inner_obj.message_id,
+                        serial=outer_env.inner_obj.serial + 1,
+                        ttl=15,
+                        code=1,
+                    )
+                    await self.receptor.router.send(err_resp)
             elif outer_env.inner_obj.message_type == 'response':
                 in_response_to = outer_env.inner_obj.in_response_to
                 if in_response_to in self.receptor.router.response_registry:
@@ -87,3 +99,4 @@ class Connection:
                     f'Unknown message type: {outer_env.inner_obj.message_type}')
         else:
             await self.receptor.router.forward(outer_env, next_hop)
+
