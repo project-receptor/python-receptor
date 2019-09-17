@@ -34,6 +34,7 @@ class BaseProtocol(asyncio.Protocol):
     def __init__(self, receptor, loop):
         self.receptor = receptor
         self.loop = loop
+        self.connection = None
 
     async def watch_queue(self, node, transport):
         '''
@@ -69,7 +70,8 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
-        self.receptor.remove_connection(self.connection)
+        if self.connection is not None:
+            self.receptor.remove_connection(self.connection)
 
     def data_received(self, data):
         logger.debug(data)
