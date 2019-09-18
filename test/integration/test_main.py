@@ -1,7 +1,7 @@
 import pytest
 import receptor
 from receptor.config import ReceptorConfig
-from receptor import Receptor
+from receptor.receptor import Receptor
 from receptor.node import mainloop
 import socket
 import asyncio
