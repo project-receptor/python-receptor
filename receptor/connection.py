@@ -1,6 +1,7 @@
 import asyncio
-import logging
 import json
+import logging
+
 from . import exceptions
 from .messages import envelope, directive
 from .exceptions import ReceptorBufferError
@@ -75,7 +76,20 @@ class Connection:
                     else:
                         # other namespace/work directives
                         await self.receptor.work_manager.handle(outer_env.inner_obj)
+                except ValueError:
+                    logger.error("error in handle_message: Invalid directive -> '%s'. Sending failure response back." % (outer_env.inner_obj.directive,))
+                    err_resp = outer_env.inner_obj.make_response(
+                        receptor=self.receptor,
+                        recipient=outer_env.inner_obj.sender,
+                        payload="An invalid directive ('%s') was specified." % (outer_env.inner_obj.directive,),
+                        in_response_to=outer_env.inner_obj.message_id,
+                        serial=outer_env.inner_obj.serial + 1,
+                        ttl=15,
+                        code=1,
+                    )
+                    await self.receptor.router.send(err_resp)
                 except Exception as e:
+                    logger.error("error in handle_message: '%s'. Sending failure response back." % (str(e),))
                     err_resp = outer_env.inner_obj.make_response(
                         receptor=self.receptor,
                         recipient=outer_env.inner_obj.sender,

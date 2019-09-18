@@ -2,6 +2,7 @@ import argparse
 import datetime
 import logging
 import logging.config
+import sys
 
 from .config import ReceptorConfig
 from .receptor import Receptor
@@ -11,7 +12,11 @@ logger = logging.getLogger(__name__)
 
 def main(args=None):
     
-    config = ReceptorConfig(args)
+    try:
+        config = ReceptorConfig(args)
+    except Exception as e:
+        logger.error("An error occured while validating the configuration options:\n%s" % (str(e),))
+        sys.exit(1)
 
     logging.config.dictConfig(
         {
@@ -38,7 +43,11 @@ def main(args=None):
         }
     )
 
-    config.go()
+    try:
+        config.go()
+    except Exception as e:
+        logger.error("An error occured while running receptor:\n%s" % (str(e),))
+        sys.exit(1)
 
 
 if __name__ == '__main__':
