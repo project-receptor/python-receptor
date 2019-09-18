@@ -5,8 +5,9 @@ import sys
 import time
 
 from .receptor import Receptor
-from . import node
 from . import controller
+from . import exceptions
+from . import node
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,13 @@ def run_as_send(config):
     logger.info(f'Sending a {config.send_directive} directive to {config.send_recipient}.')
     sock = controller.connect_to_socket(config.send_socket_path)
     try:
+        if config.send_directive in (None, ''):
+            raise exceptions.UnknownDirective("The directive cannot be left out when using send.")
+        else:
+            try:
+                left, right = config.send_directive.split(':', 1)
+            except ValueError:
+                raise exceptions.UnknownDirective("Invalid directive format (%s). Directives must be in the form `action:method`." % (config.send_directive,))
         response = controller.send_directive(config.send_directive, config.send_recipient, config.send_payload, sock)
         sys.stdout.buffer.write(response + b"\n")
         sys.stdout.flush()
