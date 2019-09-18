@@ -22,9 +22,10 @@ class Receptor:
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
         self.controller_connections = []
-        self.connection_manifest_path = os.path.join(self.config.default_data_dir,
-                                                     self.node_id,
-                                                     "connection_manifest")
+        self.base_path = os.path.join(self.config.default_data_dir, self.node_id)
+        if not os.path.exists(self.base_path):
+            os.mkdir(os.path.join(self.config.default_data_dir, self.node_id))
+        self.connection_manifest_path = os.path.join(self.base_path, "connection_manifest")
         self.stop = False
 
     def _find_node_id(self):
