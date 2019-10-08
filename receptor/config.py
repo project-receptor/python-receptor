@@ -404,6 +404,8 @@ class ReceptorConfig:
     def go(self):
         if not self._parsed_args:
             raise ReceptorRuntimeError("there are no parsed args yet")
+        elif not hasattr(self._parsed_args, 'subparser_name'):
+            raise ReceptorRuntimeError("you must specify a subcommand (%s)." % (", ".join(SUBCOMMAND_EXTRAS.keys()),))
         self._parsed_args.func(self)
 
 
