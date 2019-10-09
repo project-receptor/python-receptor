@@ -124,7 +124,7 @@ class ReceptorConfig:
             key='peers',
             short_option='-p',
             long_option='--peer',
-            default_value=None,
+            default_value=[],
             value_type='list',
             listof='str',
             hint='Set/override peer nodes/controllers to connect to. Use multiple times for multiple peers.',
