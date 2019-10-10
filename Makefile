@@ -31,6 +31,9 @@ sdist: dist/$(NAME)-$(VERSION).tar.gz
 dist/$(NAME)-$(VERSION).tar.gz:
 	$(DIST_PYTHON) setup.py sdist
 
+image: dist
+	docker build --rm=true -t $(IMAGE_NAME) -f ./packaging/docker/Dockerfile .
+
 dev:
 	pipenv install
 
