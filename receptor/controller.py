@@ -14,6 +14,7 @@ def connect_to_socket(socket_path):
     sock.connect(socket_path)
     return sock
 
+
 def send_directive(directive, recipient, payload, sock):
     if payload == '-':
         payload = sys.stdin.read()
@@ -27,6 +28,7 @@ def send_directive(directive, recipient, payload, sock):
             break
             
     return response
+
 
 # FIXME: the socket path is in the config, it shouldn't need to be passed as an arg here
 def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):

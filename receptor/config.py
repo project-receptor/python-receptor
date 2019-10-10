@@ -30,6 +30,7 @@ SUBCOMMAND_EXTRAS = {
     },
 }
 
+
 def py_class(class_spec):
     if class_spec not in SINGLETONS:
         module_name, class_name = class_spec.rsplit('.', 1)
@@ -256,8 +257,8 @@ class ReceptorConfig:
         self.parse_options(args)
 
     def add_config_option(self, section, key, cli=True, short_option='', long_option='',
-            default_value=None, set_value=None, value_type=None, listof=None, subparse=True,
-            hint=None):
+                          default_value=None, set_value=None, value_type=None, listof=None, subparse=True,
+                          hint=None):
 
         config_entry = '%s_%s' % (section, key)
         if cli:
@@ -404,7 +405,7 @@ class ReceptorConfig:
     def go(self):
         if not self._parsed_args:
             raise ReceptorRuntimeError("there are no parsed args yet")
-        elif not hasattr(self._parsed_args, 'subparser_name'):
+        elif not hasattr(self._parsed_args, 'func'):
             raise ReceptorRuntimeError("you must specify a subcommand (%s)." % (", ".join(SUBCOMMAND_EXTRAS.keys()),))
         self._parsed_args.func(self)
 
