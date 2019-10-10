@@ -1,11 +1,8 @@
-import argparse
-import datetime
 import logging
 import logging.config
 import sys
 
 from .config import ReceptorConfig
-from .receptor import Receptor
 
 logger = logging.getLogger(__name__)
 
