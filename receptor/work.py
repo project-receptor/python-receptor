@@ -18,6 +18,9 @@ class WorkManager:
             raise exceptions.UnknownDirective(f"Error loading directive handlers for {name}")
         return entry_points[0].load()
 
+    def get_capabilities(self):
+        return [x.name for x in pkg_resources.iter_entry_points('receptor.worker')]
+
     async def handle(self, inner_env):
         logger.info(f'Handling work for {inner_env.message_id} as {inner_env.directive}')
         namespace, action = inner_env.directive.split(':', 1)

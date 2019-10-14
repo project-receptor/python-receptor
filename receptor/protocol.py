@@ -97,7 +97,6 @@ class BaseProtocol(asyncio.Protocol):
                     self.transport.close()
             await asyncio.sleep(.1)
         logger.debug("handshake complete, starting normal handle loop")
-        self.loop.create_task(self.connection.message_handler(self.incoming_buffer)) # Duplicated (see handle_handshake)?
 
     def handle_handshake(self, data):
         self.greeted = True
@@ -110,6 +109,7 @@ class BaseProtocol(asyncio.Protocol):
             "cmd": "HI",
             "id": self.receptor.node_id,
             "expire_time": time.time() + 10,
+            "capabilities": self.receptor.work_manager.get_capabilities(),
         }).encode("utf-8")
         self.transport.write(msg + DELIM)
 
