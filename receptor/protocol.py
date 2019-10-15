@@ -109,7 +109,8 @@ class BaseProtocol(asyncio.Protocol):
             "cmd": "HI",
             "id": self.receptor.node_id,
             "expire_time": time.time() + 10,
-            "capabilities": self.receptor.work_manager.get_capabilities(),
+            "meta": dict(capabilities=self.receptor.work_manager.get_capabilities(),
+                         groups=self.receptor.config.node_groups),
         }).encode("utf-8")
         self.transport.write(msg + DELIM)
 

@@ -144,6 +144,16 @@ class ReceptorConfig:
             value_type='int',
             hint='If specified, the node will ping all other known nodes in the mesh every N seconds. The default is -1, meaning no pings are sent.',
         )
+        self.add_config_option(
+            section='node',
+            key='groups',
+            short_option='-g',
+            long_option='--group',
+            default_value=[],
+            value_type='list',
+            listof='str',
+            hint='Define membership in one or more groups to aid in message routing',
+        )
         # Controller options
         self.add_config_option(
             section='controller',
