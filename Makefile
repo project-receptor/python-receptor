@@ -17,7 +17,7 @@ else
     endif
 endif
 
-.PHONY: dist sdist
+.PHONY: dist sdist test
 
 clean:
 	rm -rf dist
