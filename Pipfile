@@ -8,7 +8,6 @@ pylint = "*"
 ipython = "*"
 pytest = "*"
 pytest-asyncio = "*"
-mock = "*"
 flake8 = "*"
 
 [packages]
