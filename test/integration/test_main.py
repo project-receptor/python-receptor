@@ -5,7 +5,7 @@ from receptor.receptor import Receptor
 from receptor.node import mainloop
 import socket
 import asyncio
-from mock import patch
+from unittest.mock import patch
 
 
 @pytest.fixture
@@ -20,7 +20,9 @@ def receptor_service(receptor_config):
 
 @pytest.fixture
 def receptor_service_factory(unused_tcp_port_factory, tmpdir):
-    def _receptor_service(node_name, peer_ports=[], type="node"):
+    def _receptor_service(node_name, peer_ports=None, type="node"):
+        if peer_ports is None:
+            peer_ports = []
         peers = {'127.0.0.1:{}'.format(p): '' for p in peer_ports}
         peer_config = []
         for peer in peers:
