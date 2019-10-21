@@ -22,6 +22,9 @@ class WorkManager:
     def get_capabilities(self):
         return [x.name for x in pkg_resources.iter_entry_points('receptor.worker')]
 
+    def get_work(self):
+        return self.active_work
+
     def add_work(self, env):
         self.active_work.append(dict(id=env.message_id,
                                      directive=env.directive,

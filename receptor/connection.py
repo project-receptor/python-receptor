@@ -54,6 +54,8 @@ class Connection:
                 buf.push(json.dumps({
                     "cmd": "ROUTE",
                     "id": self.receptor.node_id,
+                    "capabilities": self.receptor.work_manager.get_capabilities(),
+                    "groups": self.receptor.config.node_groups,
                     "edges": edges,
                     "seen": seens
                 }).encode("utf-8"))

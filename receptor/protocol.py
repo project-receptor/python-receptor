@@ -110,7 +110,8 @@ class BaseProtocol(asyncio.Protocol):
             "id": self.receptor.node_id,
             "expire_time": time.time() + 10,
             "meta": dict(capabilities=self.receptor.work_manager.get_capabilities(),
-                         groups=self.receptor.config.node_groups),
+                         groups=self.receptor.config.node_groups,
+                         work=self.receptor.work_manager.get_work())
         }).encode("utf-8")
         self.transport.write(msg + DELIM)
 

@@ -1,5 +1,6 @@
 import datetime
 import logging
+import json
 
 from ..exceptions import UnknownDirective
 from . import envelope
@@ -21,7 +22,7 @@ class Control:
         if action not in self.CONTROL_DIRECTIVES:
             raise UnknownDirective(f'Unknown control directive: {action}')
         action_method = getattr(self, action)
-        responses = action_method(inner_env)
+        responses = action_method(router.receptor, inner_env)
         serial = 0
         async for response in responses:
             serial += 1
@@ -34,9 +35,12 @@ class Control:
             )
             await router.send(enveloped_response)
     
-    async def ping(self, inner_env):
+    async def ping(self, receptor, inner_env):
         logger.info(f'Received ping from {inner_env.sender}')
-        yield f'{inner_env.raw_payload}|{datetime.datetime.utcnow().isoformat()}'
+        return_data = dict(initial_time=inner_env.raw_payload,
+                           response_time=str(datetime.datetime.utcnow()),
+                           active_work=receptor.work_manager.get_work())
+        yield json.dumps(return_data)
 
 
 control = Control()
