@@ -93,9 +93,9 @@ class Receptor:
             self.connections[connection.id_] = [connection]
         self.update_connection_manifest(connection.id_)
 
-    def add_connection(self, id_, protocol_obj):
+    def add_connection(self, id_, meta, protocol_obj):
         buffer_mgr = self.config.components_buffer_manager
-        conn = Connection(id_, protocol_obj, buffer_mgr, self)
+        conn = Connection(id_, meta, protocol_obj, buffer_mgr, self)
         self.update_connections(conn)
         return conn
 

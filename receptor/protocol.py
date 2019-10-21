@@ -100,7 +100,7 @@ class BaseProtocol(asyncio.Protocol):
 
     def handle_handshake(self, data):
         self.greeted = True
-        self.connection = self.receptor.add_connection(data["id"], self)
+        self.connection = self.receptor.add_connection(data["id"], data.get("meta", {}), self)
         self.loop.create_task(self.watch_queue(data["id"], self.transport))
         self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
 
