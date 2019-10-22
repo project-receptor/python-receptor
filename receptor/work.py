@@ -20,7 +20,8 @@ class WorkManager:
         return entry_points[0].load()
 
     def get_capabilities(self):
-        return [x.name for x in pkg_resources.iter_entry_points('receptor.worker')]
+        return [(x.name, pkg_resources.get_distribution(x.resolve().__package__).version)
+                for x in pkg_resources.iter_entry_points('receptor.worker')]
 
     def get_work(self):
         return self.active_work
