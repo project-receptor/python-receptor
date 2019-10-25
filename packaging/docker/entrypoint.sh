@@ -15,8 +15,8 @@ EOF
   rm /tmp/passwd
 fi
 
-if [ ! -f /receptor/receptor.conf ]; then
-    cp /tmp/receptor.conf /receptor/receptor.conf
+if [ ! -f /var/lib/receptor/receptor.conf ]; then
+    cp /tmp/receptor.conf /var/lib/receptor/receptor.conf
 fi
 
 exec tini -- "${@}"

@@ -1,20 +1,29 @@
-FROM centos:8
+FROM fedora:31
 
-ADD https://github.com/krallin/tini/releases/download/v0.18.0/tini /bin/tini
+ADD dist/receptor-*.whl /tmp/
+ADD https://github.com/krallin/tini/releases/latest/download/tini /bin/tini
 ADD packaging/docker/entrypoint.sh /bin/entrypoint
 ADD packaging/docker/receptor.conf /tmp/receptor.conf
-RUN yum install -y python36 python3-dateutil
-ADD dist/receptor-0.1.0-py2.py3-none-any.whl /tmp/receptor-0.1.0-py2.py3-none-any.whl
-RUN pip3 install /tmp/receptor-0.1.0-py2.py3-none-any.whl
-RUN mkdir -p /receptor && \
-    chmod +x /bin/tini /bin/entrypoint && \
+
+RUN dnf update -y &&\
+    dnf install -y python3 python3-pip &&\
+    dnf clean all
+
+RUN chmod +x /bin/tini /bin/entrypoint &&\
     rm -rf /var/cache/yum
-VOLUME /receptor
+
+RUN pip3 install --no-cache-dir python-dateutil &&\
+    pip3 install --no-cache-dir /tmp/receptor-*.whl &&\
+    rm /tmp/receptor-*.whl
+
+RUN mkdir /var/lib/receptor
+VOLUME /var/lib/receptor
+
 ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
-ENV HOME=/receptor
+ENV HOME=/var/lib/receptor
 EXPOSE 8888/tcp
-WORKDIR /receptor
+WORKDIR /var/lib/receptor
 ENTRYPOINT ["entrypoint"]
-CMD ["receptor", "-c", "/receptor/receptor.conf", "node"]
+CMD ["receptor", "-c", "/var/lib/receptor/receptor.conf", "node"]
