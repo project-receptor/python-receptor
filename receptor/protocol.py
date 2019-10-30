@@ -223,4 +223,3 @@ class BasicControllerProtocol(asyncio.Protocol):
                 code=1,
             )
             self.emit_response(err_resp)
-
