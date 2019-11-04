@@ -12,8 +12,9 @@ RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 
 
 class Connection:
-    def __init__(self, id_, protocol_obj, buffer_mgr, receptor):
+    def __init__(self, id_, meta, protocol_obj, buffer_mgr, receptor):
         self.id_ = id_
+        self.meta = meta
         self.protocol_obj = protocol_obj
         self.buffer_mgr = buffer_mgr
         self.receptor = receptor
@@ -53,6 +54,8 @@ class Connection:
                 buf.push(json.dumps({
                     "cmd": "ROUTE",
                     "id": self.receptor.node_id,
+                    "capabilities": self.receptor.work_manager.get_capabilities(),
+                    "groups": self.receptor.config.node_groups,
                     "edges": edges,
                     "seen": seens
                 }).encode("utf-8"))
