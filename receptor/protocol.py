@@ -37,7 +37,6 @@ class BaseProtocol(asyncio.Protocol):
     def __init__(self, receptor, loop):
         self.receptor = receptor
         self.loop = loop
-        self.connection = None
 
     async def watch_queue(self, node, transport):
         '''
@@ -73,8 +72,7 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
-        if self.connection is not None:
-            self.receptor.remove_connection(self.connection)
+        self.receptor.remove_connection(self)
 
     def data_received(self, data):
         logger.debug(data)
@@ -100,9 +98,9 @@ class BaseProtocol(asyncio.Protocol):
 
     def handle_handshake(self, data):
         self.greeted = True
-        self.connection = self.receptor.add_connection(data["id"], data.get("meta", {}), self)
+        self.receptor.add_connection(data["id"], data.get("meta", {}), self)
         self.loop.create_task(self.watch_queue(data["id"], self.transport))
-        self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
+        self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
         msg = json.dumps({
@@ -125,7 +123,7 @@ class BasicProtocol(BaseProtocol):
         super().handle_handshake(data)
         logger.debug("Received handshake from client with id %s, responding...", data["id"])
         self.send_handshake()
-        self.connection.send_route_advertisement()
+        self.receptor.send_route_advertisement()
 
 
 async def create_peer(receptor, loop, host, port):
@@ -155,7 +153,7 @@ class BasicClientProtocol(BaseProtocol):
     def handle_handshake(self, data):
         super().handle_handshake(data)
         logger.debug("Received handshake from server with id %s", data["id"])
-        self.connection.send_route_advertisement()
+        self.receptor.send_route_advertisement()
 
 
 class BasicControllerProtocol(asyncio.Protocol):

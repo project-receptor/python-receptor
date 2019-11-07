@@ -52,6 +52,14 @@ class MeshRouter:
                 return edge
         return None
 
+    def add_edges(self, edges):
+        for edge in edges:
+            existing_edge = self.find_edge(edge[0], edge[1])
+            if existing_edge and existing_edge[2] > edge[2]:
+                self.update_node(edge[0], edge[1], edge[2])
+            else:
+                self.register_edge(*edge)
+
     def register_edge(self, left, right, cost):
         if left != self.node_id:
             self._nodes.add(left)

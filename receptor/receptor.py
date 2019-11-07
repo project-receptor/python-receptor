@@ -9,7 +9,10 @@ import copy
 from .router import MeshRouter
 from .work import WorkManager
 from .connection import Connection
+from .messages import envelope, directive
+from . import exceptions
 
+RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 logger = logging.getLogger(__name__)
 
 
@@ -26,6 +29,7 @@ class Receptor:
         if not os.path.exists(self.base_path):
             os.makedirs(os.path.join(self.config.default_data_dir, self.node_id))
         self.connection_manifest_path = os.path.join(self.base_path, "connection_manifest")
+        self.buffer_mgr = self.config.components_buffer_manager
         self.stop = False
 
     def _find_node_id(self):
@@ -42,7 +46,7 @@ class Receptor:
         while True:
             current_manifest = self.get_connection_manifest()
             for connection in current_manifest:
-                buffer = self.config.components_buffer_manager.get_buffer_for_node(connection["id"], self)
+                buffer = self.buffer_mgr.get_buffer_for_node(connection["id"], self)
                 for ident, message in buffer:
                     message_actual = json.loads(message)
                     if "expire_time" in message_actual and message_actual['expire_time'] < time.time():
@@ -84,7 +88,7 @@ class Receptor:
             manifest.append(dict(id=connection,
                             last=time.time()))
         self.write_connection_manifest(manifest)
-                        
+
     def update_connections(self, connection):
         self.router.register_edge(connection.id_, self.node_id, 1)
         if connection.id_ in self.connections:
@@ -93,11 +97,18 @@ class Receptor:
             self.connections[connection.id_] = [connection]
         self.update_connection_manifest(connection.id_)
 
+    async def message_handler(self, buf):
+        while True:
+            for data in buf.get():
+                if "cmd" in data and data["cmd"] == "ROUTE":
+                    self.handle_route_advertisement(data)
+                else:
+                    await self.handle_message(data)
+            await asyncio.sleep(.1)
+
     def add_connection(self, id_, meta, protocol_obj):
-        buffer_mgr = self.config.components_buffer_manager
-        conn = Connection(id_, meta, protocol_obj, buffer_mgr, self)
+        conn = Connection(id_, meta, protocol_obj)
         self.update_connections(conn)
-        return conn
 
     def remove_connection(self, protocol_obj):
         notify_connections = []
@@ -118,3 +129,84 @@ class Receptor:
             if self.stop:
                 return
             await asyncio.sleep(1)
+
+    def handle_route_advertisement(self, data):
+        self.router.add_edges(data["edges"])
+        self.send_route_advertisement(data["edges"], data["seen"])
+
+    def send_route_advertisement(self, edges=None, seen=[]):
+        edges = edges or self.router.get_edges()
+        seen = set(seen)
+        logger.debug("Emitting Route Advertisements, excluding {}".format(seen))
+        destinations = set(self.connections) - seen
+        seens = list(seen | destinations | {self.node_id})
+
+        # TODO: This should be a broadcast call to the connection manager
+        for target in destinations:
+            buf = self.buffer_mgr.get_buffer_for_node(target, self)
+            try:
+                buf.push(json.dumps({
+                    "cmd": "ROUTE",
+                    "id": self.node_id,
+                    "capabilities": self.work_manager.get_capabilities(),
+                    "groups": self.config.node_groups,
+                    "edges": edges,
+                    "seen": seens
+                }).encode("utf-8"))
+            except exceptions.ReceptorBufferError as e:
+                logger.exception("Receptor Buffer Write Error broadcasting routes and capabilities: {}".format(e))
+                # TODO: This might should be a hard shutdown event
+            except Exception as e:
+                logger.exception("Error trying to broadcast routes and capabilities: {}".format(e))
+
+    async def handle_message(self, msg):
+        outer_env = envelope.OuterEnvelope(**msg)
+        next_hop = self.router.next_hop(outer_env.recipient)
+        if next_hop:
+            return await self.router.forward(outer_env, next_hop)
+
+        await outer_env.deserialize_inner(self)
+
+        if outer_env.inner_obj.message_type != 'directive':
+            raise exceptions.UnknownMessageType(
+                f'Unknown message type: {outer_env.inner_obj.message_type}')
+
+        try:
+            namespace, _ = outer_env.inner_obj.directive.split(':', 1)
+            if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
+                await directive.control(self.router, outer_env.inner_obj)
+            else:
+                # other namespace/work directives
+                await self.work_manager.handle(outer_env.inner_obj)
+        except ValueError:
+            logger.error("error in handle_message: Invalid directive -> '%s'. Sending failure response back." % (outer_env.inner_obj.directive,))
+            err_resp = outer_env.inner_obj.make_response(
+                receptor=self,
+                recipient=outer_env.inner_obj.sender,
+                payload="An invalid directive ('%s') was specified." % (outer_env.inner_obj.directive,),
+                in_response_to=outer_env.inner_obj.message_id,
+                serial=outer_env.inner_obj.serial + 1,
+                ttl=15,
+                code=1,
+            )
+            await self.router.send(err_resp)
+        except Exception as e:
+            logger.error("error in handle_message: '%s'. Sending failure response back." % (str(e),))
+            err_resp = outer_env.inner_obj.make_response(
+                receptor=self,
+                recipient=outer_env.inner_obj.sender,
+                payload=str(e),
+                in_response_to=outer_env.inner_obj.message_id,
+                serial=outer_env.inner_obj.serial + 1,
+                ttl=15,
+                code=1,
+            )
+            await self.router.send(err_resp)
+    elif outer_env.inner_obj.message_type == 'response':
+        in_response_to = outer_env.inner_obj.in_response_to
+        if in_response_to in self.router.response_registry:
+            logger.info(f'Handling response to {in_response_to} with callback.')
+            for connection in self.controller_connections:
+                connection.emit_response(outer_env.inner_obj)
+        else:
+            logger.warning(f'Received response to {in_response_to} but no record of sent message.')
