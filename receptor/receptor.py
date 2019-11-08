@@ -89,13 +89,13 @@ class Receptor:
                             last=time.time()))
         self.write_connection_manifest(manifest)
 
-    def update_connections(self, connection):
-        self.router.register_edge(connection.id_, self.node_id, 1)
-        if connection.id_ in self.connections:
-            self.connections[connection.id_].append(connection)
+    def update_connections(self, protocol_obj):
+        self.router.register_edge(protocol_obj.id, self.node_id, 1)
+        if protocol_obj.id in self.connections:
+            self.connections[protocol_obj.id].append(protocol_obj)
         else:
-            self.connections[connection.id_] = [connection]
-        self.update_connection_manifest(connection.id_)
+            self.connections[protocol_obj.id] = [protocol_obj]
+        self.update_connection_manifest(protocol_obj.id)
 
     async def message_handler(self, buf):
         while True:
@@ -106,9 +106,8 @@ class Receptor:
                     await self.handle_message(data)
             await asyncio.sleep(.1)
 
-    def add_connection(self, id_, meta, protocol_obj):
-        conn = Connection(id_, meta, protocol_obj)
-        self.update_connections(conn)
+    def add_connection(self, protocol_obj):
+        self.update_connections(protocol_obj)
 
     def remove_connection(self, protocol_obj):
         notify_connections = []
@@ -159,18 +158,7 @@ class Receptor:
             except Exception as e:
                 logger.exception("Error trying to broadcast routes and capabilities: {}".format(e))
 
-    async def handle_message(self, msg):
-        outer_env = envelope.OuterEnvelope(**msg)
-        next_hop = self.router.next_hop(outer_env.recipient)
-        if next_hop:
-            return await self.router.forward(outer_env, next_hop)
-
-        await outer_env.deserialize_inner(self)
-
-        if outer_env.inner_obj.message_type != 'directive':
-            raise exceptions.UnknownMessageType(
-                f'Unknown message type: {outer_env.inner_obj.message_type}')
-
+    async def handle_directive(self, outer_env):
         try:
             namespace, _ = outer_env.inner_obj.directive.split(':', 1)
             if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
@@ -202,7 +190,8 @@ class Receptor:
                 code=1,
             )
             await self.router.send(err_resp)
-    elif outer_env.inner_obj.message_type == 'response':
+
+    async def handle_response(self, outer_env):
         in_response_to = outer_env.inner_obj.in_response_to
         if in_response_to in self.router.response_registry:
             logger.info(f'Handling response to {in_response_to} with callback.')
@@ -210,3 +199,21 @@ class Receptor:
                 connection.emit_response(outer_env.inner_obj)
         else:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
+
+    async def handle_message(self, msg):
+        handlers = dict(
+            directive=self.handle_directive,
+            response=self.handle_response,
+        )
+        outer_env = envelope.OuterEnvelope(**msg)
+        next_hop = self.router.next_hop(outer_env.recipient)
+        if next_hop:
+            return await self.router.forward(outer_env, next_hop)
+
+        await outer_env.deserialize_inner(self)
+
+        if outer_env.inner_obj.message_type not in handlers:
+            raise exceptions.UnknownMessageType(
+                f'Unknown message type: {outer_env.inner_obj.message_type}')
+
+        await handlers[outer_env.inner_obj.message_type](outer_env)
