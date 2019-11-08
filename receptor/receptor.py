@@ -8,7 +8,6 @@ import copy
 
 from .router import MeshRouter
 from .work import WorkManager
-from .connection import Connection
 from .messages import envelope, directive
 from . import exceptions
 
@@ -120,8 +119,7 @@ class Receptor:
                 self.router.debug_router()
                 self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
-        for active_connection in notify_connections:
-            active_connection.send_route_advertisement(self.router.get_edges())
+        self.send_route_advertisement(self.router.get_edges())
 
     async def shutdown_handler(self):
         while True:
