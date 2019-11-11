@@ -443,4 +443,8 @@ class ReceptorConfig:
             return None
 
     def __getattr__(self, key):
-        return self._config_options[key].value
+        value = self._config_options[key]
+        if type(value) is dict:
+            return value
+        else:
+            return self._config_options[key].value
