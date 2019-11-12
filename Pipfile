@@ -12,6 +12,8 @@ flake8 = "*"
 
 [packages]
 python-dateutil = "*"
+opentracing = "*"
+jaeger-client = "*"
 
 [requires]
 python_version = "3.6"

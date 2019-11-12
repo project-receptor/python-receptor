@@ -1,18 +1,32 @@
-import os
-import json
-import uuid
-import time
 import asyncio
-import logging
 import copy
+import json
+import logging
+import os
+import time
+import uuid
 
+import jaeger_client
+
+from . import exceptions
+from .messages import directive, envelope
 from .router import MeshRouter
 from .work import WorkManager
-from .messages import envelope, directive
-from . import exceptions
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 logger = logging.getLogger(__name__)
+
+tracer = jaeger_client.Config(
+    config={
+        'sampler': {
+            'type': 'const',
+            'param': 1,
+        },
+        'logging': True,
+    },
+    service_name='receptor',
+    validate=True,
+).initialize_tracer()
 
 
 class Receptor:

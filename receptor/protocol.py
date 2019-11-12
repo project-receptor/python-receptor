@@ -5,11 +5,15 @@ import json
 import logging
 import time
 import uuid
-
 from collections import deque
 
-from .messages import envelope
+import opentracing
+from opentracing import tags
+
+from receptor.receptor import tracer
+
 from .exceptions import ReceptorBufferError
+from .messages import envelope
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +34,10 @@ class DataBuffer:
 
     def get(self):
         while self.q:
-            yield self.deserializer(self.q.popleft())
+            msg = self.deserializer(self.q.popleft())
+            span = tracer.extract(opentracing.Format.TEXT_MAP, msg)
+            with tracer.start_active_span('get_data', child_of=span):
+                yield msg
 
 
 class BaseProtocol(asyncio.Protocol):
@@ -54,7 +61,16 @@ class BaseProtocol(asyncio.Protocol):
         while not self.transport.is_closing():
             try:
                 msg = buffer_obj.pop()
-                self.transport.write(msg + DELIM)
+                msg = json.loads(msg)
+                with tracer.start_active_span('send') as scope:
+                    scope.span.set_tag(tags.SPAN_KIND, tags.SPAN_KIND_RPC_CLIENT)
+                    tracer.inject(
+                        scope.span.context,
+                        opentracing.Format.TEXT_MAP,
+                        msg
+                    )
+                    msg = json.dumps(msg).encode('utf-8')
+                    self.transport.write(msg + DELIM)
             except IndexError:
                 await asyncio.sleep(0.1)
             except ReceptorBufferError as e:
@@ -110,15 +126,23 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
-        msg = json.dumps({
+        msg = { 
             "cmd": "HI",
             "id": self.receptor.node_id,
             "expire_time": time.time() + 10,
             "meta": dict(capabilities=self.receptor.work_manager.get_capabilities(),
                          groups=self.receptor.config.node_groups,
                          work=self.receptor.work_manager.get_work())
-        }).encode("utf-8")
-        self.transport.write(msg + DELIM)
+        }
+        with tracer.start_active_span('handshake') as scope:
+            scope.span.set_tag(tags.SPAN_KIND, tags.SPAN_KIND_RPC_CLIENT)
+            tracer.inject(
+                scope.span.context,
+                opentracing.Format.TEXT_MAP,
+                msg
+            )
+            msg = json.dumps(msg).encode("utf-8")
+            self.transport.write(msg + DELIM)
 
 
 class BasicProtocol(BaseProtocol):
