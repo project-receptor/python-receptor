@@ -37,32 +37,36 @@ class BaseProtocol(asyncio.Protocol):
     def __init__(self, receptor, loop):
         self.receptor = receptor
         self.loop = loop
-        self.connection = None
+        self.id = None
+        self.meta = None
 
-    async def watch_queue(self, node, transport):
+    def __str__(self):
+        return f"<Connection {self.id} {self.transport}"
+
+    async def watch_queue(self):
         '''
         Watches the buffer for this connection for messages delivered from other
         parts of Receptor (forwarded messages for example) for messages to send
         over the connection.
         '''
         buffer_mgr = self.receptor.config.components_buffer_manager
-        buffer_obj = buffer_mgr.get_buffer_for_node(node, self.receptor)
-        while not transport.is_closing():
+        buffer_obj = buffer_mgr.get_buffer_for_node(self.id, self.receptor)
+        while not self.transport.is_closing():
             try:
                 msg = buffer_obj.pop()
-                transport.write(msg + DELIM)
+                self.transport.write(msg + DELIM)
             except IndexError:
                 await asyncio.sleep(0.1)
             except ReceptorBufferError as e:
                 logger.exception("Receptor Buffer Read Error: {}".format(e))
                 # TODO: We need to try to send this message along somewhere else
                 # and record the failure somewhere
-                transport.close()
+                self.transport.close()
                 return
             except Exception as e:
-                logger.exception("Error received trying to write to {}: {}".format(node, e))
+                logger.exception("Error received trying to write to {}: {}".format(self.id, e))
                 buffer_obj.push(msg)
-                transport.close()
+                self.transport.close()
                 return
 
     def connection_made(self, transport):
@@ -73,8 +77,7 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
-        if self.connection is not None:
-            self.receptor.remove_connection(self.connection)
+        self.receptor.remove_connection(self)
 
     def data_received(self, data):
         logger.debug(data)
@@ -100,9 +103,11 @@ class BaseProtocol(asyncio.Protocol):
 
     def handle_handshake(self, data):
         self.greeted = True
-        self.connection = self.receptor.add_connection(data["id"], data.get("meta", {}), self)
-        self.loop.create_task(self.watch_queue(data["id"], self.transport))
-        self.loop.create_task(self.connection.message_handler(self.incoming_buffer))
+        self.id = data["id"]
+        self.meta = data.get("meta", {})
+        self.receptor.add_connection(self)
+        self.loop.create_task(self.watch_queue())
+        self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
         msg = json.dumps({
@@ -125,7 +130,7 @@ class BasicProtocol(BaseProtocol):
         super().handle_handshake(data)
         logger.debug("Received handshake from client with id %s, responding...", data["id"])
         self.send_handshake()
-        self.connection.send_route_advertisement()
+        self.receptor.send_route_advertisement()
 
 
 async def create_peer(receptor, loop, host, port):
@@ -155,7 +160,7 @@ class BasicClientProtocol(BaseProtocol):
     def handle_handshake(self, data):
         super().handle_handshake(data)
         logger.debug("Received handshake from server with id %s", data["id"])
-        self.connection.send_route_advertisement()
+        self.receptor.send_route_advertisement()
 
 
 class BasicControllerProtocol(asyncio.Protocol):
