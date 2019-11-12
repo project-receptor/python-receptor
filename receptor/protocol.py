@@ -10,6 +10,7 @@ from collections import deque
 
 from .messages import envelope
 from .exceptions import ReceptorBufferError
+from .config import connected_peers_guage
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +75,11 @@ class BaseProtocol(asyncio.Protocol):
         self.transport = transport
         self.greeted = False
         self.incoming_buffer = DataBuffer()
+        connected_peers_guage.inc()
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
+        connected_peers_guage.dec()
         self.receptor.remove_connection(self)
 
     def data_received(self, data):
@@ -171,10 +174,12 @@ class BasicControllerProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
+        connected_peers_guage.inc()
         if self not in self.receptor.controller_connections:
             self.receptor.controller_connections.append(self)
 
     def connection_lost(self, exc):
+        connected_peers_guage.dec()
         if self in self.receptor.controller_connections:
             self.receptor.controller_connections.remove(self)
 
