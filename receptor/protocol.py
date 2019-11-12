@@ -6,10 +6,8 @@ import logging
 import time
 import uuid
 
-from collections import deque
-
-from .messages import envelope
 from .exceptions import ReceptorBufferError
+from .messages import envelope
 from .stats import connected_peers_guage
 
 logger = logging.getLogger(__name__)
@@ -19,19 +17,19 @@ SIZEB = b"\x1b[%dD"
 
 
 class DataBuffer:
-    def __init__(self, deserializer=json.loads):
-        self.q = deque()
+    def __init__(self, loop=None, deserializer=json.loads):
+        self.q = asyncio.Queue(loop=loop)
         self.data_buffer = b""
         self.deserializer = deserializer
 
     def add(self, data):
         self.data_buffer = self.data_buffer + data
         *ready, self.data_buffer = self.data_buffer.rsplit(DELIM)
-        self.q.extend(ready)
+        for chunk in ready:
+            self.q.put_nowait(chunk)
 
-    def get(self):
-        while self.q:
-            yield self.deserializer(self.q.popleft())
+    async def get(self):
+        return self.deserializer(await self.q.get())
 
 
 class BaseProtocol(asyncio.Protocol):
@@ -74,8 +72,8 @@ class BaseProtocol(asyncio.Protocol):
         self.peername = transport.get_extra_info('peername')
         self.transport = transport
         self.greeted = False
-        self.incoming_buffer = DataBuffer()
         connected_peers_guage.inc()
+        self.incoming_buffer = DataBuffer(loop=self.loop)
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
@@ -91,18 +89,15 @@ class BaseProtocol(asyncio.Protocol):
         Initialized when the connection is established to handle the greeting
         before transitioning to message processing.
         '''
-        while not self.greeted:
-            logger.debug('Looking for handshake...')
-            for data in self.incoming_buffer.get():
-                logger.debug(data)
-                if data["cmd"] == "HI":
-                    self.handle_handshake(data)
-                    break
-                else:
-                    logger.error("Handshake failed!")
-                    self.transport.close()
-            await asyncio.sleep(.1)
-        logger.debug("handshake complete, starting normal handle loop")
+        logger.debug('Looking for handshake...')
+        data = await self.incoming_buffer.get()
+        logger.debug(data)
+        if data["cmd"] == "HI":
+            self.handle_handshake(data)
+            logger.debug("handshake complete, starting normal handle loop")
+        else:
+            logger.error("Handshake failed!")
+            self.transport.close()
 
     def handle_handshake(self, data):
         self.greeted = True

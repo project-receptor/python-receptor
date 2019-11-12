@@ -1,16 +1,16 @@
-import os
-import json
-import uuid
-import time
 import asyncio
-import logging
 import copy
+import json
+import logging
+import os
+import time
+import uuid
 
-from .router import MeshRouter
-from .work import WorkManager
-from .messages import envelope, directive
-from .stats import messages_received_counter
 from . import exceptions
+from .messages import directive, envelope
+from .router import MeshRouter
+from .stats import messages_received_counter
+from .work import WorkManager
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 logger = logging.getLogger(__name__)
@@ -99,12 +99,11 @@ class Receptor:
 
     async def message_handler(self, buf):
         while True:
-            for data in buf.get():
-                if "cmd" in data and data["cmd"] == "ROUTE":
-                    self.handle_route_advertisement(data)
-                else:
-                    await self.handle_message(data)
-            await asyncio.sleep(.1)
+            data = await buf.get()
+            if "cmd" in data and data["cmd"] == "ROUTE":
+                self.handle_route_advertisement(data)
+            else:
+                await self.handle_message(data)
 
     def add_connection(self, protocol_obj):
         self.update_connections(protocol_obj)
