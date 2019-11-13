@@ -10,7 +10,7 @@ from collections import deque
 
 from .messages import envelope
 from .exceptions import ReceptorBufferError
-from .config import connected_peers_guage
+from .stats import connected_peers_guage
 
 logger = logging.getLogger(__name__)
 

@@ -9,6 +9,7 @@ import copy
 from .router import MeshRouter
 from .work import WorkManager
 from .messages import envelope, directive
+from .stats import messages_received_counter
 from . import exceptions
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
@@ -203,6 +204,7 @@ class Receptor:
             directive=self.handle_directive,
             response=self.handle_response,
         )
+        messages_received_counter.inc()
         outer_env = envelope.OuterEnvelope(**msg)
         next_hop = self.router.next_hop(outer_env.recipient)
         if next_hop:

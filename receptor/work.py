@@ -4,6 +4,9 @@ import pkg_resources
 
 from . import exceptions
 from .messages import envelope
+from .stats import work_counter, active_work_gauge
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,6 +30,8 @@ class WorkManager:
         return self.active_work
 
     def add_work(self, env):
+        work_counter.inc()
+        active_work_gauge.inc()
         self.active_work.append(dict(id=env.message_id,
                                      directive=env.directive,
                                      sender=env.sender))
@@ -34,6 +39,7 @@ class WorkManager:
     def remove_work(self, env):
         for work in self.active_work:
             if env.message_id == work["id"]:
+                active_work_gauge.dec()
                 self.active_work.remove(work)
 
     async def handle(self, inner_env):

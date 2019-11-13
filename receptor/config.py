@@ -5,8 +5,6 @@ import logging
 import os
 import ssl
 
-from prometheus_client import Counter, Gauge
-
 from .entrypoints import run_as_node, run_as_controller, run_as_ping, run_as_send
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
 
@@ -31,12 +29,6 @@ SUBCOMMAND_EXTRAS = {
         'entrypoint': run_as_send,
     },
 }
-
-messages_received_counter = Counter("incoming_messages", "Messages received from Receptor Peers")
-connected_peers_guage = Gauge("connected_peers", "Number of active peer connections")
-work_counter = Counter("work_events", "A count of the number of work events that have been received")
-active_work_gauge = Gauge("active_work", "Amount of work currently being performed")
-route_counter = Counter("route_events", "A count of the number of messages that have been routed elsewhere in the mesh")
 
 
 def py_class(class_spec):
