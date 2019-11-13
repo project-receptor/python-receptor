@@ -5,11 +5,6 @@ import logging
 import time
 import uuid
 
-import opentracing
-from opentracing import tags
-
-from ..trace import tracer
-
 logger = logging.getLogger(__name__)
 
 
@@ -21,7 +16,6 @@ class OuterEnvelope:
         self.route_list = route_list
         self.inner = inner
         self.inner_obj = None
-        self.span = tracer.extract(opentracing.Format.TEXT_MAP, kwargs) 
 
     async def deserialize_inner(self, receptor):
         self.inner_obj = await InnerEnvelope.deserialize(receptor, self.inner)
@@ -39,14 +33,7 @@ class OuterEnvelope:
             route_list=self.route_list,
             inner=self.inner
         )
-        with tracer.start_active_span('serialize_outer', child_of=self.span) as scope:
-            scope.span.set_tag(tags.SPAN_KIND, tags.SPAN_KIND_RPC_CLIENT)
-            tracer.inject(
-                scope.span.context,
-                opentracing.Format.TEXT_MAP,
-                msg
-            )
-            return json.dumps(msg)
+        return json.dumps(msg)
         
 
 

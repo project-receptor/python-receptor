@@ -35,7 +35,7 @@ class DataBuffer:
         while self.q:
             msg = self.deserializer(self.q.popleft())
             span = tracer.extract(opentracing.Format.TEXT_MAP, msg)
-            with tracer.start_active_span('get_data', child_of=span):
+            with tracer.start_active_span('receive', child_of=span, tags={tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER}):
                 yield msg
 
 
