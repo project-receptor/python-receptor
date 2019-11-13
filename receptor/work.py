@@ -48,7 +48,7 @@ class WorkManager:
                 logger.exception(f'Could not load action {action} from {namespace}')
                 raise exceptions.InvalidDirectiveAction(f'Invalid action {action} for {namespace}')
             self.add_work(inner_env)
-            responses = action_method(inner_env, self.receptor.config.plugins.get("namespace", {}))
+            responses = action_method(inner_env, self.receptor.config.plugins.get(namespace, {}))
             async for response in responses:
                 serial += 1
                 logger.debug(f'Response emitted for {inner_env.message_id}, serial {serial}')
