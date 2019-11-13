@@ -2,20 +2,26 @@ import base64
 import datetime
 import json
 import logging
-import uuid
 import time
+import uuid
+
+import opentracing
+from opentracing import tags
+
+from ..trace import tracer
 
 logger = logging.getLogger(__name__)
 
 
 class OuterEnvelope:
-    def __init__(self, frame_id, sender, recipient, route_list, inner):
+    def __init__(self, frame_id, sender, recipient, route_list, inner, **kwargs):
         self.frame_id = frame_id
         self.sender = sender
         self.recipient = recipient
         self.route_list = route_list
         self.inner = inner
         self.inner_obj = None
+        self.span = tracer.extract(opentracing.Format.TEXT_MAP, kwargs) 
 
     async def deserialize_inner(self, receptor):
         self.inner_obj = await InnerEnvelope.deserialize(receptor, self.inner)
@@ -26,13 +32,22 @@ class OuterEnvelope:
         return cls(**doc)
     
     def serialize(self):
-        return json.dumps(dict(
+        msg = dict(
             frame_id=self.frame_id,
             sender=self.sender,
             recipient=self.recipient,
             route_list=self.route_list,
             inner=self.inner
-        ))
+        )
+        with tracer.start_active_span('serialize_outer', child_of=self.span) as scope:
+            scope.span.set_tag(tags.SPAN_KIND, tags.SPAN_KIND_RPC_CLIENT)
+            tracer.inject(
+                scope.span.context,
+                opentracing.Format.TEXT_MAP,
+                msg
+            )
+            return json.dumps(msg)
+        
 
 
 class InnerEnvelope:

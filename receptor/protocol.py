@@ -10,10 +10,9 @@ from collections import deque
 import opentracing
 from opentracing import tags
 
-from receptor.receptor import tracer
-
 from .exceptions import ReceptorBufferError
 from .messages import envelope
+from .trace import tracer
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +69,7 @@ class BaseProtocol(asyncio.Protocol):
                         msg
                     )
                     msg = json.dumps(msg).encode('utf-8')
+                    logger.debug("writing to transport for %s", self.id)
                     self.transport.write(msg + DELIM)
             except IndexError:
                 await asyncio.sleep(0.1)

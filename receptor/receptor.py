@@ -6,8 +6,6 @@ import os
 import time
 import uuid
 
-import jaeger_client
-
 from . import exceptions
 from .messages import directive, envelope
 from .router import MeshRouter
@@ -15,18 +13,6 @@ from .work import WorkManager
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 logger = logging.getLogger(__name__)
-
-tracer = jaeger_client.Config(
-    config={
-        'sampler': {
-            'type': 'const',
-            'param': 1,
-        },
-        'logging': True,
-    },
-    service_name='receptor',
-    validate=True,
-).initialize_tracer()
 
 
 class Receptor:
