@@ -71,7 +71,6 @@ class BaseProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.peername = transport.get_extra_info('peername')
         self.transport = transport
-        self.greeted = False
         connected_peers_guage.inc()
         self.incoming_buffer = DataBuffer(loop=self.loop)
         self.loop.create_task(self.wait_greeting())
@@ -100,7 +99,6 @@ class BaseProtocol(asyncio.Protocol):
             self.transport.close()
 
     def handle_handshake(self, data):
-        self.greeted = True
         self.id = data["id"]
         self.meta = data.get("meta", {})
         self.receptor.add_connection(self)
