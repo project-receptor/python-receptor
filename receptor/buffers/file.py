@@ -39,11 +39,15 @@ class DurableBuffer:
             await self.q.put(ident)
             await self._save_manifest()
     
-    async def get(self, handle_only=False):
+    async def get(self, handle_only=False, delete=True):
         async with self._manifest_lock:
-            msg = await self.q.get()
-            await self._save_manifest()
-            return await self._get_file(msg, handle_only=handle_only)
+            while True:
+                msg = await self.q.get()
+                await self._save_manifest()
+                try:
+                    return await self._get_file(msg, handle_only=handle_only, delete=delete)
+                except FileNotFoundError:
+                    pass
     
     async def _save_manifest(self):
         await self._loop.run_in_executor(pool, self._write_manifest)
@@ -59,13 +63,22 @@ class DurableBuffer:
         except FileNotFoundError:
             return []
 
-    async def _get_file(self, path, handle_only=False):
+    async def _get_file(self, path, handle_only=False, delete=True):
+        """
+        Retrieves a file from disk. If handle_only is True then we will
+        return the handle to the file and do nothing else. Otherwise the file
+        is read into memory all at once and returned. If delete is True (the
+        default) and handle_only is False (the default) then the underlying
+        file will be removed as well.
+        """
         path = os.path.join(self._message_path, path)
         fp = await self._loop.run_in_executor(pool, open, path, "rb")
         if handle_only:
             return fp
         bytes = await self._loop.run_in_executor(pool, lambda: fp.read())
         fp.close()
+        if delete:
+            os.remove(path)
         return bytes
 
     def _write_file(self, data, ident):
