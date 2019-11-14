@@ -4,6 +4,8 @@ import logging
 import sys
 import time
 
+from prometheus_client import start_http_server
+
 from .receptor import Receptor
 from . import controller
 from . import exceptions
@@ -15,12 +17,18 @@ logger = logging.getLogger(__name__)
 def run_as_controller(config):
     receptor = Receptor(config)
     logger.info(f'Starting up as node ID {receptor.node_id}')
+    if config.controller_stats_enable:
+        logger.info(f'Starting stats on port {config.controller_stats_port}')
+        start_http_server(config.controller_stats_port)
     controller.mainloop(receptor, config.controller_socket_path)
 
 
 def run_as_node(config):
     receptor = Receptor(config)
     logger.info(f'Running as Receptor node with ID: {receptor.node_id}')
+    if config.node_stats_enable:
+        logger.info(f'Starting stats on port {config.node_stats_port}')
+        start_http_server(config.node_stats_port)
     node.mainloop(receptor, config.node_ping_interval)
 
 

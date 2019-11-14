@@ -139,6 +139,21 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section='node',
+            key='stats_enable',
+            default_value=None,
+            set_value=True,
+            value_type='bool',
+            hint="Enable Prometheus style stats port",
+        )
+        self.add_config_option(
+            section='node',
+            key='stats_port',
+            default_value=8889,
+            value_type='int',
+            hint='Port to listen for requests to show stats',
+        )
+        self.add_config_option(
+            section='node',
             key='ping_interval',
             default_value=-1,
             value_type='int',
@@ -191,6 +206,21 @@ class ReceptorConfig:
             default_value='/var/run/receptor_controller.sock',
             value_type='path',
             hint='Path to control socket for controller commands.',
+        )
+        self.add_config_option(
+            section='controller',
+            key='stats_enable',
+            default_value=None,
+            set_value=True,
+            value_type='bool',
+            hint="Enable Prometheus style stats port",
+        )
+        self.add_config_option(
+            section='controller',
+            key='stats_port',
+            default_value=8889,
+            value_type='int',
+            hint='Port to listen for requests to show stats',
         )
         self.add_config_option(
             section='ping',

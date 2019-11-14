@@ -19,6 +19,7 @@ setup(
     long_description_content_type='text/markdown',
     python_requires=">=3.6",
     install_requires=[
+        "prometheus_client==0.7.1",
     ],
     zip_safe=False,
     entry_points={

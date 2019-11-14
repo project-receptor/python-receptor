@@ -12,6 +12,7 @@ flake8 = "*"
 
 [packages]
 python-dateutil = "*"
+prometheus-client = "*"
 
 [requires]
 python_version = "3.6"
