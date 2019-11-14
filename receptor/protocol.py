@@ -6,7 +6,6 @@ import logging
 import time
 import uuid
 
-from .exceptions import ReceptorBufferError
 from .messages import envelope
 from .stats import connected_peers_guage
 
@@ -52,19 +51,13 @@ class BaseProtocol(asyncio.Protocol):
         buffer_obj = buffer_mgr.get_buffer_for_node(self.id, self.receptor)
         while not self.transport.is_closing():
             try:
-                msg = buffer_obj.pop()
+                logger.debug("about to wait for a message")
+                msg = await buffer_obj.get()
+                logger.debug("got a message to send")
                 self.transport.write(msg + DELIM)
-            except IndexError:
-                await asyncio.sleep(0.1)
-            except ReceptorBufferError as e:
-                logger.exception("Receptor Buffer Read Error: {}".format(e))
-                # TODO: We need to try to send this message along somewhere else
-                # and record the failure somewhere
-                self.transport.close()
-                return
-            except Exception as e:
-                logger.exception("Error received trying to write to {}: {}".format(self.id, e))
-                buffer_obj.push(msg)
+            except Exception:
+                logger.exception("Error received trying to write to %s", self.id)
+                await buffer_obj.put(msg)
                 self.transport.close()
                 return
 
@@ -126,7 +119,7 @@ class BasicProtocol(BaseProtocol):
         super().handle_handshake(data)
         logger.debug("Received handshake from client with id %s, responding...", data["id"])
         self.send_handshake()
-        self.receptor.send_route_advertisement()
+        self.loop.create_task(self.receptor.send_route_advertisement())
 
 
 async def create_peer(receptor, loop, host, port):
@@ -156,7 +149,7 @@ class BasicClientProtocol(BaseProtocol):
     def handle_handshake(self, data):
         super().handle_handshake(data)
         logger.debug("Received handshake from server with id %s", data["id"])
-        self.receptor.send_route_advertisement()
+        self.loop.create_task(self.receptor.send_route_advertisement())
 
 
 class BasicControllerProtocol(asyncio.Protocol):

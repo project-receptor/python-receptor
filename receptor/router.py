@@ -1,14 +1,14 @@
-import logging
-
 import datetime
-from collections import defaultdict
 import heapq
+import logging
 import random
 import uuid
+from collections import defaultdict
 
 from dateutil import parser
+
+from .exceptions import ReceptorBufferError, UnrouteableError
 from .messages import envelope
-from .exceptions import UnrouteableError, ReceptorBufferError
 from .stats import route_counter
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ class MeshRouter:
         logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
         try:
             route_counter.inc()
-            buffer_obj.push(outer_envelope.serialize().encode("utf-8"))
+            await buffer_obj.put(outer_envelope.serialize().encode("utf-8"))
         except ReceptorBufferError as e:
             logger.exception("Receptor Buffer Write Error forwarding message to {}: {}".format(next_hop, e))
             # TODO: Possible to find another route? This might be a hard failure
@@ -188,6 +188,3 @@ class MeshRouter:
         if expected_response and inner_envelope.message_type == 'directive':
             self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
         await self.forward(outer_envelope, next_node_id)
-
-
-
