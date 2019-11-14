@@ -47,12 +47,7 @@ class Receptor:
             current_manifest = self.get_connection_manifest()
             for connection in current_manifest:
                 buffer = self.buffer_mgr.get_buffer_for_node(connection["id"], self)
-                for ident, message in buffer:
-                    message_actual = json.loads(message)
-                    if "expire_time" in message_actual and message_actual['expire_time'] < time.time():
-                        buffer.read_message(ident, remove=True)
-                        logger.info("Expiring message {}:{}".format(ident, connection["id"]))
-                        # TODO: Do something with expired message
+                await buffer.expire()
                 if connection["last"] + 86400 < time.time():
                     logger.info("Expiring connection {}".format(connection["id"]))
                     write_manifest = copy.copy(current_manifest)

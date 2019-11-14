@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 import uuid
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
@@ -61,7 +62,10 @@ class DurableBuffer:
         except FileNotFoundError:
             return []
 
-    async def _get_file(self, path, handle_only=False, delete=True):
+    def _path_for_ident(self, ident):
+        return os.path.join(self._message_path, ident)
+
+    async def _get_file(self, ident, handle_only=False, delete=True):
         """
         Retrieves a file from disk. If handle_only is True then we will
         return the handle to the file and do nothing else. Otherwise the file
@@ -69,19 +73,37 @@ class DurableBuffer:
         default) and handle_only is False (the default) then the underlying
         file will be removed as well.
         """
-        path = os.path.join(self._message_path, path)
+        path = self._path_for_ident(ident)
         fp = await self._loop.run_in_executor(pool, open, path, "rb")
         if handle_only:
             return fp
         bytes = await self._loop.run_in_executor(pool, lambda: fp.read())
         fp.close()
         if delete:
-            os.remove(path)
+            await self._loop.run_in_executor(pool, os.remove, path)
         return bytes
 
     def _write_file(self, data, ident):
         with open(os.path.join(self._message_path, ident), "wb") as fp:
             fp.write(data)
+
+    async def expire(self):
+        async with self._manifest_lock:
+            new_queue = asyncio.Queue()
+            while self.q.qsize() > 0:
+                ident = await self.q.get()
+                data = await self._get_file(ident, handle_only=True, delete=False)
+                msg = json.load(data)
+                if "expire_time" in msg and msg['expire_time'] < time.time():
+                    logger.info("Expiring message %s", ident)
+                    # TODO: Do something with expired message
+                    await self._loop.run_in_executor(pool, os.remove, self._path_for_ident(ident))
+                else:
+                    await new_queue.put(ident)
+            self.q = new_queue
+
+
+
         
 
 class FileBufferManager(BaseBufferManager):
