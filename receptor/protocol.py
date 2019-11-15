@@ -51,9 +51,7 @@ class BaseProtocol(asyncio.Protocol):
         buffer_obj = buffer_mgr.get_buffer_for_node(self.id, self.receptor)
         while not self.transport.is_closing():
             try:
-                logger.debug("about to wait for a message")
                 msg = await buffer_obj.get()
-                logger.debug("got a message to send")
                 self.transport.write(msg + DELIM)
             except Exception:
                 logger.exception("Error received trying to write to %s", self.id)
