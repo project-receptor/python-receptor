@@ -1,16 +1,16 @@
-import os
-import json
-import uuid
-import time
 import asyncio
-import logging
 import copy
+import json
+import logging
+import os
+import time
+import uuid
 
-from .router import MeshRouter
-from .work import WorkManager
-from .messages import envelope, directive
-from .stats import messages_received_counter
 from . import exceptions
+from .messages import directive, envelope
+from .router import MeshRouter
+from .stats import messages_received_counter
+from .work import WorkManager
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 logger = logging.getLogger(__name__)
@@ -47,12 +47,7 @@ class Receptor:
             current_manifest = self.get_connection_manifest()
             for connection in current_manifest:
                 buffer = self.buffer_mgr.get_buffer_for_node(connection["id"], self)
-                for ident, message in buffer:
-                    message_actual = json.loads(message)
-                    if "expire_time" in message_actual and message_actual['expire_time'] < time.time():
-                        buffer.read_message(ident, remove=True)
-                        logger.info("Expiring message {}:{}".format(ident, connection["id"]))
-                        # TODO: Do something with expired message
+                await buffer.expire()
                 if connection["last"] + 86400 < time.time():
                     logger.info("Expiring connection {}".format(connection["id"]))
                     write_manifest = copy.copy(current_manifest)
@@ -99,12 +94,11 @@ class Receptor:
 
     async def message_handler(self, buf):
         while True:
-            for data in buf.get():
-                if "cmd" in data and data["cmd"] == "ROUTE":
-                    self.handle_route_advertisement(data)
-                else:
-                    await self.handle_message(data)
-            await asyncio.sleep(.1)
+            data = await buf.get()
+            if "cmd" in data and data["cmd"] == "ROUTE":
+                await self.handle_route_advertisement(data)
+            else:
+                await self.handle_message(data)
 
     def add_connection(self, protocol_obj):
         self.update_connections(protocol_obj)
@@ -120,7 +114,7 @@ class Receptor:
                 self.router.debug_router()
                 self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
-        self.send_route_advertisement(self.router.get_edges())
+        protocol_obj.loop.create_task(self.send_route_advertisement(self.router.get_edges()))
 
     async def shutdown_handler(self):
         while True:
@@ -128,11 +122,11 @@ class Receptor:
                 return
             await asyncio.sleep(1)
 
-    def handle_route_advertisement(self, data):
+    async def handle_route_advertisement(self, data):
         self.router.add_edges(data["edges"])
-        self.send_route_advertisement(data["edges"], data["seen"])
+        await self.send_route_advertisement(data["edges"], data["seen"])
 
-    def send_route_advertisement(self, edges=None, seen=[]):
+    async def send_route_advertisement(self, edges=None, seen=[]):
         edges = edges or self.router.get_edges()
         seen = set(seen)
         logger.debug("Emitting Route Advertisements, excluding {}".format(seen))
@@ -143,7 +137,7 @@ class Receptor:
         for target in destinations:
             buf = self.buffer_mgr.get_buffer_for_node(target, self)
             try:
-                buf.push(json.dumps({
+                await buf.put(json.dumps({
                     "cmd": "ROUTE",
                     "id": self.node_id,
                     "capabilities": self.work_manager.get_capabilities(),
@@ -151,9 +145,6 @@ class Receptor:
                     "edges": edges,
                     "seen": seens
                 }).encode("utf-8"))
-            except exceptions.ReceptorBufferError as e:
-                logger.exception("Receptor Buffer Write Error broadcasting routes and capabilities: {}".format(e))
-                # TODO: This might should be a hard shutdown event
             except Exception as e:
                 logger.exception("Error trying to broadcast routes and capabilities: {}".format(e))
 
