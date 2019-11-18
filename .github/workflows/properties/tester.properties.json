@@ -1,0 +1,6 @@
+{
+    "name": "Receptor Perf Testing",
+    "description": "Performance testing of Receptor.",
+    "iconName": "python",
+    "categories": ["Python"]
+}
