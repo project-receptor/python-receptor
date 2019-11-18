@@ -52,6 +52,11 @@ class BaseProtocol(asyncio.Protocol):
         while not self.transport.is_closing():
             try:
                 msg = await buffer_obj.get()
+            except Exception:
+                logger.exception("Unhandled error when fetch from buffer for %s", self.id)
+                continue
+
+            try:
                 self.transport.write(msg + DELIM)
             except Exception:
                 logger.exception("Error received trying to write to %s", self.id)
