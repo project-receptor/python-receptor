@@ -4,7 +4,6 @@ import logging
 import os
 import time
 import uuid
-from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 
 from .base import BaseBufferManager
@@ -26,11 +25,8 @@ class DurableBuffer:
             os.makedirs(self._message_path, mode=0o700)
         except Exception:
             pass
-        # We are setting the internal queue for the asyncio Queue to have a
-        # default from what we have in the manifest. This relies on an
-        # implementation detail of asyncio.Queue because there doesn't appear
-        # to be a way to set initial state otherwise
-        self.q._queue = deque(self._read_manifest())
+        for item in self._read_manifest():
+            self.q.put_nowait(item)
     
     async def put(self, data):
         ident = str(uuid.uuid4())
@@ -102,9 +98,6 @@ class DurableBuffer:
                     await new_queue.put(ident)
             self.q = new_queue
 
-
-
-        
 
 class FileBufferManager(BaseBufferManager):
     _buffers = {}
