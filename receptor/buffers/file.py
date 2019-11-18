@@ -103,5 +103,11 @@ class FileBufferManager(BaseBufferManager):
     _buffers = {}
 
     def get_buffer_for_node(self, node_id, receptor):
-        path = os.path.join(os.path.expanduser(receptor.config.default_data_dir))
-        return self._buffers.setdefault(node_id, DurableBuffer(path, node_id, asyncio.get_event_loop()))
+        # due to the way that the manager is constructed, we won't have enough
+        # information to build a proper defaultdict at the time, and we want to
+        # make sure we only construct a single instance of DurableBuffer
+        # per-node so.. doing this the hard way.
+        if node_id not in self._buffers:
+            path = os.path.join(os.path.expanduser(receptor.config.default_data_dir))
+            self._buffers[node_id] = DurableBuffer(path, node_id, asyncio.get_event_loop())
+        return self._buffers[node_id]
