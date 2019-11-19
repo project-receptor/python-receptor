@@ -26,6 +26,11 @@ jobs:
         python ./test/perf/node_utils.py ping ./test/perf/topology-random.yaml --count 100 --validate 0.1
         kill `pidof python`
         rm -Rf /tmp/receptor
+    - name: Upload artifact for Perf - Random
+      uses: actions/upload-artifact@v1
+      with:
+        name: RandomPerfTest
+        path: results.yaml
     - name: Perform perf test 2 - Flat
       run: |
         python ./test/perf/node_utils.py file ./test/perf/topology-flat.yaml&
@@ -33,6 +38,11 @@ jobs:
         python ./test/perf/node_utils.py ping ./test/perf/topology-flat.yaml --count 100 --validate 0.1
         kill `pidof python`
         rm -Rf /tmp/receptor
+    - name: Upload artifact for Perf - Flat
+      uses: actions/upload-artifact@v1
+      with:
+        name: FlatPerfTest
+        path: results.yaml
     - name: Perform perf test 3 - Tree
       run: |
         python ./test/perf/node_utils.py file ./test/perf/topology-tree.yaml&
@@ -40,6 +50,11 @@ jobs:
         python ./test/perf/node_utils.py ping ./test/perf/topology-tree.yaml --count 100 --validate 0.1
         kill `pidof python`
         rm -Rf /tmp/receptor
+    - name: Upload artifact for Perf - Tree
+      uses: actions/upload-artifact@v1
+      with:
+        name: TreePerfTest
+        path: results.yaml
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest
