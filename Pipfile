@@ -13,6 +13,7 @@ flake8 = "*"
 [packages]
 python-dateutil = "*"
 prometheus-client = "*"
+aiohttp = "*"
 
 [requires]
 python_version = "3.6"
