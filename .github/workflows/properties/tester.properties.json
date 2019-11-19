@@ -1,6 +1,6 @@
 {
-    "name": "Receptor Perf Testing",
-    "description": "Performance testing of Receptor.",
+    "name": "Receptor Testing",
+    "description": "Unit + Perf tests for Receptor.",
     "iconName": "python",
     "categories": ["Python"]
 }
