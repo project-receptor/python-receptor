@@ -1,10 +1,10 @@
-name: Receptor Perf Testing
+name: Receptor Testing
 
 on: [push, pull_request]
 
 jobs:
   build:
-
+    name: Performance Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -40,3 +40,21 @@ jobs:
         python ./test/perf/node_utils.py ping ./test/perf/topology-tree.yaml --count 100 --validate 0.1
         kill `pidof python`
         rm -Rf /tmp/receptor
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install python-dateutil pytest pytest-asyncio
+        pip install .
+    - name: pytest unit tests
+      run: |
+        pytest
