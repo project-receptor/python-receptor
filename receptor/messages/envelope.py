@@ -1,11 +1,128 @@
+import asyncio
 import base64
 import datetime
+import itertools
 import json
 import logging
-import uuid
 import time
+import uuid
+from struct import pack, unpack
 
 logger = logging.getLogger(__name__)
+
+MAX_INT64 = (2 ** 64 - 1)
+
+
+class FramedBuffer:
+    """
+    A buffer that accumulates frames and bytes to produce a header and a
+    payload.
+
+    This buffer assumes that an entire message (denoted by msg_id) will be
+    sent before another message is sent.
+    """
+    def __init__(self, loop=None):
+        self.q = asyncio.Queue(loop=loop)
+        self.header = None
+        self.bb = bytearray()
+        self.current_frame = None
+        self.to_read = 0
+
+    async def put(self, data):
+        if not self.to_read:
+            return await self.handle_frame(data)
+        await self.consume(data)
+    
+    async def handle_frame(self, data):
+        self.current_frame, rest = Frame.from_data(data)
+        if self.current_frame.type in (Frame.START_MSG, Frame.PAYLOAD):
+            self.to_read = self.current_frame.length
+            await self.consume(rest)
+        else:
+            raise Exception("Unknown Frame Type")
+
+    async def consume(self, data):
+        self.to_read -= len(data)
+        self.bb += data
+        if self.to_read == 0:
+            await self.finish()
+
+    async def finish(self):
+        if self.current_frame.type == Frame.START_MSG:
+            self.header = Header(**json.loads(self.bb))
+        elif self.current_frame.type == Frame.PAYLOAD:
+            await self.q.put((self.header, self.bb))
+            self.header = None
+        self.to_read = 0
+        self.bb = bytearray()
+
+    async def get(self):
+        return await self.q.get()
+
+
+class Frame:
+    START_MSG = 0
+    PAYLOAD = 1
+    FINISH = 2
+
+    def __init__(self, type_, version, length, msg_id, id_):
+        self.type = type_
+        self.version = version
+        self.length = length
+        self.msg_id = msg_id
+        self.id = id_
+
+    def serialize(self):
+        high, low = ((self.msg_id >> 64) & MAX_INT64, self.msg_id & MAX_INT64)
+        return b''.join([
+            pack("ccIi", chr(self.type).encode("ascii"), chr(self.version).encode("ascii"), self.id, self.length),
+            pack(">QQ", high, low),
+        ])
+
+    @classmethod
+    def deserialize(cls, buf):
+        t, v, i, length = unpack("ccIi", buf[0:12])
+        hi, lo = unpack(">QQ", buf[12:])
+        msg_id = (hi << 64) | lo
+        return cls(ord(t), ord(v), length, msg_id, i)
+
+    @classmethod
+    def from_data(cls, data):
+        return cls.deserialize(data[:28]), data[28:]
+
+
+class Header:
+    def __init__(self, sender, recipient, route_list):
+        self.sender = sender
+        self.recipient = recipient
+        self.route_list = route_list
+
+    def serialize(self):
+        return json.dumps({"sender": self.sender, "recipient": self.recipient, "route_list": self.route_list}).encode("utf-8")
+
+    def __repr__(self):
+        return f"Header: {self.sender}, {self.recipient}, {self.route_list}"
+
+    def __eq__(self, other):
+        return (self.sender, self.recipient, self.route_list) == (other.sender, other.recipient, other.route_list)
+
+
+def gen_chunks(buffer, header, msg_id=None, chunksize=2 ** 8):
+    if msg_id is None:
+        msg_id = uuid.uuid4().int
+    seq = itertools.count()
+    buf = bytearray(chunksize)
+    bv = memoryview(buf)
+    header = header.serialize()
+    yield Frame(Frame.START_MSG, 1, len(header), msg_id, next(seq)).serialize() + header
+    bytes_read = buffer.readinto(buf)
+    while bytes_read:
+        f = Frame(Frame.PAYLOAD, 1, bytes_read, msg_id, next(seq)).serialize()
+        if bytes_read == chunksize:
+            yield f + bv.tobytes()
+        else:
+            yield f + bv[:bytes_read].tobytes()
+        bytes_read = buffer.readinto(buf)
 
 
 class OuterEnvelope:
