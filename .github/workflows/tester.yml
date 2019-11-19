@@ -1,0 +1,42 @@
+name: Receptor Perf Testing
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v1
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install python-dateutil
+        pip install .
+        pip install -r ./test/perf/requirements.txt
+    - name: Perform perf test 1 - Random
+      run: |
+        python ./test/perf/node_utils.py file ./test/perf/topology-random.yaml&
+        sleep 10
+        python ./test/perf/node_utils.py ping ./test/perf/topology-random.yaml --count 100 --validate 0.1
+        kill `pidof python`
+        rm -Rf /tmp/receptor
+    - name: Perform perf test 2 - Flat
+      run: |
+        python ./test/perf/node_utils.py file ./test/perf/topology-flat.yaml&
+        sleep 10
+        python ./test/perf/node_utils.py ping ./test/perf/topology-flat.yaml --count 100 --validate 0.1
+        kill `pidof python`
+        rm -Rf /tmp/receptor
+    - name: Perform perf test 3 - Tree
+      run: |
+        python ./test/perf/node_utils.py file ./test/perf/topology-tree.yaml&
+        sleep 10
+        python ./test/perf/node_utils.py ping ./test/perf/topology-tree.yaml --count 100 --validate 0.1
+        kill `pidof python`
+        rm -Rf /tmp/receptor

@@ -1,0 +1,78 @@
+nodes:
+  controller:
+    connections: []
+    controller: true
+    listen_port: 8888
+    name: controller
+  node1:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node1
+  node10:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node10
+  node11:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node11
+  node12:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node12
+  node2:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node2
+  node3:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node3
+  node4:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node4
+  node5:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node5
+  node6:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node6
+  node7:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node7
+  node8:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node8
+  node9:
+    connections:
+    - controller
+    controller: false
+    listen_port: null
+    name: node9
