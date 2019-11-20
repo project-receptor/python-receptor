@@ -36,11 +36,12 @@ class FramedBuffer:
     
     async def handle_frame(self, data):
         self.current_frame, rest = Frame.from_data(data)
-        if self.current_frame.type in (Frame.START_MSG, Frame.PAYLOAD):
-            self.to_read = self.current_frame.length
-            await self.consume(rest)
-        else:
+
+        if self.current_frame.type not in (Frame.HEADER, Frame.PAYLOAD):
             raise Exception("Unknown Frame Type")
+
+        self.to_read = self.current_frame.length
+        await self.consume(rest)
 
     async def consume(self, data):
         self.to_read -= len(data)
@@ -49,8 +50,8 @@ class FramedBuffer:
             await self.finish()
 
     async def finish(self):
-        if self.current_frame.type == Frame.START_MSG:
-            self.header = Header(**json.loads(self.bb))
+        if self.current_frame.type == Frame.HEADER:
+            self.header = Header.from_bytes(self.bb)
         elif self.current_frame.type == Frame.PAYLOAD:
             await self.q.put((self.header, self.bb))
             self.header = None
@@ -62,8 +63,10 @@ class FramedBuffer:
 
 
 class Frame:
-    START_MSG = 0
+    HEADER = 0
     PAYLOAD = 1
+
+    __slots__ = ('type', 'version', 'length', 'msg_id', 'id')
 
     def __init__(self, type_, version, length, msg_id, id_):
         self.type = type_
@@ -103,8 +106,12 @@ class Header:
     def serialize(self):
         return json.dumps({"sender": self.sender, "recipient": self.recipient, "route_list": self.route_list}).encode("utf-8")
 
+    @classmethod
+    def from_bytes(cls, data):
+        return cls(**json.loads(data))
+
     def __repr__(self):
-        return f"Header: {self.sender}, {self.recipient}, {self.route_list}"
+        return f"Header({self.sender}, {self.recipient}, {self.route_list})"
 
     def __eq__(self, other):
         return (self.sender, self.recipient, self.route_list) == (other.sender, other.recipient, other.route_list)
@@ -117,7 +124,7 @@ def gen_chunks(data, header, msg_id=None, chunksize=2 ** 8):
     buf = bytearray(chunksize)
     bv = memoryview(buf)
     header = header.serialize()
-    yield Frame(Frame.START_MSG, 1, len(header), msg_id, next(seq)).serialize() + header
+    yield Frame(Frame.HEADER, 1, len(header), msg_id, next(seq)).serialize() + header
     yield Frame(Frame.PAYLOAD, 1, len(data), msg_id, next(seq)).serialize()
     buffer = io.BytesIO(data)
     bytes_read = buffer.readinto(buf)

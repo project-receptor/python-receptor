@@ -9,6 +9,7 @@ ipython = "*"
 pytest = "*"
 pytest-asyncio = "*"
 flake8 = "*"
+rope = "*"
 
 [packages]
 python-dateutil = "*"
