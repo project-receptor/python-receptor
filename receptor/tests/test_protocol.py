@@ -1,4 +1,3 @@
-import io
 import uuid
 
 import pytest
@@ -69,7 +68,7 @@ async def test_gen_chunks():
 
     header = Header("node1", "node2", [])
     payload = b"this is a test with a buffer"
-    for chunk in gen_chunks(io.BytesIO(payload), header):
+    for chunk in gen_chunks(payload, header):
         await b.put(chunk)
     
     h, p = await b.get()

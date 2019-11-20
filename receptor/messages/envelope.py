@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import datetime
+import io
 import itertools
 import json
 import logging
@@ -63,7 +64,6 @@ class FramedBuffer:
 class Frame:
     START_MSG = 0
     PAYLOAD = 1
-    FINISH = 2
 
     def __init__(self, type_, version, length, msg_id, id_):
         self.type = type_
@@ -73,22 +73,25 @@ class Frame:
         self.id = id_
 
     def serialize(self):
-        high, low = ((self.msg_id >> 64) & MAX_INT64, self.msg_id & MAX_INT64)
-        return b''.join([
-            pack("ccIi", chr(self.type).encode("ascii"), chr(self.version).encode("ascii"), self.id, self.length),
-            pack(">QQ", high, low),
-        ])
+        return pack(">ccIIQQ", bytes([self.type]), bytes([self.version]), self.id, self.length, *split_uuid(self.msg_id))
 
     @classmethod
     def deserialize(cls, buf):
-        t, v, i, length = unpack("ccIi", buf[0:12])
-        hi, lo = unpack(">QQ", buf[12:])
-        msg_id = (hi << 64) | lo
+        t, v, i, length, hi, lo = unpack(">ccIIQQ", buf)
+        msg_id = join_uuid(hi, lo)
         return cls(ord(t), ord(v), length, msg_id, i)
 
     @classmethod
     def from_data(cls, data):
-        return cls.deserialize(data[:28]), data[28:]
+        return cls.deserialize(data[:26]), data[26:]
+
+
+def split_uuid(data):
+    return ((data >> 64) & MAX_INT64, data & MAX_INT64)
+
+
+def join_uuid(hi, lo):
+    return (hi << 64) | lo
 
 
 class Header:
@@ -107,7 +110,7 @@ class Header:
         return (self.sender, self.recipient, self.route_list) == (other.sender, other.recipient, other.route_list)
 
 
-def gen_chunks(buffer, header, msg_id=None, chunksize=2 ** 8):
+def gen_chunks(data, header, msg_id=None, chunksize=2 ** 8):
     if msg_id is None:
         msg_id = uuid.uuid4().int
     seq = itertools.count()
@@ -115,13 +118,14 @@ def gen_chunks(buffer, header, msg_id=None, chunksize=2 ** 8):
     bv = memoryview(buf)
     header = header.serialize()
     yield Frame(Frame.START_MSG, 1, len(header), msg_id, next(seq)).serialize() + header
+    yield Frame(Frame.PAYLOAD, 1, len(data), msg_id, next(seq)).serialize()
+    buffer = io.BytesIO(data)
     bytes_read = buffer.readinto(buf)
     while bytes_read:
-        f = Frame(Frame.PAYLOAD, 1, bytes_read, msg_id, next(seq)).serialize()
         if bytes_read == chunksize:
-            yield f + bv.tobytes()
+            yield bv.tobytes()
         else:
-            yield f + bv[:bytes_read].tobytes()
+            yield bv[:bytes_read].tobytes()
         bytes_read = buffer.readinto(buf)
 
 
