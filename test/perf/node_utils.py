@@ -9,9 +9,34 @@ from time import sleep
 
 import click
 import yaml
+from pyparsing import alphanums
+from pyparsing import Group
+from pyparsing import OneOrMore
+from pyparsing import ParseException
+from pyparsing import Suppress
+from pyparsing import Word
 
 
 DEBUG = False
+
+
+class Conn:
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+
+    def __eq__(self, other):
+        if self.a == other.a and self.b == other.b or self.a == other.b and self.b == other.a:
+            return True
+        return False
+
+    def __hash__(self):
+        enps = [self.a, self.b]
+        sorted_enps = sorted(enps)
+        return hash(tuple(sorted_enps))
+
+    def __repr__(self):
+        return f"{self.a} -- {self.b}"
 
 
 def random_port(tcp=True):
@@ -265,6 +290,44 @@ def ping(filename, count, validate):
             else:
                 print("  PASSED!")
         if not valid:
+            sys.exit(127)
+
+
+def read_and_parse_dot(filename):
+    group = Group(Word(alphanums) + Suppress("--") + Word(alphanums)) + Suppress(";")
+    dot = Suppress("graph {") + OneOrMore(group) + Suppress("}")
+
+    with open(filename) as f:
+        raw_data = f.read()
+    data = dot.parseString(raw_data).asList()
+    return {Conn(c[0], c[1]) for c in data}
+
+
+@main.command("dot-compare")
+@click.option("--wait", default=None)
+@click.argument("filename_one")
+@click.argument("filename_two")
+def dot_compare(filename_one, filename_two, wait):
+
+    if wait:
+        start = time.time()
+        while True:
+            try:
+                assert read_and_parse_dot(filename_one) == read_and_parse_dot(filename_two)
+                sys.stderr.write("Matched\n")
+                sys.exit(0)
+            except (AssertionError, ParseException, FileNotFoundError) as e:
+                if time.time() < start + float(wait):
+                    time.sleep(1)
+                else:
+                    sys.stderr.write("Failed match\n")
+                    raise e
+    else:
+        try:
+            assert read_and_parse_dot(filename_one) == read_and_parse_dot(filename_two)
+            sys.stderr.write("Matched\n")
+        except AssertionError:
+            sys.stderr.write("Failed match\n")
             sys.exit(127)
 
 
