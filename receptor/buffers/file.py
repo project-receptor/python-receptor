@@ -57,6 +57,10 @@ class DurableBuffer:
                 return json.load(fp)
         except FileNotFoundError:
             return []
+        except json.decoder.JSONDecodeError:
+            with open(self._manifest_path, "r") as fp:
+                logger.error("failed to decode manifest: %s", fp.read())
+            raise
 
     def _path_for_ident(self, ident):
         return os.path.join(self._message_path, ident)
