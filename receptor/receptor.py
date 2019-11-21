@@ -93,12 +93,18 @@ class Receptor:
         self.update_connection_manifest(protocol_obj.id)
 
     async def message_handler(self, buf):
+        logger.debug("spawning message_handler")
         while True:
-            header, data = await buf.get()
-            if "cmd" in data and data["cmd"] == "ROUTE":
-                await self.handle_route_advertisement(data)
+            try:
+                data = await buf.get()
+            except Exception:
+                logger.exception("message_handler")
             else:
-                await self.handle_message(header, data)
+                logger.debug("message_handler: %s", data)
+                if "cmd" in data.header and data.header["cmd"] == "ROUTE":
+                    await self.handle_route_advertisement(data.header)
+                else:
+                    await self.handle_message(data)
 
     def add_connection(self, protocol_obj):
         self.update_connections(protocol_obj)
@@ -191,17 +197,17 @@ class Receptor:
         else:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
 
-    async def handle_message(self, header, msg):
+    async def handle_message(self, msg):
         handlers = dict(
             directive=self.handle_directive,
             response=self.handle_response,
         )
         messages_received_counter.inc()
-        next_hop = self.router.next_hop(header.recipient)
+        next_hop = self.router.next_hop(msg.header["recipient"])
         if next_hop:
-            return await self.router.forward(header, msg, next_hop)
+            return await self.router.forward(msg, next_hop)
 
-        inner = await envelope.Inner.deserialize(self, msg)
+        inner = await envelope.Inner.deserialize(self, msg.payload)
 
         if inner.message_type not in handlers:
             raise exceptions.UnknownMessageType(

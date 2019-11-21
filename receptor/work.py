@@ -1,11 +1,11 @@
 import logging
 import traceback
+
 import pkg_resources
 
 from . import exceptions
 from .messages import envelope
-from .stats import work_counter, active_work_gauge
-
+from .stats import active_work_gauge, work_counter
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class WorkManager:
             async for response in responses:
                 serial += 1
                 logger.debug(f'Response emitted for {inner_env.message_id}, serial {serial}')
-                enveloped_response = envelope.InnerEnvelope.make_response(
+                enveloped_response = envelope.Inner.make_response(
                     receptor=self.receptor,
                     recipient=inner_env.sender,
                     payload=response,
@@ -70,7 +70,7 @@ class WorkManager:
             serial += 1
             logger.error(f'Error encountered while handling the response, replying with an error message ({e})')
             logger.error(traceback.format_tb(e.__traceback__))
-            enveloped_response = envelope.InnerEnvelope.make_response(
+            enveloped_response = envelope.Inner.make_response(
                 receptor=self.receptor,
                 recipient=inner_env.sender,
                 payload=str(e),
@@ -80,4 +80,3 @@ class WorkManager:
             )
             self.remove_work(inner_env)
             await self.receptor.router.send(enveloped_response)
-

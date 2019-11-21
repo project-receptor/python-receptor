@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from receptor.messages.envelope import Frame, FramedBuffer, gen_chunks
+from receptor.messages.envelope import Frame, FramedBuffer, FramedMessage
 
 
 @pytest.yield_fixture
@@ -12,8 +12,8 @@ def msg_id():
 
 
 @pytest.yield_fixture
-def framed_buffer():
-    return FramedBuffer()
+def framed_buffer(event_loop):
+    return FramedBuffer(loop=event_loop)
 
 
 @pytest.mark.asyncio
@@ -35,21 +35,6 @@ async def test_framedbuffer(framed_buffer, msg_id):
 
     assert m.header == header
     assert m.payload == payload + payload2
-
-
-@pytest.mark.asyncio
-async def test_gen_chunks():
-
-    b = FramedBuffer()
-
-    header = {"sender": "node1", "recipient": "node2", "route_list": []}
-    payload = b"this is a test with a buffer"
-    for chunk in gen_chunks(payload, header):
-        await b.put(chunk)
-
-    m = await b.get()
-    assert m.header == header
-    assert m.payload == payload
 
 
 @pytest.mark.asyncio
@@ -94,3 +79,33 @@ async def test_command(framed_buffer, msg_id):
     m = await framed_buffer.get()
     assert m.header == cmd
     assert m.payload is None
+
+
+@pytest.mark.asyncio
+async def test_overfull(framed_buffer, msg_id):
+    header = {"foo": "bar"}
+    payload = b'this is a test'
+    msg = FramedMessage(header=header, payload=payload)
+
+    await framed_buffer.put(msg.serialize())
+
+    m = await framed_buffer.get()
+
+    assert m.header == header
+    assert m.payload == payload
+
+
+@pytest.mark.asyncio
+async def test_underfull(framed_buffer, msg_id):
+    header = {"foo": "bar"}
+    payload = b'this is a test'
+    msg = FramedMessage(header=header, payload=payload)
+    b = msg.serialize()
+
+    await framed_buffer.put(b[:10])
+    await framed_buffer.put(b[10:])
+
+    m = await framed_buffer.get()
+
+    assert m.header == header
+    assert m.payload == payload

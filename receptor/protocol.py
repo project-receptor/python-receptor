@@ -57,7 +57,9 @@ class BaseProtocol(asyncio.Protocol):
                 continue
 
             try:
-                self.transport.write(msg + DELIM)
+                logger.debug("about to write %s ... %s", msg[:8], msg[-8:])
+                self.transport.write(msg)
+                logger.debug("written successfully")
             except Exception:
                 logger.exception("Error received trying to write to %s", self.id)
                 await buffer_obj.put(msg)
@@ -76,7 +78,7 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor.remove_connection(self)
 
     def data_received(self, data):
-        logger.debug(data)
+        logger.debug("recv: %s ... %s", data[:16], data[-16:])
         self.loop.create_task(self.incoming_buffer.put(data))
 
     async def wait_greeting(self):
@@ -95,10 +97,12 @@ class BaseProtocol(asyncio.Protocol):
             self.transport.close()
 
     def handle_handshake(self, data):
+        logger.debug("handle_handshake: %s", data)
         self.id = data["id"]
         self.meta = data.get("meta", {})
         self.receptor.add_connection(self)
         self.loop.create_task(self.watch_queue())
+        logger.debug("starting message_handler: %s", self.incoming_buffer)
         self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
@@ -180,14 +184,15 @@ class BasicControllerProtocol(asyncio.Protocol):
 
     def _do_emit_callback(self, fut):
         res = fut.result()
-        self.transport.write(res.encode() + DELIM)
+        logger.debug("_do_emit_callback: %s", res)
+        self.transport.write(res + DELIM)
 
     def data_received(self, data):
         recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)
         message_id = str(uuid.uuid4())
         logger.info(f'{message_id}: Sending {directive} to {recipient}')
         sent_timestamp = datetime.datetime.utcnow()
-        inner_env = envelope.InnerEnvelope(
+        inner_env = envelope.Inner(
             receptor=self.receptor,
             message_id=message_id,
             sender=self.receptor.node_id,
@@ -212,7 +217,7 @@ class BasicControllerProtocol(asyncio.Protocol):
         try:
             fut.result()
         except Exception as e:
-            err_resp = envelope.InnerEnvelope.make_response(
+            err_resp = envelope.Inner.make_response(
                 receptor=self.receptor,
                 recipient=inner_env.sender,
                 payload=str(e),

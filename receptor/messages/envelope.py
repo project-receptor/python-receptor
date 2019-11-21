@@ -1,8 +1,6 @@
 import asyncio
 import base64
 import datetime
-import io
-import itertools
 import json
 import logging
 import struct
@@ -61,29 +59,42 @@ class FramedBuffer:
     def __init__(self, loop=None):
         self.q = asyncio.Queue(loop=loop)
         self.header = None
+        self.framebuffer = bytearray()
         self.bb = bytearray()
         self.current_frame = None
         self.to_read = 0
 
     async def put(self, data):
+        logger.debug("put: %s ... %s", data[:16], data[-16:])
         if not self.to_read:
             return await self.handle_frame(data)
         await self.consume(data)
 
     async def handle_frame(self, data):
-        self.current_frame, rest = Frame.from_data(data)
+        try:
+            self.framebuffer += data
+            frame, rest = Frame.from_data(self.framebuffer)
+        except struct.error:
+            return  # We don't have enough data yet
+        else:
+            self.framebuffer = bytearray()
 
-        if self.current_frame.type not in Frame.Types:
+        if frame.type not in Frame.Types:
             raise Exception("Unknown Frame Type")
 
+        self.current_frame = frame
         self.to_read = self.current_frame.length
         await self.consume(rest)
 
     async def consume(self, data):
+        logger.debug("consuming %d bytes; to_read = %d bytes", len(data), self.to_read)
+        data, rest = data[:self.to_read], data[self.to_read:]
         self.to_read -= len(data)
         self.bb += data
         if self.to_read == 0:
             await self.finish()
+        if rest:
+            await self.handle_frame(rest)
 
     async def finish(self):
         if self.current_frame.type == Frame.Types.HEADER:
@@ -124,6 +135,9 @@ class Frame:
         self.msg_id = msg_id
         self.id = id_
 
+    def __repr__(self):
+        return f"Frame({self.type}, {self.version}, {self.length}, {self.msg_id}, {self.id})"
+
     def serialize(self):
         return self.fmt.pack(
             bytes([self.type]), bytes([self.version]),
@@ -156,58 +170,6 @@ def split_uuid(data):
 
 def join_uuid(hi, lo):
     return (hi << 64) | lo
-
-
-def glue(header, payload):
-    hf = Frame.wrap(header, type_=Frame.Types.HEADER)
-    pf = Frame.wrap(payload, msg_id=hf.msg_id)
-    return hf.serialize() + header + pf.serialize() + payload
-
-
-def gen_chunks(data, header, msg_id=None, chunksize=2 ** 8):
-    if msg_id is None:
-        msg_id = uuid.uuid4().int
-    seq = itertools.count()
-    buf = bytearray(chunksize)
-    bv = memoryview(buf)
-    header = json.dumps(header).encode("utf-8")
-    yield Frame(Frame.Types.HEADER, 1, len(header), msg_id, next(seq)).serialize() + header
-    yield Frame(Frame.Types.PAYLOAD, 1, len(data), msg_id, next(seq)).serialize()
-    buffer = io.BytesIO(data)
-    bytes_read = buffer.readinto(buf)
-    while bytes_read:
-        if bytes_read == chunksize:
-            yield bv.tobytes()
-        else:
-            yield bv[:bytes_read].tobytes()
-        bytes_read = buffer.readinto(buf)
-
-
-class OuterEnvelope:
-    def __init__(self, frame_id, sender, recipient, route_list, inner):
-        self.frame_id = frame_id
-        self.sender = sender
-        self.recipient = recipient
-        self.route_list = route_list
-        self.inner = inner
-        self.inner_obj = None
-
-    async def deserialize_inner(self, receptor):
-        self.inner_obj = await Inner.deserialize(receptor, self.inner)
-
-    @classmethod
-    def from_raw(cls, raw):
-        doc = json.loads(raw)
-        return cls(**doc)
-
-    def serialize(self):
-        return json.dumps(dict(
-            frame_id=self.frame_id,
-            sender=self.sender,
-            recipient=self.recipient,
-            route_list=self.route_list,
-            inner=self.inner
-        ))
 
 
 class Inner:
