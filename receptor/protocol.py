@@ -68,7 +68,7 @@ class BaseProtocol(asyncio.Protocol):
         self.peername = transport.get_extra_info('peername')
         self.transport = transport
         connected_peers_gauge.inc()
-        self.incoming_buffer = DataBuffer(loop=self.loop)
+        self.incoming_buffer = envelope.FramedBuffer(loop=self.loop)
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
@@ -77,7 +77,7 @@ class BaseProtocol(asyncio.Protocol):
 
     def data_received(self, data):
         logger.debug(data)
-        self.incoming_buffer.add(data)
+        self.loop.create_task(self.incoming_buffer.put(data))
 
     async def wait_greeting(self):
         '''
@@ -86,9 +86,9 @@ class BaseProtocol(asyncio.Protocol):
         '''
         logger.debug('Looking for handshake...')
         data = await self.incoming_buffer.get()
-        logger.debug(data)
-        if data["cmd"] == "HI":
-            self.handle_handshake(data)
+        logger.debug(data.header)
+        if data.header["cmd"] == "HI":
+            self.handle_handshake(data.header)
             logger.debug("handshake complete, starting normal handle loop")
         else:
             logger.error("Handshake failed!")
@@ -102,15 +102,15 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
-        msg = json.dumps({
+        msg = envelope.CommandMessage(header={
             "cmd": "HI",
             "id": self.receptor.node_id,
             "expire_time": time.time() + 10,
             "meta": dict(capabilities=self.receptor.work_manager.get_capabilities(),
                          groups=self.receptor.config.node_groups,
                          work=self.receptor.work_manager.get_work())
-        }).encode("utf-8")
-        self.transport.write(msg + DELIM)
+        })
+        self.transport.write(msg.serialize())
 
 
 class BasicProtocol(BaseProtocol):

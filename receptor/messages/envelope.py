@@ -5,13 +5,49 @@ import io
 import itertools
 import json
 import logging
+import struct
 import time
 import uuid
-from struct import pack, unpack
+from enum import IntEnum
 
 logger = logging.getLogger(__name__)
 
 MAX_INT64 = (2 ** 64 - 1)
+
+
+class FramedMessage:
+    """
+    A complete message constructed from one or more Frames.
+    """
+
+    __slots__ = ("msg_id", "header", "payload")
+
+    def __init__(self, msg_id=None, header=None, payload=None):
+        if msg_id is None:
+            msg_id = uuid.uuid4().int
+        self.msg_id = msg_id
+        self.header = header
+        self.payload = payload
+
+
+    def serialize(self):
+        h = json.dumps(self.header).encode("utf-8")
+        return b''.join([
+            Frame.wrap(h, type_=Frame.Types.HEADER, msg_id=self.msg_id).serialize(),
+            h,
+            Frame.wrap(self.payload, msg_id=self.msg_id).serialize(),
+            self.payload
+        ])
+
+
+class CommandMessage(FramedMessage):
+
+    def serialize(self):
+        h = json.dumps(self.header).encode("utf-8")
+        return b''.join([
+            Frame.wrap(h, type_=Frame.Types.COMMAND, msg_id=self.msg_id).serialize(),
+            h,
+        ])
 
 
 class FramedBuffer:
@@ -33,11 +69,11 @@ class FramedBuffer:
         if not self.to_read:
             return await self.handle_frame(data)
         await self.consume(data)
-    
+
     async def handle_frame(self, data):
         self.current_frame, rest = Frame.from_data(data)
 
-        if self.current_frame.type not in (Frame.HEADER, Frame.PAYLOAD):
+        if self.current_frame.type not in Frame.Types:
             raise Exception("Unknown Frame Type")
 
         self.to_read = self.current_frame.length
@@ -50,11 +86,18 @@ class FramedBuffer:
             await self.finish()
 
     async def finish(self):
-        if self.current_frame.type == Frame.HEADER:
-            self.header = Header.from_bytes(self.bb)
-        elif self.current_frame.type == Frame.PAYLOAD:
-            await self.q.put((self.header, self.bb))
+        if self.current_frame.type == Frame.Types.HEADER:
+            self.header = json.loads(self.bb)
+        elif self.current_frame.type == Frame.Types.PAYLOAD:
+            await self.q.put(FramedMessage(
+                self.current_frame.msg_id, header=self.header,
+                payload=self.bb))
             self.header = None
+        elif self.current_frame.type == Frame.Types.COMMAND:
+            await self.q.put(FramedMessage(
+                self.current_frame.msg_id, header=json.loads(self.bb)))
+        else:
+            raise Exception("Unknown Frame Type")
         self.to_read = 0
         self.bb = bytearray()
 
@@ -63,10 +106,16 @@ class FramedBuffer:
 
 
 class Frame:
-    HEADER = 0
-    PAYLOAD = 1
+
+    class Types(IntEnum):
+        HEADER = 0
+        PAYLOAD = 1
+        COMMAND = 2
+
+    fmt = struct.Struct(">ccIIQQ")
 
     __slots__ = ('type', 'version', 'length', 'msg_id', 'id')
+
 
     def __init__(self, type_, version, length, msg_id, id_):
         self.type = type_
@@ -76,17 +125,29 @@ class Frame:
         self.id = id_
 
     def serialize(self):
-        return pack(">ccIIQQ", bytes([self.type]), bytes([self.version]), self.id, self.length, *split_uuid(self.msg_id))
+        return self.fmt.pack(
+            bytes([self.type]), bytes([self.version]),
+            self.id, self.length, *split_uuid(self.msg_id))
 
     @classmethod
     def deserialize(cls, buf):
-        t, v, i, length, hi, lo = unpack(">ccIIQQ", buf)
+        t, v, i, length, hi, lo = Frame.fmt.unpack(buf)
         msg_id = join_uuid(hi, lo)
-        return cls(ord(t), ord(v), length, msg_id, i)
+        return cls(Frame.Types(ord(t)), ord(v), length, msg_id, i)
 
     @classmethod
     def from_data(cls, data):
-        return cls.deserialize(data[:26]), data[26:]
+        return cls.deserialize(data[:Frame.fmt.size]), data[Frame.fmt.size:]
+
+    @classmethod
+    def wrap(cls, data, type_=Types.PAYLOAD, msg_id=None):
+        """
+        Returns a frame for the passed data.
+        """
+        if not msg_id:
+            msg_id = uuid.uuid4().int
+
+        return cls(type_, 1, len(data), msg_id, 1)
 
 
 def split_uuid(data):
@@ -97,24 +158,10 @@ def join_uuid(hi, lo):
     return (hi << 64) | lo
 
 
-class Header:
-    def __init__(self, sender, recipient, route_list):
-        self.sender = sender
-        self.recipient = recipient
-        self.route_list = route_list
-
-    def serialize(self):
-        return json.dumps({"sender": self.sender, "recipient": self.recipient, "route_list": self.route_list}).encode("utf-8")
-
-    @classmethod
-    def from_bytes(cls, data):
-        return cls(**json.loads(data))
-
-    def __repr__(self):
-        return f"Header({self.sender}, {self.recipient}, {self.route_list})"
-
-    def __eq__(self, other):
-        return (self.sender, self.recipient, self.route_list) == (other.sender, other.recipient, other.route_list)
+def glue(header, payload):
+    hf = Frame.wrap(header, type_=Frame.Types.HEADER)
+    pf = Frame.wrap(payload, msg_id=hf.msg_id)
+    return hf.serialize() + header + pf.serialize() + payload
 
 
 def gen_chunks(data, header, msg_id=None, chunksize=2 ** 8):
@@ -123,9 +170,9 @@ def gen_chunks(data, header, msg_id=None, chunksize=2 ** 8):
     seq = itertools.count()
     buf = bytearray(chunksize)
     bv = memoryview(buf)
-    header = header.serialize()
-    yield Frame(Frame.HEADER, 1, len(header), msg_id, next(seq)).serialize() + header
-    yield Frame(Frame.PAYLOAD, 1, len(data), msg_id, next(seq)).serialize()
+    header = json.dumps(header).encode("utf-8")
+    yield Frame(Frame.Types.HEADER, 1, len(header), msg_id, next(seq)).serialize() + header
+    yield Frame(Frame.Types.PAYLOAD, 1, len(data), msg_id, next(seq)).serialize()
     buffer = io.BytesIO(data)
     bytes_read = buffer.readinto(buf)
     while bytes_read:
@@ -146,13 +193,13 @@ class OuterEnvelope:
         self.inner_obj = None
 
     async def deserialize_inner(self, receptor):
-        self.inner_obj = await InnerEnvelope.deserialize(receptor, self.inner)
+        self.inner_obj = await Inner.deserialize(receptor, self.inner)
 
     @classmethod
     def from_raw(cls, raw):
         doc = json.loads(raw)
         return cls(**doc)
-    
+
     def serialize(self):
         return json.dumps(dict(
             frame_id=self.frame_id,
@@ -163,7 +210,7 @@ class OuterEnvelope:
         ))
 
 
-class InnerEnvelope:
+class Inner:
     def __init__(self, receptor, message_id, sender, recipient, message_type, timestamp,
                  raw_payload, directive=None, in_response_to=None, ttl=None, serial=1,
                  code=0, expire_time_delta=300):

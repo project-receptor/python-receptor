@@ -177,14 +177,14 @@ class MeshRouter:
             #TODO: This probably needs to emit an error response
             raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
         signed = await inner_envelope.sign_and_serialize()
-        outer_envelope = envelope.OuterEnvelope(
-            frame_id=str(uuid.uuid4()),
-            sender=self.node_id,
-            recipient=inner_envelope.recipient,
-            route_list=[self.node_id],
-            inner=signed
-        )
+
+        header = {
+            "sender": self.node_id,
+            "recipient": inner_envelope.recipient,
+            "route_list": [self.node_id]
+        }
+        msg = envelope.FramedMessage(uuid.uuid4().int, header, signed)
         logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
         if expected_response and inner_envelope.message_type == 'directive':
             self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
-        await self.forward(outer_envelope, next_node_id)
+        await self.forward(msg, next_node_id)
