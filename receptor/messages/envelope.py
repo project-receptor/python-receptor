@@ -65,7 +65,6 @@ class FramedBuffer:
         self.to_read = 0
 
     async def put(self, data):
-        logger.debug("put: %s ... %s", data[:16], data[-16:])
         if not self.to_read:
             return await self.handle_frame(data)
         await self.consume(data)

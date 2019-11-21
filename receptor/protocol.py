@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import functools
-import json
 import logging
 import time
 import uuid
@@ -12,23 +11,6 @@ from .stats import connected_peers_gauge
 logger = logging.getLogger(__name__)
 
 DELIM = b"\x1b[K"
-SIZEB = b"\x1b[%dD"
-
-
-class DataBuffer:
-    def __init__(self, loop=None, deserializer=json.loads):
-        self.q = asyncio.Queue(loop=loop)
-        self.data_buffer = b""
-        self.deserializer = deserializer
-
-    def add(self, data):
-        self.data_buffer = self.data_buffer + data
-        *ready, self.data_buffer = self.data_buffer.rsplit(DELIM)
-        for chunk in ready:
-            self.q.put_nowait(chunk)
-
-    async def get(self):
-        return self.deserializer(await self.q.get())
 
 
 class BaseProtocol(asyncio.Protocol):
@@ -57,9 +39,7 @@ class BaseProtocol(asyncio.Protocol):
                 continue
 
             try:
-                logger.debug("about to write %s ... %s", msg[:8], msg[-8:])
                 self.transport.write(msg)
-                logger.debug("written successfully")
             except Exception:
                 logger.exception("Error received trying to write to %s", self.id)
                 await buffer_obj.put(msg)
@@ -78,7 +58,6 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor.remove_connection(self)
 
     def data_received(self, data):
-        logger.debug("recv: %s ... %s", data[:16], data[-16:])
         self.loop.create_task(self.incoming_buffer.put(data))
 
     async def wait_greeting(self):
@@ -88,10 +67,8 @@ class BaseProtocol(asyncio.Protocol):
         '''
         logger.debug('Looking for handshake...')
         data = await self.incoming_buffer.get()
-        logger.debug(data.header)
         if data.header["cmd"] == "HI":
             self.handle_handshake(data.header)
-            logger.debug("handshake complete, starting normal handle loop")
         else:
             logger.error("Handshake failed!")
             self.transport.close()
@@ -102,7 +79,6 @@ class BaseProtocol(asyncio.Protocol):
         self.meta = data.get("meta", {})
         self.receptor.add_connection(self)
         self.loop.create_task(self.watch_queue())
-        logger.debug("starting message_handler: %s", self.incoming_buffer)
         self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
@@ -184,7 +160,6 @@ class BasicControllerProtocol(asyncio.Protocol):
 
     def _do_emit_callback(self, fut):
         res = fut.result()
-        logger.debug("_do_emit_callback: %s", res)
         self.transport.write(res + DELIM)
 
     def data_received(self, data):
