@@ -24,8 +24,8 @@ async def test_framedbuffer(framed_buffer, msg_id):
 
     await framed_buffer.put(f1.serialize() + header_bytes)
 
-    payload = b"tina loves butts"
-    payload2 = b"yep yep yep"
+    payload = b"payload one is very boring"
+    payload2 = b"payload two is also very boring"
     f2 = Frame(Frame.Types.PAYLOAD, 1, len(payload) + len(payload2), msg_id, 2)
 
     await framed_buffer.put(f2.serialize() + payload)
@@ -84,7 +84,7 @@ async def test_command(framed_buffer, msg_id):
 @pytest.mark.asyncio
 async def test_overfull(framed_buffer, msg_id):
     header = {"foo": "bar"}
-    payload = b'this is a test'
+    payload = b"this is a test"
     msg = FramedMessage(header=header, payload=payload)
 
     await framed_buffer.put(msg.serialize())
@@ -98,7 +98,7 @@ async def test_overfull(framed_buffer, msg_id):
 @pytest.mark.asyncio
 async def test_underfull(framed_buffer, msg_id):
     header = {"foo": "bar"}
-    payload = b'this is a test'
+    payload = b"this is a test"
     msg = FramedMessage(header=header, payload=payload)
     b = msg.serialize()
 
@@ -109,3 +109,28 @@ async def test_underfull(framed_buffer, msg_id):
 
     assert m.header == header
     assert m.payload == payload
+
+
+@pytest.mark.asyncio
+async def test_malformed_frame(framed_buffer, msg_id):
+    with pytest.raises(ValueError):
+        await framed_buffer.put(
+            b"this is total garbage and should break things very nicely"
+        )
+
+
+@pytest.mark.skip(
+    reason="""
+    This test illustrates that sending an incomplete stream corrupts the transport"""
+)
+@pytest.mark.asyncio
+async def test_too_short(framed_buffer, msg_id):
+    f1 = Frame(Frame.Types.HEADER, 1, 100, 1, 1)
+    too_short_header = b"this is not long enough"
+    f2 = Frame(Frame.Types.PAYLOAD, 1, 100, 1, 2)
+    too_short_payload = b"this is also not long enough"
+
+    await framed_buffer.put(f1.serialize() + too_short_header)
+    await framed_buffer.put(f2.serialize() + too_short_payload)
+
+    await framed_buffer.get()

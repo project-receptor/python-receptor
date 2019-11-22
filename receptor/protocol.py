@@ -58,6 +58,8 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor.remove_connection(self)
 
     def data_received(self, data):
+        # TODO: The put() call can raise an exception which should trigger a
+        # transport failure.
         self.loop.create_task(self.incoming_buffer.put(data))
 
     async def wait_greeting(self):
