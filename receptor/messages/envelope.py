@@ -15,7 +15,7 @@ MAX_INT64 = (2 ** 64 - 1)
 
 class FramedMessage:
     """
-    A complete message constructed from one or more Frames.
+    A complete, two-part message.
     """
 
     __slots__ = ("msg_id", "header", "payload")
@@ -26,7 +26,6 @@ class FramedMessage:
         self.msg_id = msg_id
         self.header = header
         self.payload = payload
-
 
     def serialize(self):
         h = json.dumps(self.header).encode("utf-8")
@@ -39,6 +38,10 @@ class FramedMessage:
 
 
 class CommandMessage(FramedMessage):
+    """
+    A complete, single part message, meant to encapsulate point to point
+    commands or naive broadcasts.
+    """
 
     def serialize(self):
         h = json.dumps(self.header).encode("utf-8")
@@ -116,6 +119,12 @@ class FramedBuffer:
 
 
 class Frame:
+    """
+    A Frame represents the minimal metadata about a transmission.
+
+    Usually you should not create one directly, but rather use the
+    FramedMessage or CommandMessage classes.
+    """
 
     class Types(IntEnum):
         HEADER = 0
@@ -125,7 +134,6 @@ class Frame:
     fmt = struct.Struct(">ccIIQQ")
 
     __slots__ = ('type', 'version', 'length', 'msg_id', 'id')
-
 
     def __init__(self, type_, version, length, msg_id, id_):
         self.type = type_
@@ -164,10 +172,12 @@ class Frame:
 
 
 def split_uuid(data):
+    "Splits a 128 bit int into two 64 bit words for binary encoding"
     return ((data >> 64) & MAX_INT64, data & MAX_INT64)
 
 
 def join_uuid(hi, lo):
+    "Joins two 64 bit words into a 128bit int from binary encoding"
     return (hi << 64) | lo
 
 
