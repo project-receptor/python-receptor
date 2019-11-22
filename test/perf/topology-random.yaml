@@ -6,6 +6,7 @@ nodes:
     name: controller
     stats_enable: true
     stats_port: null
+    socket_path: /tmp/receptor/random-receptor.sock
   node1:
     connections:
     - controller
