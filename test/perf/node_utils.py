@@ -8,7 +8,9 @@ from collections import namedtuple
 from time import sleep
 
 import click
+import requests
 import yaml
+from prometheus_client.parser import text_string_to_metric_families
 from pyparsing import alphanums
 from pyparsing import Group
 from pyparsing import OneOrMore
@@ -18,6 +20,14 @@ from pyparsing import Word
 
 
 DEBUG = False
+
+RECEPTOR_METRICS = (
+    "active_work",
+    "connected_peers",
+    "incoming_messages",
+    "route_events",
+    "work_events",
+)
 
 
 class Conn:
@@ -65,7 +75,10 @@ def random_port(tcp=True):
 procs = []
 
 
-Node = namedtuple("Node", ["name", "controller", "listen_port", "connections"])
+Node = namedtuple('Node', [
+    "name", "controller", "listen_port", "connections", "stats_enable",
+    "stats_port"
+])
 
 
 def generate_random_mesh(controller_port, node_count, conn_method):
@@ -91,6 +104,8 @@ def do_it(topology, profile=False):
                 "listen_port": node_data.listen_port if node_data.controller else None,
                 "controller": node_data.controller,
                 "connections": node_data.connections,
+                "stats_enable": node_data.stats_enable,
+                "stats_port": node_data.stats_port,
             }
         yaml.dump(data, f)
     with open("last-topology_graph.dot", "w") as f:
@@ -131,6 +146,11 @@ def do_it(topology, profile=False):
                             f"--listen-port={node.listen_port}",
                         ]
                     )
+                    if node.stats_enable:
+                        starter.extend([
+                            "--stats-enable",
+                            f"--stats-port={node.stats_port}",
+                        ])
                     op = subprocess.Popen(" ".join(starter), shell=True)
                     procs.append(op)
                 f.write(f"{' '.join(starter)}\n")
@@ -155,6 +175,11 @@ def do_it(topology, profile=False):
                             peer_string,
                         ]
                     )
+                    if node.stats_enable:
+                        starter.extend([
+                            "--stats-enable",
+                            f"--stats-port={node.stats_port}",
+                        ])
                     op = subprocess.Popen(" ".join(starter), shell=True)
                     procs.append(op)
                 f.write(f"{' '.join(starter)}\n")
@@ -177,6 +202,8 @@ def load_topology(filename):
             definition["controller"],
             definition.get("listen_port", None) or random_port(),
             definition["connections"],
+            definition.get("stats_enable", False),
+            definition.get("stats_port", None) or random_port(),
         )
     return topology
 
@@ -329,6 +356,38 @@ def dot_compare(filename_one, filename_two, wait):
         except AssertionError:
             sys.stderr.write("Failed match\n")
             sys.exit(127)
+
+
+@main.command("check-stats")
+@click.option("--debug", is_flag=True, default=False)
+@click.option("--profile", is_flag=True, default=False)
+@click.argument("filename", type=click.File("r"))
+def check_stats(filename, debug, profile):
+    topology = load_topology(filename)
+    failures = []
+
+    for node in topology.values():
+        if not node.stats_enable:
+            continue
+        stats = requests.get(f'http://localhost:{node.stats_port}/metrics')
+        metrics = {
+            metric.name: metric
+            for metric in text_string_to_metric_families(stats.text)
+            if metric.name in RECEPTOR_METRICS
+        }
+        expected_connected_peers = len([
+            n for n in topology.values() if node.name in n.connections
+        ]) + len(node.connections)
+        connected_peers = metrics['connected_peers'].samples[0].value
+        if expected_connected_peers != connected_peers:
+            failures.append(
+                f"Node '{node.name}' was expected to have "
+                f"{expected_connected_peers} connections, but it reported to "
+                f" have {connected_peers}"
+            )
+    if failures:
+        print('\n'.join(failures))
+        sys.exit(127)
 
 
 if __name__ == "__main__":
