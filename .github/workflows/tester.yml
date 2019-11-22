@@ -24,6 +24,7 @@ jobs:
         python ./test/perf/node_utils.py file ./test/perf/topology-random.yaml&
         python ./test/perf/node_utils.py dot-compare graph_controller.dot last-topology_graph.dot --wait 40
         python ./test/perf/node_utils.py ping ./test/perf/topology-random.yaml --count 100 --validate 0.1
+        python ./test/perf/node_utils.py check-stats last-topology.yaml
         kill `pidof python`
         rm -Rf /tmp/receptor
         rm graph_controller.dot
@@ -38,6 +39,7 @@ jobs:
         python ./test/perf/node_utils.py file ./test/perf/topology-flat.yaml&
         python ./test/perf/node_utils.py dot-compare graph_controller.dot last-topology_graph.dot --wait 40
         python ./test/perf/node_utils.py ping ./test/perf/topology-flat.yaml --count 100 --validate 0.1
+        python ./test/perf/node_utils.py check-stats last-topology.yaml
         kill `pidof python`
         rm -Rf /tmp/receptor
         rm graph_controller.dot
@@ -52,6 +54,7 @@ jobs:
         python ./test/perf/node_utils.py file ./test/perf/topology-tree.yaml&
         python ./test/perf/node_utils.py dot-compare graph_controller.dot last-topology_graph.dot --wait 40
         python ./test/perf/node_utils.py ping ./test/perf/topology-tree.yaml --count 100 --validate 0.1
+        python ./test/perf/node_utils.py check-stats last-topology.yaml
         kill `pidof python`
         rm -Rf /tmp/receptor
         rm graph_controller.dot
