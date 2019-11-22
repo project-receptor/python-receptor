@@ -1,7 +1,6 @@
 import asyncio
 import datetime
 import functools
-import json
 import logging
 import time
 import uuid
@@ -12,23 +11,6 @@ from .stats import connected_peers_gauge
 logger = logging.getLogger(__name__)
 
 DELIM = b"\x1b[K"
-SIZEB = b"\x1b[%dD"
-
-
-class DataBuffer:
-    def __init__(self, loop=None, deserializer=json.loads):
-        self.q = asyncio.Queue(loop=loop)
-        self.data_buffer = b""
-        self.deserializer = deserializer
-
-    def add(self, data):
-        self.data_buffer = self.data_buffer + data
-        *ready, self.data_buffer = self.data_buffer.rsplit(DELIM)
-        for chunk in ready:
-            self.q.put_nowait(chunk)
-
-    async def get(self):
-        return self.deserializer(await self.q.get())
 
 
 class BaseProtocol(asyncio.Protocol):
@@ -57,7 +39,7 @@ class BaseProtocol(asyncio.Protocol):
                 continue
 
             try:
-                self.transport.write(msg + DELIM)
+                self.transport.write(msg)
             except Exception:
                 logger.exception("Error received trying to write to %s", self.id)
                 await buffer_obj.put(msg)
@@ -68,7 +50,7 @@ class BaseProtocol(asyncio.Protocol):
         self.peername = transport.get_extra_info('peername')
         self.transport = transport
         connected_peers_gauge.inc()
-        self.incoming_buffer = DataBuffer(loop=self.loop)
+        self.incoming_buffer = envelope.FramedBuffer(loop=self.loop)
         self.loop.create_task(self.wait_greeting())
 
     def connection_lost(self, exc):
@@ -76,8 +58,9 @@ class BaseProtocol(asyncio.Protocol):
         self.receptor.remove_connection(self)
 
     def data_received(self, data):
-        logger.debug(data)
-        self.incoming_buffer.add(data)
+        # TODO: The put() call can raise an exception which should trigger a
+        # transport failure.
+        self.loop.create_task(self.incoming_buffer.put(data))
 
     async def wait_greeting(self):
         '''
@@ -86,15 +69,14 @@ class BaseProtocol(asyncio.Protocol):
         '''
         logger.debug('Looking for handshake...')
         data = await self.incoming_buffer.get()
-        logger.debug(data)
-        if data["cmd"] == "HI":
-            self.handle_handshake(data)
-            logger.debug("handshake complete, starting normal handle loop")
+        if data.header["cmd"] == "HI":
+            self.handle_handshake(data.header)
         else:
             logger.error("Handshake failed!")
             self.transport.close()
 
     def handle_handshake(self, data):
+        logger.debug("handle_handshake: %s", data)
         self.id = data["id"]
         self.meta = data.get("meta", {})
         self.receptor.add_connection(self)
@@ -102,15 +84,15 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
-        msg = json.dumps({
+        msg = envelope.CommandMessage(header={
             "cmd": "HI",
             "id": self.receptor.node_id,
             "expire_time": time.time() + 10,
             "meta": dict(capabilities=self.receptor.work_manager.get_capabilities(),
                          groups=self.receptor.config.node_groups,
                          work=self.receptor.work_manager.get_work())
-        }).encode("utf-8")
-        self.transport.write(msg + DELIM)
+        })
+        self.transport.write(msg.serialize())
 
 
 class BasicProtocol(BaseProtocol):
@@ -180,14 +162,14 @@ class BasicControllerProtocol(asyncio.Protocol):
 
     def _do_emit_callback(self, fut):
         res = fut.result()
-        self.transport.write(res.encode() + DELIM)
+        self.transport.write(res + DELIM)
 
     def data_received(self, data):
         recipient, directive, payload = data.rstrip(DELIM).decode('utf8').split('\n', 2)
         message_id = str(uuid.uuid4())
         logger.info(f'{message_id}: Sending {directive} to {recipient}')
         sent_timestamp = datetime.datetime.utcnow()
-        inner_env = envelope.InnerEnvelope(
+        inner_env = envelope.Inner(
             receptor=self.receptor,
             message_id=message_id,
             sender=self.receptor.node_id,
@@ -212,7 +194,7 @@ class BasicControllerProtocol(asyncio.Protocol):
         try:
             fut.result()
         except Exception as e:
-            err_resp = envelope.InnerEnvelope.make_response(
+            err_resp = envelope.Inner.make_response(
                 receptor=self.receptor,
                 recipient=inner_env.sender,
                 payload=str(e),

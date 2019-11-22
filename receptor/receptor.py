@@ -93,12 +93,18 @@ class Receptor:
         self.update_connection_manifest(protocol_obj.id)
 
     async def message_handler(self, buf):
+        logger.debug("spawning message_handler")
         while True:
-            data = await buf.get()
-            if "cmd" in data and data["cmd"] == "ROUTE":
-                await self.handle_route_advertisement(data)
+            try:
+                data = await buf.get()
+            except Exception:
+                logger.exception("message_handler")
             else:
-                await self.handle_message(data)
+                logger.debug("message_handler: %s", data)
+                if "cmd" in data.header and data.header["cmd"] == "ROUTE":
+                    await self.handle_route_advertisement(data.header)
+                else:
+                    await self.handle_message(data)
 
     def add_connection(self, protocol_obj):
         self.update_connections(protocol_obj)
@@ -137,56 +143,57 @@ class Receptor:
         for target in destinations:
             buf = self.buffer_mgr.get_buffer_for_node(target, self)
             try:
-                await buf.put(json.dumps({
+                msg = envelope.CommandMessage(header={
                     "cmd": "ROUTE",
                     "id": self.node_id,
                     "capabilities": self.work_manager.get_capabilities(),
                     "groups": self.config.node_groups,
                     "edges": edges,
                     "seen": seens
-                }).encode("utf-8"))
+                })
+                await buf.put(msg.serialize())
             except Exception as e:
                 logger.exception("Error trying to broadcast routes and capabilities: {}".format(e))
 
-    async def handle_directive(self, outer_env):
+    async def handle_directive(self, inner):
         try:
-            namespace, _ = outer_env.inner_obj.directive.split(':', 1)
+            namespace, _ = inner.directive.split(':', 1)
             if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
-                await directive.control(self.router, outer_env.inner_obj)
+                await directive.control(self.router, inner)
             else:
                 # other namespace/work directives
-                await self.work_manager.handle(outer_env.inner_obj)
+                await self.work_manager.handle(inner)
         except ValueError:
-            logger.error("error in handle_message: Invalid directive -> '%s'. Sending failure response back." % (outer_env.inner_obj.directive,))
-            err_resp = outer_env.inner_obj.make_response(
+            logger.error("error in handle_message: Invalid directive -> '%s'. Sending failure response back." % (inner.directive,))
+            err_resp = inner.make_response(
                 receptor=self,
-                recipient=outer_env.inner_obj.sender,
-                payload="An invalid directive ('%s') was specified." % (outer_env.inner_obj.directive,),
-                in_response_to=outer_env.inner_obj.message_id,
-                serial=outer_env.inner_obj.serial + 1,
+                recipient=inner.sender,
+                payload="An invalid directive ('%s') was specified." % (inner.directive,),
+                in_response_to=inner.message_id,
+                serial=inner.serial + 1,
                 ttl=15,
                 code=1,
             )
             await self.router.send(err_resp)
         except Exception as e:
             logger.error("error in handle_message: '%s'. Sending failure response back." % (str(e),))
-            err_resp = outer_env.inner_obj.make_response(
+            err_resp = inner.make_response(
                 receptor=self,
-                recipient=outer_env.inner_obj.sender,
+                recipient=inner.sender,
                 payload=str(e),
-                in_response_to=outer_env.inner_obj.message_id,
-                serial=outer_env.inner_obj.serial + 1,
+                in_response_to=inner.message_id,
+                serial=inner.serial + 1,
                 ttl=15,
                 code=1,
             )
             await self.router.send(err_resp)
 
-    async def handle_response(self, outer_env):
-        in_response_to = outer_env.inner_obj.in_response_to
+    async def handle_response(self, inner):
+        in_response_to = inner.in_response_to
         if in_response_to in self.router.response_registry:
             logger.info(f'Handling response to {in_response_to} with callback.')
             for connection in self.controller_connections:
-                connection.emit_response(outer_env.inner_obj)
+                connection.emit_response(inner)
         else:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
 
@@ -196,15 +203,14 @@ class Receptor:
             response=self.handle_response,
         )
         messages_received_counter.inc()
-        outer_env = envelope.OuterEnvelope(**msg)
-        next_hop = self.router.next_hop(outer_env.recipient)
+        next_hop = self.router.next_hop(msg.header["recipient"])
         if next_hop:
-            return await self.router.forward(outer_env, next_hop)
+            return await self.router.forward(msg, next_hop)
 
-        await outer_env.deserialize_inner(self)
+        inner = await envelope.Inner.deserialize(self, msg.payload)
 
-        if outer_env.inner_obj.message_type not in handlers:
+        if inner.message_type not in handlers:
             raise exceptions.UnknownMessageType(
-                f'Unknown message type: {outer_env.inner_obj.message_type}')
+                f'Unknown message type: {inner.message_type}')
 
-        await handlers[outer_env.inner_obj.message_type](outer_env)
+        await handlers[inner.message_type](inner)

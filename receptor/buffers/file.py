@@ -27,13 +27,13 @@ class DurableBuffer:
             pass
         for item in self._read_manifest():
             self.q.put_nowait(item)
-    
+
     async def put(self, data):
         ident = str(uuid.uuid4())
         await self._loop.run_in_executor(pool, self._write_file, data, ident)
         await self.q.put(ident)
         await self._save_manifest()
-    
+
     async def get(self, handle_only=False, delete=True):
         while True:
             msg = await self.q.get()
@@ -42,21 +42,25 @@ class DurableBuffer:
                 return await self._get_file(msg, handle_only=handle_only, delete=delete)
             except FileNotFoundError:
                 pass
-    
+
     async def _save_manifest(self):
         async with self._manifest_lock:
             await self._loop.run_in_executor(pool, self._write_manifest)
-    
+
     def _write_manifest(self):
         with open(self._manifest_path, "w") as fp:
             json.dump(list(self.q._queue), fp)
-    
+
     def _read_manifest(self):
         try:
             with open(self._manifest_path, "r") as fp:
                 return json.load(fp)
         except FileNotFoundError:
             return []
+        except json.decoder.JSONDecodeError:
+            with open(self._manifest_path, "r") as fp:
+                logger.error("failed to decode manifest: %s", fp.read())
+            raise
 
     def _path_for_ident(self, ident):
         return os.path.join(self._message_path, ident)

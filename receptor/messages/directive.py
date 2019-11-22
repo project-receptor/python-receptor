@@ -1,6 +1,6 @@
 import datetime
-import logging
 import json
+import logging
 
 from ..exceptions import UnknownDirective
 from . import envelope
@@ -26,7 +26,7 @@ class Control:
         serial = 0
         async for response in responses:
             serial += 1
-            enveloped_response = envelope.InnerEnvelope.make_response(
+            enveloped_response = envelope.Inner.make_response(
                 receptor=router.receptor,
                 recipient=inner_env.sender,
                 payload=response,

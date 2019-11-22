@@ -97,7 +97,7 @@ class MeshRouter:
     async def ping_node(self, node_id, callback=log_ping):
         logger.info(f'Sending ping to node {node_id}')
         now = datetime.datetime.utcnow().isoformat()
-        ping_envelope = envelope.InnerEnvelope(
+        ping_envelope = envelope.Inner(
             receptor=self.receptor,
             message_id=str(uuid.uuid4()),
             sender=self.node_id,
@@ -137,17 +137,17 @@ class MeshRouter:
                         mins[next_vertex] = next_total_cost
                         heapq.heappush(heap, (next_total_cost, next_vertex, path))
 
-    async def forward(self, outer_envelope, next_hop):
+    async def forward(self, msg, next_hop):
         """
         Forward a message on to the next hop closer to its destination
         """
         buffer_mgr = self.receptor.config.components_buffer_manager
         buffer_obj = buffer_mgr.get_buffer_for_node(next_hop, self.receptor)
-        outer_envelope.route_list.append(self.node_id)
-        logger.debug(f'Forwarding frame {outer_envelope.frame_id} to {next_hop}')
+        msg.header["route_list"].append(self.node_id)
+        logger.debug(f'Forwarding frame {msg.msg_id} to {next_hop}')
         try:
             route_counter.inc()
-            await buffer_obj.put(outer_envelope.serialize().encode("utf-8"))
+            await buffer_obj.put(msg.serialize())
         except ReceptorBufferError as e:
             logger.exception("Receptor Buffer Write Error forwarding message to {}: {}".format(next_hop, e))
             # TODO: Possible to find another route? This might be a hard failure
@@ -177,14 +177,14 @@ class MeshRouter:
             #TODO: This probably needs to emit an error response
             raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
         signed = await inner_envelope.sign_and_serialize()
-        outer_envelope = envelope.OuterEnvelope(
-            frame_id=str(uuid.uuid4()),
-            sender=self.node_id,
-            recipient=inner_envelope.recipient,
-            route_list=[self.node_id],
-            inner=signed
-        )
+
+        header = {
+            "sender": self.node_id,
+            "recipient": inner_envelope.recipient,
+            "route_list": [self.node_id]
+        }
+        msg = envelope.FramedMessage(msg_id=uuid.uuid4().int, header=header, payload=signed)
         logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
         if expected_response and inner_envelope.message_type == 'directive':
             self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
-        await self.forward(outer_envelope, next_node_id)
+        await self.forward(msg, next_node_id)

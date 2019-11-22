@@ -1,5 +1,6 @@
 import json
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,5 +27,4 @@ class MallCop:
              for attr in ['message_id', 'sender', 'recipient', 'message_type',
                           'timestamp', 'raw_payload', 'directive',
                           'in_response_to', 'ttl', 'serial', 'code']}
-        )
-
+        ).encode("utf-8")
