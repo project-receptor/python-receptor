@@ -27,6 +27,9 @@ class FramedMessage:
         self.header = header
         self.payload = payload
 
+    def __repr__(self):
+        return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload})"
+
     def serialize(self):
         h = json.dumps(self.header).encode("utf-8")
         return b''.join([
@@ -99,6 +102,7 @@ class FramedBuffer:
             await self.handle_frame(rest)
 
     async def finish(self):
+        logger.debug("finish: %s", self.current_frame)
         if self.current_frame.type == Frame.Types.HEADER:
             self.header = json.loads(self.bb)
         elif self.current_frame.type == Frame.Types.PAYLOAD:

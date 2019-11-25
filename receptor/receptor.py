@@ -84,13 +84,15 @@ class Receptor:
                             last=time.time()))
         self.write_connection_manifest(manifest)
 
-    def update_connections(self, protocol_obj):
-        self.router.register_edge(protocol_obj.id, self.node_id, 1)
-        if protocol_obj.id in self.connections:
-            self.connections[protocol_obj.id].append(protocol_obj)
+    def update_connections(self, protocol_obj, id_=None):
+        if id_ is None:
+            id_ = protocol_obj.id
+        self.router.register_edge(id_, self.node_id, 1)
+        if id_ in self.connections:
+            self.connections[id_].append(protocol_obj)
         else:
-            self.connections[protocol_obj.id] = [protocol_obj]
-        self.update_connection_manifest(protocol_obj.id)
+            self.connections[id_] = [protocol_obj]
+        self.update_connection_manifest(id_)
 
     async def message_handler(self, buf):
         logger.debug("spawning message_handler")
@@ -127,6 +129,16 @@ class Receptor:
             if self.stop:
                 return
             await asyncio.sleep(1)
+
+    def _say_hi(self):
+        return envelope.CommandMessage(header={
+            "cmd": "HI",
+            "id": self.node_id,
+            "expire_time": time.time() + 10,
+            "meta": dict(capabilities=self.work_manager.get_capabilities(),
+                         groups=self.config.node_groups,
+                         work=self.work_manager.get_work())
+        })
 
     async def handle_route_advertisement(self, data):
         self.router.add_edges(data["edges"])

@@ -84,15 +84,7 @@ class BaseProtocol(asyncio.Protocol):
         self.loop.create_task(self.receptor.message_handler(self.incoming_buffer))
 
     def send_handshake(self):
-        msg = envelope.CommandMessage(header={
-            "cmd": "HI",
-            "id": self.receptor.node_id,
-            "expire_time": time.time() + 10,
-            "meta": dict(capabilities=self.receptor.work_manager.get_capabilities(),
-                         groups=self.receptor.config.node_groups,
-                         work=self.receptor.work_manager.get_work())
-        })
-        self.transport.write(msg.serialize())
+        self.transport.write(self.receptor._say_hi().serialize())
 
 
 class BasicProtocol(BaseProtocol):

@@ -1,95 +1,104 @@
-import json
 import logging
-import time
 
+import asyncio
 import aiohttp
+import aiohttp.web
 
-from .protocol import DataBuffer
+from .messages.envelope import FramedBuffer
 
 logger = logging.getLogger(__name__)
 
 
-async def watch_queue(sock, buf):
-    while sock.open:
+async def watch_queue(ws, buf):
+    while not ws.closed:
         try:
             msg = await buf.get()
         except Exception:
-            logger.exception("Error getting data from buffer")
-        
+            logger.exception("watch_queue: error getting data from buffer")
+            continue
+
         try:
-            sock.send(msg)
+            await ws.send_bytes(msg)
         except Exception:
-            logger.exception("Error received trying to write")
+            logger.exception("watch_queue: error received trying to write")
             await buf.put(msg)
-            return await sock.close()
+            return await ws.close()
+    logger.debug("watch_queue: ws is now closed")
 
 
-class WSClient:
+class WSBase:
     def __init__(self, receptor, loop):
         self.receptor = receptor
         self.loop = loop
+        self.buf = FramedBuffer(loop=self.loop)
+        self.remote_id = None
 
+    async def receive(self, ws):
+        try:
+            async for msg in ws:
+                await self.buf.put(msg.data)
+        except Exception:
+            logger.exception("receive")
+
+    def register(self, ws):
+        self.receptor.update_connections(ws, id_=self.remote_id)
+
+    async def hello(self, ws):
+        msg = self.receptor._say_hi().serialize()
+        await ws.send_bytes(msg)
+
+    async def start_processing(self, ws):
+        self.loop.create_task(self.receptor.message_handler(self.buf))
+        out = self.receptor.buffer_mgr.get_buffer_for_node(
+            self.remote_id, self.receptor
+        )
+        return await watch_queue(ws, out)
+
+
+class WSClient(WSBase):
     async def connect(self, uri):
-        async with aiohttp.ClientSession().ws_connect(uri) as sock:
-            # handshake
-            node_id = await self.handshake(sock)
-            incoming_buffer = DataBuffer()
-            self.loop.create_task(self.receive(sock, incoming_buffer)) # reader
+        try:
+            async with aiohttp.ClientSession().ws_connect(uri) as ws:
 
-            buf = self.receptor.buffer_mgr.get_buffer_for_node(node_id, self.receptor)
-            self.loop.create_task(watch_queue(sock, buf)) # writer
-
-        self.loop.create_task(self.connect(uri))
-
-
-    async def handshake(self, sock):
-        msg = json.dumps({
-            "cmd": "HI",
-            "id": self.receptor.node_id,
-            "expire_time": time.time() + 10,
-            "meta": {
-                "capabilities": self.receptor.work_manager.get_capabilities(),
-                "groups": self.receptor.config.node_groups,
-                "work": self.receptor.work_manager.get_work(),
-            }
-        }).encode("utf-8")
-        await sock.send_bytes(msg)
-        response = await sock.receive().json()
-        return response["id"]
-
-    async def receive(self, sock, buf):
-        self.loop.create_task(self.receptor.message_handler(buf))
-        async for msg in sock.receive():
-            buf.add(msg.data)
+                logger.debug("connect: starting recv")
+                recv_loop = self.loop.create_task(self.receive(ws))  # reader
+                logger.debug("connect: sending HI")
+                await self.hello(ws)
+                logger.debug("connect: waiting for HI")
+                response = await self.buf.get()  # TODO: deal with timeout
+                self.remote_id = response.header["id"]
+                self.register(ws)
+                logger.debug("connect: sending routes")
+                await self.receptor.send_route_advertisement()
+                logger.debug("connect: starting normal loop")
+                await self.start_processing(ws)
+                logger.debug("connect: normal exit")
+        except Exception:
+            logger.exception("connect")
+            logger.debug("connect: reconnecting")
+            self.loop.create_task(self.connect(uri))
 
 
-class WSServer:
-
-    def __init__(self, receptor, loop):
-        self.receptor = receptor
-        self.loop = loop
-
+class WSServer(WSBase):
     async def serve(self, request):
 
         ws = aiohttp.web.WebSocketResponse()
         await ws.prepare(request)
 
-        handshake = await ws.receive().json()
-        await ws.send_json({
-            "cmd": "HI",
-            "id": self.receptor.node_id,
-            "expire_time": time.time() + 10,
-            "meta": {
-                "capabilities": self.receptor.work_manager.get_capabilities(),
-                "groups": self.receptor.config.node_groups,
-                "work": self.receptor.work_manager.get_work(),
-            }
-        })
+        logger.debug("serve: starting recv")
+        self.loop.create_task(self.receive(ws))  # reader
+        logger.debug("serve: waiting for HI")
+        response = await self.buf.get()  # TODO: deal with timeout
+        self.remote_id = response.header["id"]
+        self.register(ws)
+        logger.debug("serve: sending HI")
+        await self.hello(ws)
+        logger.debug("serve: sending routes")
+        await self.receptor.send_route_advertisement()
+        logger.debug("serve: starting normal recv loop")
+        await self.start_processing(ws)
 
-        buf = self.receptor.buffer_mgr.get_buffer_for_node(handshake["id"], self.receptor)
-        self.loop.create_task(watch_queue(ws, buf)) # writer
-
-        incoming_buffer = DataBuffer()
-        self.loop.create_task(self.receptor.message_handler(incoming_buffer))
-        async for msg in ws:
-            incoming_buffer.add(msg.data)
+    def app(self):
+        app = aiohttp.web.Application()
+        app.add_routes([aiohttp.web.get("/", self.serve)])
+        return app
