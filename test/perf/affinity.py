@@ -1,11 +1,18 @@
-import random
-from collections import defaultdict
-import subprocess
-import attr
 import atexit
-from utils import random_port
+import os
+import random
+import subprocess
+import time
 import uuid
+from collections import defaultdict
+from test.perf.utils import random_port
+from test.perf.utils import read_and_parse_dot
+import signal
+
+import attr
 import yaml
+from pyparsing import ParseException
+from wait_for import wait_for
 
 procs = {}
 
@@ -69,7 +76,7 @@ class Node:
                     for pnode in self.connections
                 ]
             )
-            st.extend(["-d", self.data_path, "--node-id", self.name, "node"])
+            st.extend(["--debug", "-d", self.data_path, "--node-id", self.name, "node"])
             st.extend([f"--listen-port={self.listen_port}", peer_string])
 
         if self.stats_enable:
@@ -78,12 +85,69 @@ class Node:
         return st
 
     def start(self):
-        op = subprocess.Popen(" ".join(self._construct_run_command()), shell=True)
+        try:
+            os.remove(f"graph_{self.name}.dot")
+            os.sync()
+        except FileNotFoundError:
+            print(f"DIND'T FIND IT graph_{self.name}.dot")
+        print(f"{time.time()} starting {self.name}({self.uuid})")
+        op = subprocess.Popen(" ".join(self._construct_run_command()), shell=True, preexec_fn=os.setsid)
         procs[self.uuid] = op
 
     def stop(self):
-        print(f"killing {self.name}({self.uuid})")
-        procs[self.uuid].kill()
+        print(f"{time.time()} killing {self.name}({self.uuid})")
+        try:
+            os.killpg(os.getpgid(procs[self.uuid].pid), signal.SIGTERM)
+        except ProcessLookupError:
+            print("Couldn't kill the process {procs[self.uuid].pid}")
+        procs[self.uuid].wait()
+        print(f"Service was kill {procs[self.uuid].returncode}")
+
+    def get_debug_dot(self):
+        try:
+            with open(f"graph_{self.name}.dot") as f:
+                dot_data = f.read()
+            #print(f"FILE FOUND: graph_{self.name}.dot")
+            return dot_data
+        except FileNotFoundError:
+            #print(f"FILE NOT FOUND: graph_{self.name}.dot")
+            return ""
+
+    def validate_routes(self):
+        dot1 = self.get_debug_dot()
+        dot2 = self.topology.generate_dot()
+        if dot1 and dot2:
+            return self.topology.compare_dot(dot1, dot2)
+        else:
+            return False
+
+    def ping(self, count):
+        socket_path = self.topology.find_controller()[0].socket_path
+
+        if self.controller:
+            # TODO Remove this once a controller is pingable
+            return True
+
+        starter = [
+            "time",
+            "receptor",
+            "ping",
+            "--socket-path",
+            socket_path,
+            self.name,
+            "--count",
+            str(count),
+        ]
+        start = time.time()
+        op = subprocess.Popen(" ".join(starter), shell=True, stdout=subprocess.PIPE)
+        op.wait()
+        duration = time.time() - start
+        cmd_output = op.stdout.readlines()
+        print(cmd_output)
+        if b"Failed" in cmd_output[0]:
+            return "Failed"
+        else:
+            return duration / count
 
 
 @attr.s
@@ -109,9 +173,7 @@ class Topology:
             del self.nodes[node_name]
 
     @staticmethod
-    def generate_mesh(
-        controller_port, node_count, conn_method, profile=False, socket_path=None
-    ):
+    def generate_mesh(controller_port, node_count, conn_method, profile=False, socket_path=None):
         topology = Topology()
         topology.add_node(
             Node(
@@ -170,7 +232,6 @@ class Topology:
         )
         return topology
 
-
     def dump_yaml(self, filename=".last-topology.yaml"):
         with open(filename, "w") as f:
             data = {"nodes": {}}
@@ -192,18 +253,27 @@ class Topology:
 
     def dump_dot(self, filename=".last-topology-graph.dot"):
         with open(filename, "w") as f:
-            f.write("graph {")
-            for node, node_data in self.nodes.items():
-                for conn in node_data.connections:
-                    f.write(f"{node} -- {conn}; ")
-            f.write("}")
+            f.write(self.generate_dot())
 
-    def start(self):
+    def generate_dot(self):
+        dot_data = "graph {"
+        for node, node_data in self.nodes.items():
+            for conn in node_data.connections:
+                dot_data += f"{node} -- {conn}; "
+        dot_data += "}"
+        return dot_data
+
+    def start(self, wait=True):
         self.dump_yaml()
         self.dump_dot()
 
         for k, node in self.nodes.items():
             node.start()
+
+        if wait:
+            wait_for(self.validate_all_node_routes, delay=6, num_sec=30)
+            #for name, node in self.nodes.items():
+            #    wait_for(lambda: node.validate_routes)
 
     def stop(self):
         for k, node in self.nodes.items():
@@ -212,7 +282,9 @@ class Topology:
 
     @staticmethod
     def load_topology_from_file(filename):
-        data = yaml.safe_load(filename)
+        with open(filename) as f:
+            data = yaml.safe_load(f)
+
         topology = Topology()
         for node_name, definition in data["nodes"].items():
             node = Node.create_from_config(definition)
@@ -222,3 +294,36 @@ class Topology:
 
     def find_controller(self):
         return list(filter(lambda o: o.controller, self.nodes.values()))
+
+    def ping(self, count=10, socket_path=None):
+        results = {}
+        for _, node in self.nodes.items():
+            results[node.name] = node.ping(count)
+        return results
+
+    @staticmethod
+    def validate_ping_results(results, threshold=0.1):
+        valid = True
+        for node in results:
+            print(f"Asserting node {node} was under {threshold} threshold")
+            print(f"  {results[node]}")
+            if results[node] == "Failed" or float(results[node]) > float(threshold):
+                valid = False
+        return valid
+
+    @staticmethod
+    def compare_dot(dot1, dot2):
+        try:
+            ds1 = read_and_parse_dot(dot1)
+            ds2 = read_and_parse_dot(dot2)
+            if ds1 != ds2:
+                print(f"MATCH FAIL")
+                print(ds1)
+                print(ds2)
+                return False
+            return True
+        except ParseException:
+            return False
+
+    def validate_all_node_routes(self):
+        return all(node.validate_routes() for _, node in self.nodes.items())
