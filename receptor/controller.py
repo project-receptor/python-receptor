@@ -45,11 +45,11 @@ class Controller:
         logger.info("Server ws on {}:{}".format(listen_address, listen_port))
         self.loop.create_task(listener)
 
-    def add_peer(self, peer):
+    async def add_peer(self, peer):
         # NOTE: Not signing or serializing
         logger.info("Connecting to peer {}".format(peer))
-        self.loop.create_task(create_peer(self.receptor, self.loop,
-                                          *peer.strip().split(":", 1)))
+        await self.loop.create_task(create_peer(self.receptor, self.loop,
+                                                *peer.strip().split(":", 1)))
 
     async def recv(self):
         inner = await self.receptor.response_queue.get()
@@ -58,7 +58,7 @@ class Controller:
     async def send(self, message):
         inner_env = envelope.Inner(
             receptor=self.receptor,
-            messageid=str(uuid.uuid4()),
+            message_id=str(uuid.uuid4()),
             sender=self.receptor.node_id,
             recipient=message.recipient,
             message_type="directive",
@@ -71,9 +71,11 @@ class Controller:
     async def ping(self, destination):
         await self.receptor.router.ping_node(destination)
 
-    def run(self):
+    def run(self, coro=None):
         try:
-            self.loop.run_until_complete(self.receptor.shutdown_handler())
+            if coro is None:
+                coro = self.receptor.shutdown_handler
+            self.loop.run_until_complete(coro())
         except KeyboardInterrupt:
             pass
         finally:
