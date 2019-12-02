@@ -11,7 +11,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen_port: 11111
     name: node1
     stats_enable: true
     stats_port: null

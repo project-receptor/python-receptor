@@ -16,54 +16,12 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install python-dateutil
+        pip install python-dateutil pytest
         pip install .
         pip install -r ./test/perf/requirements.txt
-    - name: Perform perf test 1 - Random
+    - name: Perform integration tests
       run: |
-        python ./test/perf/node_utils.py file ./test/perf/topology-random.yaml&
-        python ./test/perf/node_utils.py dot-compare graph_controller.dot .last-topology-graph.dot --wait 40
-        python ./test/perf/node_utils.py ping ./test/perf/topology-random.yaml --count 100 --validate 0.1
-        python ./test/perf/node_utils.py check-stats .last-topology.yaml
-        kill `pidof python`
-        rm -Rf /tmp/receptor
-        rm graph_controller.dot
-        rm .last-topology-graph.dot
-    - name: Upload artifact for Perf - Random
-      uses: actions/upload-artifact@v1
-      with:
-        name: RandomPerfTest
-        path: results.yaml
-    - name: Perform perf test 2 - Flat
-      run: |
-        python ./test/perf/node_utils.py file ./test/perf/topology-flat.yaml&
-        python ./test/perf/node_utils.py dot-compare graph_controller.dot .last-topology-graph.dot --wait 40
-        python ./test/perf/node_utils.py ping ./test/perf/topology-flat.yaml --count 100 --validate 0.1
-        python ./test/perf/node_utils.py check-stats .last-topology.yaml
-        kill `pidof python`
-        rm -Rf /tmp/receptor
-        rm graph_controller.dot
-        rm .last-topology-graph.dot
-    - name: Upload artifact for Perf - Flat
-      uses: actions/upload-artifact@v1
-      with:
-        name: FlatPerfTest
-        path: results.yaml
-    - name: Perform perf test 3 - Tree
-      run: |
-        python ./test/perf/node_utils.py file ./test/perf/topology-tree.yaml&
-        python ./test/perf/node_utils.py dot-compare graph_controller.dot .last-topology-graph.dot --wait 40
-        python ./test/perf/node_utils.py ping ./test/perf/topology-tree.yaml --count 100 --validate 0.1
-        python ./test/perf/node_utils.py check-stats .last-topology.yaml
-        kill `pidof python`
-        rm -Rf /tmp/receptor
-        rm graph_controller.dot
-        rm .last-topology-graph.dot
-    - name: Upload artifact for Perf - Tree
-      uses: actions/upload-artifact@v1
-      with:
-        name: TreePerfTest
-        path: results.yaml
+        pytest ./test/perf/
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -81,4 +39,4 @@ jobs:
         pip install .
     - name: pytest unit tests
       run: |
-        pytest
+        pytest test/integration
