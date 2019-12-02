@@ -39,6 +39,7 @@ class WSBase:
         self.write_task = None
 
     def start_receiving(self, ws):
+        logger.debug("starting recv")
         self.read_task = self.loop.create_task(self.receive(ws))
 
     async def receive(self, ws):
@@ -62,10 +63,14 @@ class WSBase:
             task.cancel()
 
     async def hello(self, ws):
+        logger.debug("sending HI")
         msg = self.receptor._say_hi().serialize()
         await ws.send_bytes(msg)
 
     async def start_processing(self, ws):
+        logger.debug("sending routes")
+        await self.receptor.send_route_advertisement()
+        logger.debug("starting normal loop")
         self.handle_task = self.loop.create_task(self.receptor.message_handler(self.buf))
         out = self.receptor.buffer_mgr.get_buffer_for_node(
             self.remote_id, self.receptor
@@ -73,22 +78,20 @@ class WSBase:
         self.write_task = self.loop.create_task(watch_queue(ws, out))
         return await self.write_task
 
+    async def _wait_handshake(self, ws):
+        logger.debug("serve: waiting for HI")
+        response = await self.buf.get()  # TODO: deal with timeout
+        self.remote_id = response.header["id"]
+        self.register(ws)
+
 
 class WSClient(WSBase):
     async def connect(self, uri):
         async with aiohttp.ClientSession().ws_connect(uri) as ws:
             try:
-                logger.debug("connect: starting recv")
                 self.start_receiving(ws)
-                logger.debug("connect: sending HI")
                 await self.hello(ws)
-                logger.debug("connect: waiting for HI")
-                response = await self.buf.get()  # TODO: deal with timeout
-                self.remote_id = response.header["id"]
-                self.register(ws)
-                logger.debug("connect: sending routes")
-                await self.receptor.send_route_advertisement()
-                logger.debug("connect: starting normal loop")
+                await self._wait_handshake(ws)
                 await self.start_processing(ws)
                 logger.debug("connect: normal exit")
             except Exception:
@@ -106,19 +109,13 @@ class WSServer(WSBase):
         ws = aiohttp.web.WebSocketResponse()
         await ws.prepare(request)
 
-        logger.debug("serve: starting recv")
-        self.loop.create_task(self.receive(ws))  # reader
-        logger.debug("serve: waiting for HI")
-        response = await self.buf.get()  # TODO: deal with timeout
-        self.remote_id = response.header["id"]
-        self.register(ws)
-        logger.debug("serve: sending HI")
-        await self.hello(ws)
-        logger.debug("serve: sending routes")
-        await self.receptor.send_route_advertisement()
-        logger.debug("serve: starting normal recv loop")
-        await self.start_processing(ws)
-        self.unregister(ws)
+        try:
+            self.start_receiving(ws)
+            await self._wait_handshake(ws)
+            await self.hello(ws)
+            await self.start_processing(ws)
+        finally:
+            self.unregister(ws)
 
     def app(self):
         app = aiohttp.web.Application()
