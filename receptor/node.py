@@ -30,11 +30,13 @@ def mainloop(receptor, ping_interval=None, loop=asyncio.get_event_loop(), skip_r
 
     for peer in config.node_peers:
         parsed = parse_peer(peer)
-        if parsed.scheme == "receptor://":
+        if parsed.scheme == "receptor":
             loop.create_task(create_peer(receptor, loop, parsed.hostname, parsed.port))
         elif parsed.scheme in ("ws", "wss"):
             c = WSClient(receptor, loop)
             loop.create_task(c.connect(peer))
+        else:
+            print(f"invalid peer: {peer} -> {parsed}")
 
     if ping_interval > 0:
         ping_time = (((int(loop.time()) + 1) // ping_interval) + 1) * ping_interval
@@ -53,6 +55,6 @@ async def send_pings_and_reschedule(receptor, loop, ping_time, ping_interval):
     logger.debug(f'Scheduling mesh ping.')
     for node_id in receptor.router.get_nodes():
         await receptor.router.ping_node(node_id)
-    loop.call_at(ping_time + ping_interval, 
+    loop.call_at(ping_time + ping_interval,
                  loop.create_task, send_pings_and_reschedule(
                      receptor, loop, ping_time + ping_interval, ping_interval))

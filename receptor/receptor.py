@@ -84,16 +84,6 @@ class Receptor:
                             last=time.time()))
         self.write_connection_manifest(manifest)
 
-    def update_connections(self, protocol_obj, id_=None):
-        if id_ is None:
-            id_ = protocol_obj.id
-        self.router.register_edge(id_, self.node_id, 1)
-        if id_ in self.connections:
-            self.connections[id_].append(protocol_obj)
-        else:
-            self.connections[id_] = [protocol_obj]
-        self.update_connection_manifest(id_)
-
     async def message_handler(self, buf):
         logger.debug("spawning message_handler")
         while True:
@@ -108,10 +98,24 @@ class Receptor:
                 else:
                     await self.handle_message(data)
 
+    def update_connections(self, protocol_obj, id_=None):
+        if id_ is None:
+            id_ = protocol_obj.id
+
+        self.router.register_edge(id_, self.node_id, 1)
+        if id_ in self.connections:
+            self.connections[id_].append(protocol_obj)
+        else:
+            self.connections[id_] = [protocol_obj]
+        self.update_connection_manifest(id_)
+
     def add_connection(self, protocol_obj):
         self.update_connections(protocol_obj)
 
-    def remove_connection(self, protocol_obj):
+    def remove_connection(self, protocol_obj, id_=None):
+        if id_ is None:
+            id_ = protocol_obj.id
+
         notify_connections = []
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
