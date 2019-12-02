@@ -121,6 +121,9 @@ class FramedBuffer:
     async def get(self):
         return await self.q.get()
 
+    def get_nowait(self):
+        return self.q.get_nowait()
+
 
 class Frame:
     """
