@@ -5,7 +5,7 @@ import logging
 import os
 import ssl
 
-from .entrypoints import run_as_node, run_as_controller, run_as_ping, run_as_send
+from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_controller
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
 
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ SUBCOMMAND_EXTRAS = {
     },
     'controller': {
         'hint': 'Run a Receptor controller',
-        'entrypoint': run_as_controller,
+        'entrypoint': run_as_controller, # TODO: New entrypoint
     },
     'ping': {
         'hint': 'Tell the local controller to ping a node',
@@ -200,12 +200,19 @@ class ReceptorConfig:
             hint='Set/override controller node identifier. If unspecified here or in a config file, one will be automatically generated.',
         )
         # Ping options
+        # self.add_config_option(
+        #     section='ping',
+        #     key='socket_path',
+        #     default_value='/var/run/receptor_controller.sock',
+        #     value_type='path',
+        #     hint='Path to control socket for controller commands.',
+        # )
         self.add_config_option(
             section='ping',
-            key='socket_path',
-            default_value='/var/run/receptor_controller.sock',
-            value_type='path',
-            hint='Path to control socket for controller commands.',
+            key='peer',
+            default_value='',
+            value_type='str',
+            hint='The peer to relay the ping directive through'
         )
         self.add_config_option(
             section='controller',

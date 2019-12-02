@@ -18,13 +18,13 @@ logger = logging.getLogger(__name__)
 
 class Receptor:
     def __init__(self, config, node_id=None, router_cls=None,
-                 work_manager_cls=None):
+                 work_manager_cls=None, response_queue=None):
         self.config = config
         self.node_id = node_id or self.config.default_node_id or self._find_node_id()
         self.router = (router_cls or MeshRouter)(self)
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
-        self.controller_connections = []
+        self.response_queue = response_queue
         self.base_path = os.path.join(self.config.default_data_dir, self.node_id)
         if not os.path.exists(self.base_path):
             os.makedirs(os.path.join(self.config.default_data_dir, self.node_id))
@@ -211,8 +211,7 @@ class Receptor:
         in_response_to = inner.in_response_to
         if in_response_to in self.router.response_registry:
             logger.info(f'Handling response to {in_response_to} with callback.')
-            for connection in self.controller_connections:
-                connection.emit_response(inner)
+            await self.response_queue.put(inner)
         else:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
 

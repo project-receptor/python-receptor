@@ -1,11 +1,12 @@
 import asyncio
+import datetime
 import logging
-import os
-import socket
-import sys
+import uuid
 
-from . import protocol
 from .ws import WSServer
+from .protocol import BasicProtocol, create_peer
+from .receptor import Receptor
+from .messages import envelope
 
 logger = logging.getLogger(__name__)
 
@@ -16,47 +17,64 @@ def connect_to_socket(socket_path):
     return sock
 
 
-def send_directive(directive, recipient, payload, sock):
-    if payload == '-':
-        payload = sys.stdin.read()
-    sock.sendall(f"{recipient}\n{directive}\n{payload}".encode('utf-8') + protocol.DELIM)
-    response = b''
-    while True:
-        received = sock.recv(1024)
-        done = protocol.DELIM in received
-        response += received.rstrip(protocol.DELIM)
-        if done:
-            break
-            
-    return response
+# TODO: track stats
+class Controller:
 
+    def __init__(self, config, loop=asyncio.get_event_loop(), queue=None):
+        self.receptor = Receptor(config)
+        self.loop = loop
+        self.queue = queue
+        if self.queue is None:
+            self.queue = asyncio.Queue(loop=loop)
+        self.receptor.response_queue = self.queue
 
-# FIXME: the socket path is in the config, it shouldn't need to be passed as an arg here
-def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):
-    config = receptor.config
-    listener = loop.create_server(
-        lambda: protocol.BasicProtocol(receptor, loop),
-        config.controller_listen_address, config.controller_listen_port, ssl=config.get_server_ssl_context())
-    logger.info("Serving on %s:%s", config.controller_listen_address, config.controller_listen_port)
-    loop.create_task(listener)
+    def enable_server(self, listen_address, listen_port):
+        listener = self.loop.create_server(
+            lambda: BasicProtocol(self.receptor, self.loop),
+            listen_address, listen_port,
+            ssl=self.receptor.config.get_server_ssl_context())
+        logger.info("Serving on {}:{}".format(listen_address, listen_port))
+        # TODO: Enable stats?
+        self.loop.create_task(listener)
 
-    ws_server = WSServer(receptor, loop)
-    ws_listener = loop.create_server(ws_server.app().make_handler(),
-        config.node_listen_address, config.node_listen_port + 1, ssl=config.get_server_ssl_context())
-    loop.create_task(ws_listener)
-    logger.info("Serving ws on %s:%s", config.node_listen_address, config.node_listen_port + 1)
+    def enable_websocket_server(self, listen_address, listen_port):
+        listener = self.loop.create_server(
+            WSServer(self.receptor, self.loop).app().make_handler(),
+            listen_address, listen_port,
+            ssl=self.receptor.config.get_server_ssl_context())
+        logger.info("Server ws on {}:{}".format(listen_address, listen_port))
+        self.loop.create_task(listener)
 
-    control_listener = loop.create_unix_server(
-        lambda: protocol.BasicControllerProtocol(receptor, loop),
-        path=socket_path
-    )
-    logger.info(f'Opening control socket on {socket_path}')
-    loop.create_task(control_listener)
-    loop.create_task(receptor.watch_expire())
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        loop.stop()
-        os.remove(socket_path)
+    def add_peer(self, peer):
+        # NOTE: Not signing or serializing
+        logger.info("Connecting to peer {}".format(peer))
+        self.loop.create_task(create_peer(self.receptor, self.loop,
+                                          *peer.strip().split(":", 1)))
+
+    async def recv(self):
+        inner = await self.receptor.response_queue.get()
+        return inner.raw_payload
+
+    async def send(self, message):
+        inner_env = envelope.Inner(
+            receptor=self.receptor,
+            messageid=str(uuid.uuid4()),
+            sender=self.receptor.node_id,
+            recipient=message.recipient,
+            message_type="directive",
+            directive=message.directive,
+            timestamp=datetime.datetime.utcnow().isoformat(),
+            raw_payload=message.fd.read(),
+        )
+        await self.receptor.router.send(inner_env, expected_response=True)
+
+    async def ping(self, destination):
+        await self.receptor.router.ping_node(destination)
+
+    def run(self):
+        try:
+            self.loop.run_until_complete(self.receptor.shutdown_handler())
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.loop.stop()

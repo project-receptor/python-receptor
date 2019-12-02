@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def main(args=None):
-    
+
     try:
         config = ReceptorConfig(args)
     except Exception as e:

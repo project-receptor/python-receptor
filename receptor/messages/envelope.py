@@ -6,11 +6,38 @@ import logging
 import struct
 import time
 import uuid
+import io
 from enum import IntEnum
+
+from ..exceptions import ReceptorRuntimeError
 
 logger = logging.getLogger(__name__)
 
-MAX_INT64 = (2 ** 64 - 1)
+MAX_INT64 = 2 ** 64 - 1
+
+
+class Message:
+
+    __slots__ = ("fd")
+
+    def __init__(self, recipient, directive):
+        self.fd = io.BytesIO()
+        self.recipient = recipient
+        self.directive = directive
+
+    def open(self):
+        return self.fd
+
+    def file(self, path):
+        self.fd = open(path)
+
+    def buffer(self, buffered_io):
+        if not isinstance(buffered_io, io.IOBase):
+            raise ReceptorRuntimeError("buffer must be of type IOBase")
+        self.fd = buffered_io
+
+    def data(self, raw_data):
+        self.fd.write(raw_data)
 
 
 class FramedMessage:
@@ -32,12 +59,14 @@ class FramedMessage:
 
     def serialize(self):
         h = json.dumps(self.header).encode("utf-8")
-        return b''.join([
-            Frame.wrap(h, type_=Frame.Types.HEADER, msg_id=self.msg_id).serialize(),
-            h,
-            Frame.wrap(self.payload, msg_id=self.msg_id).serialize(),
-            self.payload
-        ])
+        return b"".join(
+            [
+                Frame.wrap(h, type_=Frame.Types.HEADER, msg_id=self.msg_id).serialize(),
+                h,
+                Frame.wrap(self.payload, msg_id=self.msg_id).serialize(),
+                self.payload,
+            ]
+        )
 
 
 class CommandMessage(FramedMessage):
@@ -48,10 +77,14 @@ class CommandMessage(FramedMessage):
 
     def serialize(self):
         h = json.dumps(self.header).encode("utf-8")
-        return b''.join([
-            Frame.wrap(h, type_=Frame.Types.COMMAND, msg_id=self.msg_id).serialize(),
-            h,
-        ])
+        return b"".join(
+            [
+                Frame.wrap(
+                    h, type_=Frame.Types.COMMAND, msg_id=self.msg_id
+                ).serialize(),
+                h,
+            ]
+        )
 
 
 class FramedBuffer:
@@ -62,6 +95,7 @@ class FramedBuffer:
     This buffer assumes that an entire message (denoted by msg_id) will be
     sent before another message is sent.
     """
+
     def __init__(self, loop=None):
         self.q = asyncio.Queue(loop=loop)
         self.header = None
@@ -104,13 +138,16 @@ class FramedBuffer:
         if self.current_frame.type == Frame.Types.HEADER:
             self.header = json.loads(self.bb)
         elif self.current_frame.type == Frame.Types.PAYLOAD:
-            await self.q.put(FramedMessage(
-                self.current_frame.msg_id, header=self.header,
-                payload=self.bb))
+            await self.q.put(
+                FramedMessage(
+                    self.current_frame.msg_id, header=self.header, payload=self.bb
+                )
+            )
             self.header = None
         elif self.current_frame.type == Frame.Types.COMMAND:
-            await self.q.put(FramedMessage(
-                self.current_frame.msg_id, header=json.loads(self.bb)))
+            await self.q.put(
+                FramedMessage(self.current_frame.msg_id, header=json.loads(self.bb))
+            )
         else:
             raise Exception("Unknown Frame Type")
         self.to_read = 0
@@ -138,7 +175,7 @@ class Frame:
 
     fmt = struct.Struct(">ccIIQQ")
 
-    __slots__ = ('type', 'version', 'length', 'msg_id', 'id')
+    __slots__ = ("type", "version", "length", "msg_id", "id")
 
     def __init__(self, type_, version, length, msg_id, id_):
         self.type = type_
@@ -152,8 +189,12 @@ class Frame:
 
     def serialize(self):
         return self.fmt.pack(
-            bytes([self.type]), bytes([self.version]),
-            self.id, self.length, *split_uuid(self.msg_id))
+            bytes([self.type]),
+            bytes([self.version]),
+            self.id,
+            self.length,
+            *split_uuid(self.msg_id),
+        )
 
     @classmethod
     def deserialize(cls, buf):
@@ -163,7 +204,7 @@ class Frame:
 
     @classmethod
     def from_data(cls, data):
-        return cls.deserialize(data[:Frame.fmt.size]), data[Frame.fmt.size:]
+        return cls.deserialize(data[: Frame.fmt.size]), data[Frame.fmt.size:]
 
     @classmethod
     def wrap(cls, data, type_=Types.PAYLOAD, msg_id=None):
@@ -187,24 +228,37 @@ def join_uuid(hi, lo):
 
 
 class Inner:
-    def __init__(self, receptor, message_id, sender, recipient, message_type, timestamp,
-                 raw_payload, directive=None, in_response_to=None, ttl=None, serial=1,
-                 code=0, expire_time_delta=300):
+    def __init__(
+        self,
+        receptor,
+        message_id,
+        sender,
+        recipient,
+        message_type,
+        timestamp,
+        raw_payload,
+        directive=None,
+        in_response_to=None,
+        ttl=None,
+        serial=1,
+        code=0,
+        expire_time_delta=300,
+    ):
         self.receptor = receptor
         self.message_id = message_id
         self.sender = sender
         self.recipient = recipient
-        self.message_type = message_type # 'directive' or 'response'
-        self.timestamp = timestamp # ISO format
+        self.message_type = message_type  # 'directive' or 'response'
+        self.timestamp = timestamp  # ISO format
         self.raw_payload = raw_payload
-        self.directive = directive # None if response, 'namespace:action' if not
-        self.in_response_to = in_response_to # None if directive, a message_id if not
-        self.ttl = ttl # Optional
+        self.directive = directive  # None if response, 'namespace:action' if not
+        self.in_response_to = in_response_to  # None if directive, a message_id if not
+        self.ttl = ttl  # Optional
         if not expire_time_delta:
             self.expire_time = None
         self.expire_time = time.time() + expire_time_delta
-        self.serial = serial # serial index of responses
-        self.code = code # optional code indicating an error
+        self.serial = serial  # serial index of responses
+        self.code = code  # optional code indicating an error
 
     @classmethod
     async def deserialize(cls, receptor, msg):
@@ -214,7 +268,9 @@ class Inner:
         return cls(receptor=receptor, **json.loads(payload))
 
     @classmethod
-    def make_response(cls, receptor, recipient, payload, in_response_to, serial, ttl=None, code=0):
+    def make_response(
+        cls, receptor, recipient, payload, in_response_to, serial, ttl=None, code=0
+    ):
         if isinstance(payload, bytes):
             encoded_payload = base64.encodebytes(payload)
         else:
@@ -224,7 +280,7 @@ class Inner:
             message_id=str(uuid.uuid4()),
             sender=receptor.node_id,
             recipient=recipient,
-            message_type='response',
+            message_type="response",
             timestamp=datetime.datetime.utcnow().isoformat(),
             raw_payload=encoded_payload,
             directive=None,
