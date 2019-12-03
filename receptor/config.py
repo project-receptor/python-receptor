@@ -154,7 +154,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section='node',
-            key='ping_interval',
+            key='keepalive_interval',
             default_value=-1,
             value_type='int',
             hint='If specified, the node will ping all other known nodes in the mesh every N seconds. The default is -1, meaning no pings are sent.',

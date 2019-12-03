@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import logging
 import uuid
+from urllib.parse import urlparse
 
 from .ws import WSServer
 from .protocol import BasicProtocol, create_peer
@@ -11,13 +12,6 @@ from .messages import envelope
 logger = logging.getLogger(__name__)
 
 
-def connect_to_socket(socket_path):
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.connect(socket_path)
-    return sock
-
-
-# TODO: track stats
 class Controller:
 
     def __init__(self, config, loop=asyncio.get_event_loop(), queue=None):
@@ -46,16 +40,17 @@ class Controller:
         self.loop.create_task(listener)
 
     async def add_peer(self, peer):
-        # NOTE: Not signing or serializing
+        if "://" not in peer:
+            peer = f"receptor://{peer}"
+        peer = urlparse(peer)
         logger.info("Connecting to peer {}".format(peer))
-        await self.loop.create_task(create_peer(self.receptor, self.loop,
-                                                *peer.strip().split(":", 1)))
+        await self.loop.create_task(create_peer(self.receptor, self.loop, peer.hostname, peer.port))
 
     async def recv(self):
         inner = await self.receptor.response_queue.get()
         return inner.raw_payload
 
-    async def send(self, message):
+    async def send(self, message, expect_response=True):
         inner_env = envelope.Inner(
             receptor=self.receptor,
             message_id=str(uuid.uuid4()),
@@ -66,16 +61,16 @@ class Controller:
             timestamp=datetime.datetime.utcnow().isoformat(),
             raw_payload=message.fd.read(),
         )
-        await self.receptor.router.send(inner_env, expected_response=True)
+        await self.receptor.router.send(inner_env, expected_response=expect_response)
 
-    async def ping(self, destination):
-        await self.receptor.router.ping_node(destination)
+    async def ping(self, destination, expected_response=True):
+        await self.receptor.router.ping_node(destination, expected_response)
 
-    def run(self, coro=None):
+    def run(self, app=None):
         try:
-            if coro is None:
-                coro = self.receptor.shutdown_handler
-            self.loop.run_until_complete(coro())
+            if app is None:
+                app = self.receptor.shutdown_handler
+            self.loop.run_until_complete(app())
         except KeyboardInterrupt:
             pass
         finally:
