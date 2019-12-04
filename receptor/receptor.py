@@ -112,9 +112,12 @@ class Receptor:
     def add_connection(self, protocol_obj):
         self.update_connections(protocol_obj)
 
-    def remove_connection(self, protocol_obj, id_=None):
+    def remove_connection(self, protocol_obj, id_=None, loop=None):
         if id_ is None:
             id_ = protocol_obj.id
+
+        if loop is None:
+            loop = protocol_obj.loop
 
         notify_connections = []
         for connection_node in self.connections:
@@ -126,7 +129,7 @@ class Receptor:
                 self.router.debug_router()
                 self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
-        protocol_obj.loop.create_task(self.send_route_advertisement(self.router.get_edges()))
+        loop.create_task(self.send_route_advertisement(self.router.get_edges()))
 
     async def shutdown_handler(self):
         while True:

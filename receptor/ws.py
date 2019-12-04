@@ -53,7 +53,7 @@ class WSBase:
         self.receptor.update_connections(ws, id_=self.remote_id)
 
     def unregister(self, ws):
-        self.receptor.remove_connection(ws, id_=self.remote_id)
+        self.receptor.remove_connection(ws, id_=self.remote_id, loop=self.loop)
         self._cancel(self.read_task)
         self._cancel(self.handle_task)
         self._cancel(self.write_task)
