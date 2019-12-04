@@ -11,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 def run_as_node(config):
     async def node_keepalive():
+        # NOTE: I'm not really happy with this, I'd love to be able to await Peer(node).ping()
+        # and then verify the status under a timeout rather than just throw away the result and
+        # rely on the connection logic
         for node_id in controller.receptor.router.get_nodes():
             await controller.ping(node_id, expected_response=False)
         absolute_call_time = (((int(controller.loop.time()) + 1) // config.node_keepalive_interval) + 1) * config.node_keepalive_interval
