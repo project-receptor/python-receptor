@@ -20,6 +20,7 @@ setup(
     python_requires=">=3.6",
     install_requires=[
         "prometheus_client==0.7.1",
+        "aiohttp==3.6.2",
     ],
     zip_safe=False,
     entry_points={

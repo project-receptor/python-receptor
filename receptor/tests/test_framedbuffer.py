@@ -1,3 +1,4 @@
+import asyncio
 import json
 import uuid
 
@@ -119,10 +120,6 @@ async def test_malformed_frame(framed_buffer, msg_id):
         )
 
 
-@pytest.mark.skip(
-    reason="""
-    This test illustrates that sending an incomplete stream corrupts the transport"""
-)
 @pytest.mark.asyncio
 async def test_too_short(framed_buffer, msg_id):
     f1 = Frame(Frame.Types.HEADER, 1, 100, 1, 1)
@@ -133,4 +130,5 @@ async def test_too_short(framed_buffer, msg_id):
     await framed_buffer.put(f1.serialize() + too_short_header)
     await framed_buffer.put(f2.serialize() + too_short_payload)
 
-    await framed_buffer.get()
+    with pytest.raises(asyncio.QueueEmpty):
+        framed_buffer.get_nowait()

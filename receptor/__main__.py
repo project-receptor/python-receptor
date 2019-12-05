@@ -42,8 +42,8 @@ def main(args=None):
 
     try:
         config.go()
-    except Exception as e:
-        logger.error("An error occured while running receptor:\n%s" % (str(e),))
+    except Exception:
+        logger.exception("main: an error occured while running receptor")
         sys.exit(1)
 
 

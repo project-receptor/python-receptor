@@ -5,6 +5,7 @@ import socket
 import sys
 
 from . import protocol
+from .ws import WSServer
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,13 @@ def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):
         config.controller_listen_address, config.controller_listen_port, ssl=config.get_server_ssl_context())
     logger.info("Serving on %s:%s", config.controller_listen_address, config.controller_listen_port)
     loop.create_task(listener)
+
+    ws_server = WSServer(receptor, loop)
+    ws_listener = loop.create_server(ws_server.app().make_handler(),
+        config.node_listen_address, config.node_listen_port + 1, ssl=config.get_server_ssl_context())
+    loop.create_task(ws_listener)
+    logger.info("Serving ws on %s:%s", config.node_listen_address, config.node_listen_port + 1)
+
     control_listener = loop.create_unix_server(
         lambda: protocol.BasicControllerProtocol(receptor, loop),
         path=socket_path

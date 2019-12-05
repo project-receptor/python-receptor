@@ -27,6 +27,9 @@ class FramedMessage:
         self.header = header
         self.payload = payload
 
+    def __repr__(self):
+        return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload})"
+
     def serialize(self):
         h = json.dumps(self.header).encode("utf-8")
         return b''.join([
@@ -89,7 +92,6 @@ class FramedBuffer:
         await self.consume(rest)
 
     async def consume(self, data):
-        logger.debug("consuming %d bytes; to_read = %d bytes", len(data), self.to_read)
         data, rest = data[:self.to_read], data[self.to_read:]
         self.to_read -= len(data)
         self.bb += data
@@ -116,6 +118,9 @@ class FramedBuffer:
 
     async def get(self):
         return await self.q.get()
+
+    def get_nowait(self):
+        return self.q.get_nowait()
 
 
 class Frame:
