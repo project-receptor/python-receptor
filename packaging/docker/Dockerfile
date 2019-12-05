@@ -1,6 +1,11 @@
+FROM python:3 AS builder
+COPY receptor setup.* LICENSE.md README.md /receptor/
+WORKDIR /receptor
+RUN python setup.py bdist_wheel
+
 FROM fedora:31
 
-ADD dist/receptor-*.whl /tmp/
+COPY --from=builder /receptor/dist/receptor-*.whl /tmp/
 ADD https://github.com/krallin/tini/releases/latest/download/tini /bin/tini
 ADD packaging/docker/entrypoint.sh /bin/entrypoint
 ADD packaging/docker/receptor.conf /tmp/receptor.conf
