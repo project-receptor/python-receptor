@@ -4,7 +4,7 @@ import logging
 import uuid
 from urllib.parse import urlparse
 
-from .ws import WSServer
+from .ws import WSServer, WSClient
 from .protocol import BasicProtocol, create_peer
 from .receptor import Receptor
 from .messages import envelope
@@ -22,29 +22,37 @@ class Controller:
             self.queue = asyncio.Queue(loop=loop)
         self.receptor.response_queue = self.queue
 
-    def enable_server(self, listen_address, listen_port):
+    def parse_peer(self, peer):
+        if "://" not in peer:
+            peer = f"receptor://{peer}"
+        return urlparse(peer)
+
+    def enable_server(self, listen_url):
+        service = self.parse_peer(listen_url)
         listener = self.loop.create_server(
             lambda: BasicProtocol(self.receptor, self.loop),
-            listen_address, listen_port,
+            service.hostname, service.port,
             ssl=self.receptor.config.get_server_ssl_context())
-        logger.info("Serving on {}:{}".format(listen_address, listen_port))
-        # TODO: Enable stats?
+        logger.info("Serving on {}:{}".format(service.hostname, service.port))
         self.loop.create_task(listener)
 
-    def enable_websocket_server(self, listen_address, listen_port):
+    def enable_websocket_server(self, listen_url):
+        service = urlparse(listen_url)
         listener = self.loop.create_server(
             WSServer(self.receptor, self.loop).app().make_handler(),
-            listen_address, listen_port,
+            service.hostname, service.port,
             ssl=self.receptor.config.get_server_ssl_context())
-        logger.info("Server ws on {}:{}".format(listen_address, listen_port))
+        logger.info("Serving websockets on {}:{}".format(service.hostname, service.port))
         self.loop.create_task(listener)
 
     async def add_peer(self, peer):
-        if "://" not in peer:
-            peer = f"receptor://{peer}"
-        peer = urlparse(peer)
-        logger.info("Connecting to peer {}".format(peer))
-        await self.loop.create_task(create_peer(self.receptor, self.loop, peer.hostname, peer.port))
+        parsed = self.parse_peer(peer)
+        if parsed.scheme == 'receptor':
+            logger.info("Connecting to receptor peer {}".format(peer))
+            await self.loop.create_task(create_peer(self.receptor, self.loop, parsed.hostname, parsed.port))
+        elif parsed.scheme in ('ws', 'wss'):
+            logger.info("Connecting to websocket peer {}".format(peer))
+            await self.loop.create_task(WSClient(self.receptor, self.loop).connect(peer))
 
     async def recv(self):
         inner = await self.receptor.response_queue.get()

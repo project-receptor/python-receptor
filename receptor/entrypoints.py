@@ -27,8 +27,9 @@ def run_as_node(config):
         logger.info(f'Starting stats on port {config.node_stats_port}')
         start_http_server(config.node_stats_port)
     if not config.node_server_disable:
-        controller.enable_server(config.node_listen_address,
-                                 config.node_listen_port)
+        controller.enable_server(config.node_listen)
+    if config.node_websocket_listen:
+        controller.enable_websocket_server(config.node_websocket_listen)
     for peer in config.node_peers:
         controller.loop.create_task(controller.add_peer(peer))
     if config.node_keepalive_interval > 1:
@@ -42,8 +43,9 @@ def run_as_controller(config):
     if config.controller_stats_enable:
         logger.info(f'Starting stats on port {config.node_stats_port}')
         start_http_server(config.controller_stats_port)
-    controller.enable_server(config.controller_listen_address,
-                             config.controller_listen_port)
+    controller.enable_server(config.controller_listen)
+    if config.controller_websocket_listen:
+        controller.enable_websocket_server(config.controller_websocket_listen)
     controller.loop.create_task(controller.receptor.watch_expire())
     controller.run()
 

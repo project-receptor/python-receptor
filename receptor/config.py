@@ -4,6 +4,7 @@ import importlib
 import logging
 import os
 import ssl
+import urllib.parse
 
 from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_controller
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
@@ -108,17 +109,18 @@ class ReceptorConfig:
         # Receptor node options
         self.add_config_option(
             section='node',
-            key='listen_address',
-            default_value='0.0.0.0',
+            key='listen',
+            default_value='receptor://0.0.0.0:8888',
             value_type='str',
-            hint='Set/override IP address to listen on. If not set here or in a config file, the default is 0.0.0.0/0.',
+            hint='Set/override IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0:8888.',
         )
         self.add_config_option(
             section='node',
-            key='listen_port',
-            default_value=8888,
-            value_type='int',
-            hint='Set/override TCP port to listen on. If not set here or in a config file, the default is 8888.',
+            key='websocket_listen',
+            default_value='',
+            value_type='str',
+            hint='Set IP address and port to listen on for websocket clients in the form ws[s]://addr:port. '
+                 'If not set here or in a config file then it is disabled',
         )
         self.add_config_option(
             section='node',
@@ -179,17 +181,18 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section='controller',
-            key='listen_address',
-            default_value='0.0.0.0',
+            key='listen',
+            default_value='receptor://0.0.0.0:8888',
             value_type='str',
-            hint='Set/override IP address to listen on. If not set here or in a config file, the default is 0.0.0.0/0.',
+            hint='Set IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0/0:8888.',
         )
         self.add_config_option(
             section='controller',
-            key='listen_port',
-            default_value=8888,
-            value_type='int',
-            hint='Set/override TCP port to listen on. If not set here or in a config file, the default is 8888.',
+            key='websocket_listen',
+            default_value='',
+            value_type='str',
+            hint='Set IP address and port to listen on for websocket clients in the form ws://addr:port. '
+                 'If not set here or in a config file then it is disabled',
         )
         self.add_config_option(
             section='controller',
@@ -199,14 +202,6 @@ class ReceptorConfig:
             value_type='str',
             hint='Set/override controller node identifier. If unspecified here or in a config file, one will be automatically generated.',
         )
-        # Ping options
-        # self.add_config_option(
-        #     section='ping',
-        #     key='socket_path',
-        #     default_value='/var/run/receptor_controller.sock',
-        #     value_type='path',
-        #     hint='Path to control socket for controller commands.',
-        # )
         self.add_config_option(
             section='ping',
             key='peer',
@@ -461,7 +456,6 @@ class ReceptorConfig:
         elif not hasattr(self._parsed_args, 'func'):
             raise ReceptorRuntimeError("you must specify a subcommand (%s)." % (", ".join(SUBCOMMAND_EXTRAS.keys()),))
         self._parsed_args.func(self)
-
 
     def get_client_ssl_context(self):
         if self.auth_ssl_cert:
