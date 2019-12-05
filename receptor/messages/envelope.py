@@ -92,7 +92,6 @@ class FramedBuffer:
         await self.consume(rest)
 
     async def consume(self, data):
-        logger.debug("consuming %d bytes; to_read = %d bytes", len(data), self.to_read)
         data, rest = data[:self.to_read], data[self.to_read:]
         self.to_read -= len(data)
         self.bb += data
@@ -102,7 +101,6 @@ class FramedBuffer:
             await self.handle_frame(rest)
 
     async def finish(self):
-        logger.debug("finish: %s", self.current_frame)
         if self.current_frame.type == Frame.Types.HEADER:
             self.header = json.loads(self.bb)
         elif self.current_frame.type == Frame.Types.PAYLOAD:

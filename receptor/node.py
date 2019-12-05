@@ -36,7 +36,7 @@ def mainloop(receptor, ping_interval=None, loop=asyncio.get_event_loop(), skip_r
             c = WSClient(receptor, loop)
             loop.create_task(c.connect(peer))
         else:
-            print(f"invalid peer: {peer} -> {parsed}")
+            logger.warn(f"invalid peer: %s -> %s", peer, parsed)
 
     if ping_interval > 0:
         ping_time = (((int(loop.time()) + 1) // ping_interval) + 1) * ping_interval

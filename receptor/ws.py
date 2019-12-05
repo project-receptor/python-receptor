@@ -71,7 +71,9 @@ class WSBase:
         logger.debug("sending routes")
         await self.receptor.send_route_advertisement()
         logger.debug("starting normal loop")
-        self.handle_task = self.loop.create_task(self.receptor.message_handler(self.buf))
+        self.handle_task = self.loop.create_task(
+            self.receptor.message_handler(self.buf)
+        )
         out = self.receptor.buffer_mgr.get_buffer_for_node(
             self.remote_id, self.receptor
         )
