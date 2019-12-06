@@ -8,6 +8,8 @@ from .protocol import BasicProtocol, create_peer
 from .receptor import Receptor
 from .messages import envelope
 from . import connection
+from .connection import ws, Worker
+from . import protocol
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +40,9 @@ class Controller:
 
     def enable_websocket_server(self, listen_url):
         service = urlparse(listen_url)
-        factory = lambda: connection.Worker(receptor, loop)
+        factory = lambda: Worker(receptor, loop)
         listener = self.loop.create_server(
-            connection.app(factory).make_handler(),
+            ws.app(factory).make_handler(),
             service.hostname, service.port,
             ssl=self.receptor.config.get_server_ssl_context())
         logger.info("Serving websockets on {}:{}".format(service.hostname, service.port))
