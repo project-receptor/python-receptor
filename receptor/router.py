@@ -5,23 +5,11 @@ import random
 import uuid
 from collections import defaultdict
 
-from dateutil import parser
-
 from .exceptions import ReceptorBufferError, UnrouteableError
 from .messages import envelope
 from .stats import route_counter
 
 logger = logging.getLogger(__name__)
-
-
-async def log_ping(response):
-    pong_received = datetime.datetime.utcnow()
-    ping_sent, ping_received = response.raw_payload.split('|')
-    ping_time = parser.parse(ping_received) - parser.parse(ping_sent)
-    pong_time = pong_received - parser.parse(ping_received)
-    logger.info(f'Ping report for {response.sender}: '
-                f'ping={ping_time.total_seconds()}s; '
-                f'pong={pong_time.total_seconds()}s')
 
 
 class MeshRouter:
@@ -90,11 +78,11 @@ class MeshRouter:
     def get_edges(self):
         """Returns set of edges"""
         return list(self._edges)
-    
+
     def get_nodes(self):
         return self._nodes
-    
-    async def ping_node(self, node_id, callback=log_ping):
+
+    async def ping_node(self, node_id, expected_response=True):
         logger.info(f'Sending ping to node {node_id}')
         now = datetime.datetime.utcnow().isoformat()
         ping_envelope = envelope.Inner(
@@ -108,7 +96,7 @@ class MeshRouter:
             directive='receptor:ping',
             ttl=15
         )
-        await self.send(ping_envelope, callback)
+        await self.send(ping_envelope, expected_response)
 
     def find_shortest_path(self, to_node_id):
         """Implementation of Dijkstra algorithm"""
@@ -122,7 +110,7 @@ class MeshRouter:
             (cost, vertex, path) = heapq.heappop(heap)
             if vertex not in seen:
                 seen.add(vertex)
-                path = [vertex] + path                
+                path = [vertex] + path
                 if vertex == to_node_id:
                     logger.debug(f'Shortest path to {to_node_id} with cost {cost} is {path}')
                     return path
@@ -154,7 +142,6 @@ class MeshRouter:
         except Exception as e:
             logger.exception("Error trying to forward message to {}: {}".format(next_hop, e))
 
-
     def next_hop(self, recipient):
         """
         Return the node ID of the next hop for routing a message to the
@@ -167,14 +154,13 @@ class MeshRouter:
         if path:
             return path[-2]
 
-
     async def send(self, inner_envelope, expected_response=False):
         """
         Send a new message with the given outer envelope.
         """
         next_node_id = self.next_hop(inner_envelope.recipient)
         if not next_node_id:
-            #TODO: This probably needs to emit an error response
+            # TODO: This probably needs to emit an error response
             raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
         signed = await inner_envelope.sign_and_serialize()
 

@@ -2,7 +2,6 @@ import pytest
 import receptor
 from receptor.config import ReceptorConfig
 from receptor.receptor import Receptor
-from receptor.node import mainloop
 import socket
 import asyncio
 from unittest.mock import patch
@@ -10,7 +9,7 @@ from unittest.mock import patch
 
 @pytest.fixture
 def receptor_config(unused_tcp_port, tmpdir, type="node"):
-    return ReceptorConfig(['--data-dir', tmpdir.strpath, type, '--listen-port', str(unused_tcp_port)])
+    return ReceptorConfig(['--data-dir', tmpdir.strpath, type, '--listen', '127.0.0.1:'+str(unused_tcp_port)])
 
 
 @pytest.fixture
@@ -27,7 +26,7 @@ def receptor_service_factory(unused_tcp_port_factory, tmpdir):
         peer_config = []
         for peer in peers:
             peer_config.extend(['--peer', peer])
-        base_config = ['--node-id', node_name, '--data-dir', tmpdir.strpath, type, '--listen-port', str(unused_tcp_port_factory())]
+        base_config = ['--node-id', node_name, '--data-dir', tmpdir.strpath, type, '--listen', '127.0.0.1'+str(unused_tcp_port_factory())]
         base_config.extend(peer_config)
         receptor_config = ReceptorConfig(base_config)
         return Receptor(receptor_config)
@@ -38,7 +37,8 @@ async def connect_port(receptor_obj):
     n = 5
     while n:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        result = sock.connect_ex(('127.0.0.1',receptor_obj.config.node_listen_port))
+        node, port = receptor_obj.config.node_listen.split(":")
+        result = sock.connect_ex((node, int(port)))
         if result != 0:
             await asyncio.sleep(1)
             n = n - 1
@@ -52,17 +52,9 @@ async def wait_for_time(seconds):
 
 
 @patch.object(receptor.protocol.BasicProtocol, 'connection_made')
-def test_main_node(mock_connection_made, event_loop, receptor_service):
-    event_loop.call_soon(event_loop.create_task, connect_port(receptor_service))
-    mainloop(receptor=receptor_service, ping_interval=-1, loop=event_loop)
+def test_main_node(mock_connection_made, event_loop, receptor_config):
+    c = receptor.Controller(receptor_config, loop=event_loop)
+    event_loop.call_soon(event_loop.create_task, connect_port(c.receptor))
+    c.enable_server('{}'.format(receptor_config.node_listen))
+    c.run()
     mock_connection_made.assert_called_once()
-
-
-def test_peering(event_loop, receptor_service_factory):
-    r1 = receptor_service_factory('A', type="controller")
-    r2 = receptor_service_factory('B', peer_ports=[r1.config.node_listen_port])
-    mainloop(receptor=r1, ping_interval=-1, loop=event_loop, skip_run=True)
-    mainloop(receptor=r2, ping_interval=-1, loop=event_loop, skip_run=True)
-    event_loop.run_until_complete(wait_for_time(10))
-    assert r1.router.node_is_known('B')
-    assert r2.router.node_is_known('A')

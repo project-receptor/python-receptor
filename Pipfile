@@ -9,6 +9,8 @@ ipython = "*"
 pytest = "*"
 pytest-asyncio = "*"
 flake8 = "*"
+pyyaml = "*"
+wait-for = "*"
 
 [packages]
 python-dateutil = "*"

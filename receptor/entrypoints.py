@@ -1,78 +1,87 @@
-import datetime
-import json
 import logging
-import sys
 import time
+import asyncio
 
 from prometheus_client import start_http_server
 
-from .receptor import Receptor
-from . import controller
-from . import exceptions
-from . import node
+from .controller import Controller
 
 logger = logging.getLogger(__name__)
 
 
-def run_as_controller(config):
-    receptor = Receptor(config)
-    logger.info(f'Starting up as node ID {receptor.node_id}')
-    if config.controller_stats_enable:
-        logger.info(f'Starting stats on port {config.controller_stats_port}')
-        start_http_server(config.controller_stats_port)
-    controller.mainloop(receptor, config.controller_socket_path)
-
-
 def run_as_node(config):
-    receptor = Receptor(config)
-    logger.info(f'Running as Receptor node with ID: {receptor.node_id}')
+    async def node_keepalive():
+        # NOTE: I'm not really happy with this, I'd love to be able to await Peer(node).ping()
+        # and then verify the status under a timeout rather than just throw away the result and
+        # rely on the connection logic
+        for node_id in controller.receptor.router.get_nodes():
+            await controller.ping(node_id, expected_response=False)
+        absolute_call_time = (((int(controller.loop.time()) + 1) // config.node_keepalive_interval) + 1) * config.node_keepalive_interval
+        controller.loop.call_at(absolute_call_time,
+                                controller.loop.create_task,
+                                node_keepalive())
+
+    controller = Controller(config)
+    logger.info(f'Running as Receptor node with ID: {controller.receptor.node_id}')
     if config.node_stats_enable:
         logger.info(f'Starting stats on port {config.node_stats_port}')
         start_http_server(config.node_stats_port)
-    node.mainloop(receptor, config.node_ping_interval)
+    if not config.node_server_disable:
+        controller.enable_server(config.node_listen)
+    if config.node_websocket_listen:
+        controller.enable_websocket_server(config.node_websocket_listen)
+    for peer in config.node_peers:
+        controller.loop.create_task(controller.add_peer(peer))
+    if config.node_keepalive_interval > 1:
+        controller.loop.create_task(node_keepalive())
+    controller.loop.create_task(controller.receptor.watch_expire())
+    controller.run()
+
+
+def run_as_controller(config):
+    controller = Controller(config)
+    if config.controller_stats_enable:
+        logger.info(f'Starting stats on port {config.node_stats_port}')
+        start_http_server(config.controller_stats_port)
+    controller.enable_server(config.controller_listen)
+    if config.controller_websocket_listen:
+        controller.enable_websocket_server(config.controller_websocket_listen)
+    controller.loop.create_task(controller.receptor.watch_expire())
+    controller.run()
 
 
 def run_as_ping(config):
-    logger.info(f'Sending ping to {config.ping_recipient}.')
-    sock = controller.connect_to_socket(config.ping_socket_path)
+    def ping_iter():
+        if config.ping_count:
+            for x in range(config.ping_count):
+                yield x
+        else:
+            while True:
+                yield 0
 
-    try:
-        pings_sent = 0
-        while True:
-            now = datetime.datetime.utcnow()
-            response = controller.send_directive('receptor:ping', config.ping_recipient, now.isoformat(), sock)
-            resp_json = json.loads(response)
-            if 'code' in resp_json and resp_json['code'] != 0:
-                sys.stdout.buffer.write(b"Failed to ping node: %b\n" % (resp_json['raw_payload'].encode('utf-8'),))
-            else:
-                sys.stdout.buffer.write(response + b"\n")
-            sys.stdout.flush()
-            pings_sent += 1
-            if config.ping_count != 0 and pings_sent >= config.ping_count:
-                break
-            elif config.ping_delay > 0.0:
-                time.sleep(config.ping_delay)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        sock.close()
+    async def ping_entrypoint():
+        read_task = controller.loop.create_task(read_responses())
+        await controller.add_peer(config.ping_peer)
+        start_wait = time.time()
+        while not controller.receptor.router.node_is_known(config.ping_recipient) and (time.time() - start_wait < 5):
+            await asyncio.sleep(0.1)
+        await send_pings()
+        await read_task
+
+    async def read_responses():
+        for _ in ping_iter():
+            payload = await controller.recv()
+            print("{}".format(payload))
+
+    async def send_pings():
+        for _ in ping_iter():
+            await controller.ping(config.ping_recipient)
+            await asyncio.sleep(config.ping_delay)
+
+    logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')
+    controller = Controller(config)
+    controller.run(ping_entrypoint)
 
 
 def run_as_send(config):
-    logger.info(f'Sending a {config.send_directive} directive to {config.send_recipient}.')
-    sock = controller.connect_to_socket(config.send_socket_path)
-    try:
-        if config.send_directive in (None, ''):
-            raise exceptions.UnknownDirective("The directive cannot be left out when using send.")
-        else:
-            try:
-                left, right = config.send_directive.split(':', 1)
-            except ValueError:
-                raise exceptions.UnknownDirective("Invalid directive format (%s). Directives must be in the form `action:method`." % (config.send_directive,))
-        response = controller.send_directive(config.send_directive, config.send_recipient, config.send_payload, sock)
-        sys.stdout.buffer.write(response + b"\n")
-        sys.stdout.flush()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        sock.close()
+    pass

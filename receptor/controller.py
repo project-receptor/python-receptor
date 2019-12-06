@@ -1,62 +1,85 @@
 import asyncio
+import datetime
 import logging
-import os
-import socket
-import sys
+import uuid
+from urllib.parse import urlparse
 
-from . import protocol
-from .ws import WSServer
+from .ws import WSServer, WSClient
+from .protocol import BasicProtocol, create_peer
+from .receptor import Receptor
+from .messages import envelope
 
 logger = logging.getLogger(__name__)
 
 
-def connect_to_socket(socket_path):
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.connect(socket_path)
-    return sock
+class Controller:
 
+    def __init__(self, config, loop=asyncio.get_event_loop(), queue=None):
+        self.receptor = Receptor(config)
+        self.loop = loop
+        self.queue = queue
+        if self.queue is None:
+            self.queue = asyncio.Queue(loop=loop)
+        self.receptor.response_queue = self.queue
 
-def send_directive(directive, recipient, payload, sock):
-    if payload == '-':
-        payload = sys.stdin.read()
-    sock.sendall(f"{recipient}\n{directive}\n{payload}".encode('utf-8') + protocol.DELIM)
-    response = b''
-    while True:
-        received = sock.recv(1024)
-        done = protocol.DELIM in received
-        response += received.rstrip(protocol.DELIM)
-        if done:
-            break
-            
-    return response
+    def parse_peer(self, peer):
+        if "://" not in peer:
+            peer = f"receptor://{peer}"
+        return urlparse(peer)
 
+    def enable_server(self, listen_url):
+        service = self.parse_peer(listen_url)
+        listener = self.loop.create_server(
+            lambda: BasicProtocol(self.receptor, self.loop),
+            service.hostname, service.port,
+            ssl=self.receptor.config.get_server_ssl_context())
+        logger.info("Serving on {}:{}".format(service.hostname, service.port))
+        self.loop.create_task(listener)
 
-# FIXME: the socket path is in the config, it shouldn't need to be passed as an arg here
-def mainloop(receptor, socket_path, loop=asyncio.get_event_loop()):
-    config = receptor.config
-    listener = loop.create_server(
-        lambda: protocol.BasicProtocol(receptor, loop),
-        config.controller_listen_address, config.controller_listen_port, ssl=config.get_server_ssl_context())
-    logger.info("Serving on %s:%s", config.controller_listen_address, config.controller_listen_port)
-    loop.create_task(listener)
+    def enable_websocket_server(self, listen_url):
+        service = urlparse(listen_url)
+        listener = self.loop.create_server(
+            WSServer(self.receptor, self.loop).app().make_handler(),
+            service.hostname, service.port,
+            ssl=self.receptor.config.get_server_ssl_context())
+        logger.info("Serving websockets on {}:{}".format(service.hostname, service.port))
+        self.loop.create_task(listener)
 
-    ws_server = WSServer(receptor, loop)
-    ws_listener = loop.create_server(ws_server.app().make_handler(),
-        config.node_listen_address, config.node_listen_port + 1, ssl=config.get_server_ssl_context())
-    loop.create_task(ws_listener)
-    logger.info("Serving ws on %s:%s", config.node_listen_address, config.node_listen_port + 1)
+    async def add_peer(self, peer):
+        parsed = self.parse_peer(peer)
+        if parsed.scheme == 'receptor':
+            logger.info("Connecting to receptor peer {}".format(peer))
+            await self.loop.create_task(create_peer(self.receptor, self.loop, parsed.hostname, parsed.port))
+        elif parsed.scheme in ('ws', 'wss'):
+            logger.info("Connecting to websocket peer {}".format(peer))
+            await self.loop.create_task(WSClient(self.receptor, self.loop).connect(peer))
 
-    control_listener = loop.create_unix_server(
-        lambda: protocol.BasicControllerProtocol(receptor, loop),
-        path=socket_path
-    )
-    logger.info(f'Opening control socket on {socket_path}')
-    loop.create_task(control_listener)
-    loop.create_task(receptor.watch_expire())
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        loop.stop()
-        os.remove(socket_path)
+    async def recv(self):
+        inner = await self.receptor.response_queue.get()
+        return inner.raw_payload
+
+    async def send(self, message, expect_response=True):
+        inner_env = envelope.Inner(
+            receptor=self.receptor,
+            message_id=str(uuid.uuid4()),
+            sender=self.receptor.node_id,
+            recipient=message.recipient,
+            message_type="directive",
+            directive=message.directive,
+            timestamp=datetime.datetime.utcnow().isoformat(),
+            raw_payload=message.fd.read(),
+        )
+        await self.receptor.router.send(inner_env, expected_response=expect_response)
+
+    async def ping(self, destination, expected_response=True):
+        await self.receptor.router.ping_node(destination, expected_response)
+
+    def run(self, app=None):
+        try:
+            if app is None:
+                app = self.receptor.shutdown_handler
+            self.loop.run_until_complete(app())
+        except KeyboardInterrupt:
+            pass
+        finally:
+            self.loop.stop()
