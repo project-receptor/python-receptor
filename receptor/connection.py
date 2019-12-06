@@ -1,5 +1,6 @@
 import logging
 
+import functools
 import asyncio
 import aiohttp
 import aiohttp.web
@@ -9,8 +10,7 @@ from .messages.envelope import FramedBuffer
 logger = logging.getLogger(__name__)
 
 
-class Connection:
-
+class Transport:
     def __aiter__(self):
         return self
 
@@ -25,11 +25,10 @@ class Connection:
         raise NotImplementedError("subclasses should implement this")
 
     async def send(self, bytes_):
-        pass
+        raise NotImplementedError("subclasses should implement this")
 
 
-class WebSocket(Connection):
-
+class WebSocket(Transport):
     def __init__(self, ws):
         self.ws = ws
 
@@ -67,7 +66,7 @@ async def watch_queue(conn, buf):
     logger.debug("watch_queue: ws is now closed")
 
 
-class WSBase:
+class Worker:
     def __init__(self, receptor, loop):
         self.receptor = receptor
         self.loop = loop
@@ -126,35 +125,20 @@ class WSBase:
         self.remote_id = response.header["id"]
         self.register()
 
-
-class WSClient(WSBase):
-    async def connect(self, uri):
-        async with aiohttp.ClientSession().ws_connect(uri) as ws:
-            try:
-                self.conn = WebSocket(ws)
-                self.start_receiving()
-                await self.hello()
-                await self._wait_handshake()
-                await self.start_processing()
-                logger.debug("connect: normal exit")
-            except Exception:
-                logger.exception("connect")
-            finally:
-                self.unregister()
-                await asyncio.sleep(5)
-                logger.debug("connect: reconnecting")
-                self.loop.create_task(self.connect(uri))
-
-
-class WSServer(WSBase):
-    async def serve(self, request):
-
-        ws = aiohttp.web.WebSocketResponse()
-        await ws.prepare(request)
-
-        self.conn = WebSocket(ws)
-
+    async def client(self, transport):
         try:
+            self.conn = transport
+            self.start_receiving()
+            await self.hello()
+            await self._wait_handshake()
+            await self.start_processing()
+            logger.debug("connect: normal exit")
+        finally:
+            self.unregister()
+
+    async def server(self, transport):
+        try:
+            self.conn = transport
             self.start_receiving()
             await self._wait_handshake()
             await self.hello()
@@ -162,7 +146,34 @@ class WSServer(WSBase):
         finally:
             self.unregister()
 
-    def app(self):
-        app = aiohttp.web.Application()
-        app.add_routes([aiohttp.web.get("/", self.serve)])
-        return app
+
+async def connect(uri, factory, loop=None):
+    if not loop:
+        loop = asyncio.get_event_loop()
+
+    worker = factory()
+    try:
+        async with aiohttp.ClientSession().ws_connect(uri) as ws:
+            t = WebSocket(ws)
+            await worker.client(t)
+    except Exception:
+        logger.exception("connect")
+    finally:
+        await asyncio.sleep(5)
+        logger.debug("reconnecting")
+        loop.create_task(connect(uri, factory=factory, loop=loop))
+
+
+async def serve(request, factory):
+    ws = aiohttp.web.WebSocketResponse()
+    await ws.prepare(request)
+
+    t = WebSocket(ws)
+    await factory().server(t)
+
+
+def app(factory):
+    handler = functools.partial(serve, factory=factory)
+    app = aiohttp.web.Application()
+    app.add_routes([aiohttp.web.get("/", handler)])
+    return app
