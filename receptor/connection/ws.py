@@ -38,10 +38,10 @@ async def connect(uri, factory, loop=None):
             t = WebSocket(ws)
             await worker.client(t)
     except Exception:
-        logger.exception("connect")
+        logger.exception("ws.connect")
     finally:
         await asyncio.sleep(5)
-        logger.debug("reconnecting")
+        logger.debug("ws.connect: reconnecting")
         loop.create_task(connect(uri, factory=factory, loop=loop))
 
 

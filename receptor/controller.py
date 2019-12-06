@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import functools
 import logging
 import uuid
 from urllib.parse import urlparse
@@ -8,7 +9,7 @@ from .protocol import BasicProtocol, create_peer
 from .receptor import Receptor
 from .messages import envelope
 from . import connection
-from .connection import ws, Worker
+from .connection import ws, sock, Worker
 from . import protocol
 
 logger = logging.getLogger(__name__)
@@ -31,9 +32,11 @@ class Controller:
 
     def enable_server(self, listen_url):
         service = self.parse_peer(listen_url)
-        listener = self.loop.create_server(
-            lambda: BasicProtocol(self.receptor, self.loop),
-            service.hostname, service.port,
+        cb = functools.partial(sock.serve, factory=factory)
+        listener = asyncio.start_server(
+            client_connected_cb,
+            host=service.hostname,
+            port=service.port,
             ssl=self.receptor.config.get_server_ssl_context())
         logger.info("Serving on {}:{}".format(service.hostname, service.port))
         self.loop.create_task(listener)
