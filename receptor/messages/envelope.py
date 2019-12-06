@@ -18,7 +18,7 @@ MAX_INT64 = 2 ** 64 - 1
 
 class Message:
 
-    __slots__ = ("fd")
+    __slots__ = ("fd", "recipient", "directive")
 
     def __init__(self, recipient, directive):
         self.fd = io.BytesIO()

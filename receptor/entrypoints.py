@@ -1,10 +1,13 @@
 import logging
 import time
 import asyncio
+import sys
+import os
 
 from prometheus_client import start_http_server
 
 from .controller import Controller
+from .messages import Message
 
 logger = logging.getLogger(__name__)
 
@@ -84,4 +87,26 @@ def run_as_ping(config):
 
 
 def run_as_send(config):
-    pass
+    async def send_entrypoint():
+        read_task = controller.loop.create_task(read_responses())
+        await controller.add_peer(config.send_peer)
+        start_wait = time.time()
+        while not controller.receptor.router.node_is_known(config.ping_recipient) and (time.time() - start_wait < 5):
+            await asyncio.sleep(0.1)
+        msg = Message(config.send_recipient, config.send_directive)
+        if config.send_payload == "-":
+            msg.buffer(sys.stdin)
+        elif os.path.exists(config.send_payload):
+            msg.file(config.send_payload)
+        else:
+            msg.data(config.send_payload)
+        await controller.send(msg)
+        await read_task
+
+    async def read_responses():
+        while True:
+            print("{}".format(await controller.recv()))
+
+    logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
+    controller = Controller(config)
+    controller.run(send_entrypoint)
