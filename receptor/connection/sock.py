@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from . import Transport
+from .base import Transport
 
 logger = logging.getLogger(__name__)
 

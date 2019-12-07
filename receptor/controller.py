@@ -1,13 +1,12 @@
 import asyncio
 import datetime
-import functools
 import logging
 import uuid
-from urllib.parse import urlparse
 
 from .receptor import Receptor
 from .messages import envelope
-from .connection import ws, sock, Worker
+from .connection.base import Worker
+from .connection.manager import Manager
 
 logger = logging.getLogger(__name__)
 
@@ -17,45 +16,27 @@ class Controller:
     def __init__(self, config, loop=asyncio.get_event_loop(), queue=None):
         self.receptor = Receptor(config)
         self.loop = loop
-        self.factory = lambda: Worker(self.receptor, loop)
+        self.connection_manager = Manager(
+            lambda: Worker(self.receptor, loop),
+            self.receptor.config.get_server_ssl_context(),
+            loop
+        )
         self.queue = queue
         if self.queue is None:
             self.queue = asyncio.Queue(loop=loop)
         self.receptor.response_queue = self.queue
 
-    def parse_peer(self, peer):
-        if "://" not in peer:
-            peer = f"receptor://{peer}"
-        return urlparse(peer)
-
     def enable_server(self, listen_url):
-        service = self.parse_peer(listen_url)
-        client_connected_cb = functools.partial(sock.serve, factory=self.factory)
-        listener = asyncio.start_server(
-            client_connected_cb,
-            host=service.hostname,
-            port=service.port,
-            ssl=self.receptor.config.get_server_ssl_context())
-        logger.info("Serving on {}:{}".format(service.hostname, service.port))
+        listener = self.connection_manager.get_listener(listen_url)
+        logger.info("Serving on %s", listen_url)
         self.loop.create_task(listener)
 
     def enable_websocket_server(self, listen_url):
-        service = urlparse(listen_url)
-        listener = self.loop.create_server(
-            ws.app(self.factory).make_handler(),
-            service.hostname, service.port,
-            ssl=self.receptor.config.get_server_ssl_context())
-        logger.info("Serving websockets on {}:{}".format(service.hostname, service.port))
-        self.loop.create_task(listener)
+        self.enable_server(listen_url)
 
     async def add_peer(self, peer):
-        parsed = self.parse_peer(peer)
-        if parsed.scheme == 'receptor':
-            logger.info("Connecting to receptor peer {}".format(peer))
-            await self.loop.create_task(sock.connect(parsed.hostname, parsed.port, self.factory, self.loop))
-        elif parsed.scheme in ('ws', 'wss'):
-            logger.info("Connecting to websocket peer {}".format(peer))
-            await self.loop.create_task(ws.connect(peer, self.factory, self.loop))
+        logger.info("Connecting to peer {}".format(peer))
+        await self.loop.create_task(self.connection_manager.get_peer(peer))
 
     async def recv(self):
         inner = await self.receptor.response_queue.get()

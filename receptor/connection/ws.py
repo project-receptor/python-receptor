@@ -4,7 +4,7 @@ import aiohttp
 import aiohttp.web
 import asyncio
 
-from . import Transport
+from .base import Transport
 
 logger = logging.getLogger(__name__)
 
