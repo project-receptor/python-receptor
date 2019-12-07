@@ -51,10 +51,10 @@ async def wait_for_time(seconds):
     await asyncio.sleep(seconds)
 
 
-@patch.object(receptor.protocol.BasicProtocol, 'connection_made')
-def test_main_node(mock_connection_made, event_loop, receptor_config):
+@patch('receptor.connection.sock.serve')
+def test_main_node(mock_sock, event_loop, receptor_config):
     c = receptor.Controller(receptor_config, loop=event_loop)
     event_loop.call_soon(event_loop.create_task, connect_port(c.receptor))
     c.enable_server('{}'.format(receptor_config.node_listen))
     c.run()
-    mock_connection_made.assert_called_once()
+    mock_sock.assert_called_once()
