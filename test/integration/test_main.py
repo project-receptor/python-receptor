@@ -1,10 +1,12 @@
+import asyncio
+import socket
+from unittest.mock import patch
+
 import pytest
+
 import receptor
 from receptor.config import ReceptorConfig
 from receptor.receptor import Receptor
-import socket
-import asyncio
-from unittest.mock import patch
 
 
 @pytest.fixture
@@ -37,7 +39,7 @@ async def connect_port(receptor_obj):
     n = 5
     while n:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        node, port = receptor_obj.config.node_listen.split(":")
+        node, port = receptor_obj.config.node_listen[0].split(":")
         result = sock.connect_ex((node, int(port)))
         if result != 0:
             await asyncio.sleep(1)
@@ -55,6 +57,6 @@ async def wait_for_time(seconds):
 def test_main_node(mock_sock, event_loop, receptor_config):
     c = receptor.Controller(receptor_config, loop=event_loop)
     event_loop.call_soon(event_loop.create_task, connect_port(c.receptor))
-    c.enable_server('{}'.format(receptor_config.node_listen))
+    c.enable_server(receptor_config.node_listen)
     c.run()
     mock_sock.assert_called_once()
