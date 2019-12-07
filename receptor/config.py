@@ -250,10 +250,10 @@ class ReceptorConfig:
         # send options
         self.add_config_option(
             section='send',
-            key='socket_path',
-            default_value='/var/run/receptor_controller.sock',
-            value_type='path',
-            hint='Path to control socket for controller commands.',
+            key='peer',
+            default_value='',
+            value_type='str',
+            hint='The peer to relay the directive through'
         )
         self.add_config_option(
             section='send',
@@ -276,7 +276,7 @@ class ReceptorConfig:
             long_option='send_payload',
             default_value='',
             value_type='str',
-            hint='Payload of the directive to send. Use - for stdin.',
+            hint='Payload of the directive to send. Use - for stdin or give the path to a file to transmit the file contents.',
         )
         # Component options. These are also only used in a config section
         # like auth, so they also set `subparse=False`.
