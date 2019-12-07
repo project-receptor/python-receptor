@@ -6,13 +6,15 @@ logger = logging.getLogger(__name__)
 
 
 class RawSocket(Transport):
-    def __init__(self, reader, writer):
+    def __init__(self, reader, writer, chunk_size=2 ** 8):
         self.reader = reader
         self.writer = writer
         self._closed = False
+        self.chunk_size = chunk_size
 
     async def __anext__(self):
-        return await self.reader.read()
+        bytes_ = await self.reader.read(self.chunk_size)
+        return bytes_
 
     @property
     def closed(self):

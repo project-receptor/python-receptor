@@ -1,28 +1,27 @@
 import logging
 
 import asyncio
+from collections.abc import AsyncIterator
+from abc import abstractmethod, abstractproperty
 
 from ..messages.envelope import FramedBuffer
 
 logger = logging.getLogger(__name__)
 
 
-class Transport:
-    def __aiter__(self):
-        return self
+class Transport(AsyncIterator):
 
-    async def __anext__(self):
-        raise NotImplementedError("subclasses should implement this")
-
+    @abstractmethod
     async def close(self):
-        raise NotImplementedError("subclasses should implement this")
+        pass
 
-    @property
+    @abstractproperty
     def closed(self):
-        raise NotImplementedError("subclasses should implement this")
+        pass
 
+    @abstractmethod
     async def send(self, bytes_):
-        raise NotImplementedError("subclasses should implement this")
+        pass
 
 
 async def watch_queue(conn, buf):
@@ -41,7 +40,6 @@ async def watch_queue(conn, buf):
             logger.exception("watch_queue: error received trying to write")
             await buf.put(msg)
             return await conn.close()
-    logger.debug("watch_queue: ws is now closed")
 
 
 class Worker:
@@ -56,7 +54,6 @@ class Worker:
         self.write_task = None
 
     def start_receiving(self):
-        logger.debug("starting recv")
         self.read_task = self.loop.create_task(self.receive())
 
     async def receive(self):
@@ -98,7 +95,7 @@ class Worker:
         return await self.write_task
 
     async def _wait_handshake(self):
-        logger.debug("serve: waiting for HI")
+        logger.debug("waiting for HI")
         response = await self.buf.get()  # TODO: deal with timeout
         self.remote_id = response.header["id"]
         self.register()
@@ -110,7 +107,7 @@ class Worker:
             await self.hello()
             await self._wait_handshake()
             await self.start_processing()
-            logger.debug("connect: normal exit")
+            logger.debug("normal exit")
         finally:
             self.unregister()
 
