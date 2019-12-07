@@ -26,13 +26,11 @@ class Controller:
             self.queue = asyncio.Queue(loop=loop)
         self.receptor.response_queue = self.queue
 
-    def enable_server(self, listen_url):
-        listener = self.connection_manager.get_listener(listen_url)
-        logger.info("Serving on %s", listen_url)
-        self.loop.create_task(listener)
-
-    def enable_websocket_server(self, listen_url):
-        self.enable_server(listen_url)
+    def enable_server(self, listen_urls):
+        for url in listen_urls:
+            listener = self.connection_manager.get_listener(url)
+            logger.info("Serving on %s", url)
+            self.loop.create_task(listener)
 
     async def add_peer(self, peer):
         logger.info("Connecting to peer {}".format(peer))
