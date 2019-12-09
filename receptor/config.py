@@ -110,17 +110,9 @@ class ReceptorConfig:
         self.add_config_option(
             section='node',
             key='listen',
-            default_value='receptor://0.0.0.0:8888',
-            value_type='str',
+            default_value=['receptor://0.0.0.0:8888'],
+            value_type='list',
             hint='Set/override IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0:8888.',
-        )
-        self.add_config_option(
-            section='node',
-            key='websocket_listen',
-            default_value='',
-            value_type='str',
-            hint='Set IP address and port to listen on for websocket clients in the form ws[s]://addr:port. '
-                 'If not set here or in a config file then it is disabled',
         )
         self.add_config_option(
             section='node',
@@ -182,17 +174,9 @@ class ReceptorConfig:
         self.add_config_option(
             section='controller',
             key='listen',
-            default_value='receptor://0.0.0.0:8888',
-            value_type='str',
-            hint='Set IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0/0:8888.',
-        )
-        self.add_config_option(
-            section='controller',
-            key='websocket_listen',
-            default_value='',
-            value_type='str',
-            hint='Set IP address and port to listen on for websocket clients in the form ws://addr:port. '
-                 'If not set here or in a config file then it is disabled',
+            default_value=['receptor://0.0.0.0:8888'],
+            value_type='list',
+            hint='Set IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0/0:8888. This option can be passed multiple times.',
         )
         self.add_config_option(
             section='controller',

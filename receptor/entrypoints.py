@@ -31,8 +31,6 @@ def run_as_node(config):
         start_http_server(config.node_stats_port)
     if not config.node_server_disable:
         controller.enable_server(config.node_listen)
-    if config.node_websocket_listen:
-        controller.enable_websocket_server(config.node_websocket_listen)
     for peer in config.node_peers:
         controller.loop.create_task(controller.add_peer(peer))
     if config.node_keepalive_interval > 1:
