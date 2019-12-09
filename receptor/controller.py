@@ -41,9 +41,10 @@ class Controller:
         return inner.raw_payload
 
     async def send(self, message, expect_response=True):
+        new_id = uuid.uuid4()
         inner_env = envelope.Inner(
             receptor=self.receptor,
-            message_id=str(uuid.uuid4()),
+            message_id=str(new_id),
             sender=self.receptor.node_id,
             recipient=message.recipient,
             message_type="directive",
@@ -52,9 +53,10 @@ class Controller:
             raw_payload=message.fd.read(),
         )
         await self.receptor.router.send(inner_env, expected_response=expect_response)
+        return new_id
 
     async def ping(self, destination, expected_response=True):
-        await self.receptor.router.ping_node(destination, expected_response)
+        return await self.receptor.router.ping_node(destination, expected_response)
 
     def run(self, app=None):
         try:
