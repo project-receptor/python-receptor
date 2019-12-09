@@ -93,6 +93,7 @@ class DurableBuffer:
             while self.q.qsize() > 0:
                 ident = await self.q.get()
                 data = await self._get_file(ident, handle_only=True, delete=False)
+                # TODO: This will never work, it's not pure json anymore
                 msg = json.load(data)
                 if "expire_time" in msg and msg['expire_time'] < time.time():
                     logger.info("Expiring message %s", ident)

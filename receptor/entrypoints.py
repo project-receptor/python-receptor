@@ -45,8 +45,6 @@ def run_as_controller(config):
         logger.info(f'Starting stats on port {config.node_stats_port}')
         start_http_server(config.controller_stats_port)
     controller.enable_server(config.controller_listen)
-    if config.controller_websocket_listen:
-        controller.enable_websocket_server(config.controller_websocket_listen)
     controller.loop.create_task(controller.receptor.watch_expire())
     controller.run()
 

@@ -91,6 +91,7 @@ class Receptor:
                 data = await buf.get()
             except Exception:
                 logger.exception("message_handler")
+                break
             else:
                 logger.debug("message_handler: %s", data)
                 if "cmd" in data.header and data.header["cmd"] == "ROUTE":
