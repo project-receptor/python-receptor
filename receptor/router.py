@@ -96,7 +96,7 @@ class MeshRouter:
             directive='receptor:ping',
             ttl=15
         )
-        await self.send(ping_envelope, expected_response)
+        return await self.send(ping_envelope, expected_response)
 
     def find_shortest_path(self, to_node_id):
         """Implementation of Dijkstra algorithm"""
