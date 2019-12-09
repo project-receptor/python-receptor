@@ -27,7 +27,7 @@ class Conn:
 
 
 def read_and_parse_dot(raw_data):
-    group = Group(Word(alphanums) + Suppress("--") + Word(alphanums)) + Suppress(";")
+    group = Group(Word(alphanums + "_") + Suppress("--") + Word(alphanums + "_")) + Suppress(";")
     dot = Suppress("graph {") + OneOrMore(group) + Suppress("}")
 
     data = dot.parseString(raw_data).asList()

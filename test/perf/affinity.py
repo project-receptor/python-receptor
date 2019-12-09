@@ -1,18 +1,22 @@
 import atexit
 import os
 import random
+import signal
 import subprocess
 import time
 import uuid
 from collections import defaultdict
+from test.perf import ping
 from test.perf.utils import random_port
 from test.perf.utils import read_and_parse_dot
-import signal
 
 import attr
 import yaml
 from pyparsing import ParseException
 from wait_for import wait_for
+
+STANDARD = 0
+PING = 1
 
 procs = {}
 
@@ -29,33 +33,33 @@ atexit.register(shut_all_procs)
 class Node:
     name = attr.ib()
     controller = attr.ib(default=False)
-    listen_port = attr.ib(factory=random_port)
+    listen = attr.ib(default=None)
     connections = attr.ib(factory=list)
     stats_enable = attr.ib(default=False)
     stats_port = attr.ib(default=None)
     profile = attr.ib(default=False)
-    socket_path = attr.ib(default=None)
     data_path = attr.ib(default=None)
     topology = attr.ib(init=False, default=None)
     uuid = attr.ib(init=False, factory=uuid.uuid4)
 
+    node_type = STANDARD
+
     def __attrs_post_init__(self):
-        if not self.socket_path:
-            self.socket_path = f"/tmp/receptor/{str(self.uuid)}/receptor.sock"
         if not self.data_path:
             self.data_path = f"/tmp/receptor/{str(self.uuid)}"
+        if not self.listen:
+            self.listen = f"receptor://0.0.0.0:{random_port()}"
 
     @staticmethod
     def create_from_config(config):
         return Node(
             name=config["name"],
             controller=config.get("controller", False),
-            listen_port=config.get("listen_port", None) or random_port(),
+            listen=config.get("listen", f"receptor://0.0.0.0:{random_port()}"),
             connections=config.get("connections", []) or [],
             stats_enable=config.get("stats_enable", False),
             stats_port=config.get("stats_port", None) or random_port(),
             profile=config.get("profile", False),
-            socket_path=config.get("socket_path", None),
             data_path=config.get("data_path", None),
         )
 
@@ -67,17 +71,13 @@ class Node:
 
         if self.controller:
             st.extend(["--debug", "-d", self.data_path, "--node-id", self.name, "controller"])
-            st.extend([f"--socket-path={self.socket_path}"])
-            st.extend([f"--listen-port={self.listen_port}"])
+            st.extend([f"--listen={self.listen}"])
         else:
             peer_string = " ".join(
-                [
-                    f"--peer=localhost:{self.topology.nodes[pnode].listen_port}"
-                    for pnode in self.connections
-                ]
+                [f"--peer={self.topology.nodes[pnode].listen}" for pnode in self.connections]
             )
             st.extend(["--debug", "-d", self.data_path, "--node-id", self.name, "node"])
-            st.extend([f"--listen-port={self.listen_port}", peer_string])
+            st.extend([f"--listen={self.listen}", peer_string])
 
         if self.stats_enable:
             st.extend(["--stats-enable", f"--stats-port={self.stats_port}"])
@@ -91,7 +91,9 @@ class Node:
         except FileNotFoundError:
             print(f"DIND'T FIND IT graph_{self.name}.dot")
         print(f"{time.time()} starting {self.name}({self.uuid})")
-        op = subprocess.Popen(" ".join(self._construct_run_command()), shell=True, preexec_fn=os.setsid)
+        op = subprocess.Popen(
+            " ".join(self._construct_run_command()), shell=True, preexec_fn=os.setsid
+        )
         procs[self.uuid] = op
 
     def stop(self):
@@ -107,13 +109,14 @@ class Node:
         try:
             with open(f"graph_{self.name}.dot") as f:
                 dot_data = f.read()
-            #print(f"FILE FOUND: graph_{self.name}.dot")
+            print(f"FILE FOUND: graph_{self.name}.dot")
             return dot_data
         except FileNotFoundError:
-            #print(f"FILE NOT FOUND: graph_{self.name}.dot")
+            print(f"FILE NOT FOUND: graph_{self.name}.dot")
             return ""
 
     def validate_routes(self):
+        print(f"****====TRYING COMPARE {self.name}")
         dot1 = self.get_debug_dot()
         dot2 = self.topology.generate_dot()
         if dot1 and dot2:
@@ -121,33 +124,77 @@ class Node:
         else:
             return False
 
-    def ping(self, count):
-        socket_path = self.topology.find_controller()[0].socket_path
+    def ping(self, count, peer=None, node_ping_name="ping_node"):
+
+        if not peer:
+            peer = self.topology.find_controller()[0]
+
+        if node_ping_name not in self.topology.nodes:
+            self.topology.add_node(PingNode(name=node_ping_name))
+
+        if peer.name not in self.topology.nodes[node_ping_name].connections:
+            self.topology.nodes[node_ping_name].connections.append(peer.name)
 
         if self.controller:
             # TODO Remove this once a controller is pingable
             return True
 
+        peer_address = self.topology.nodes[peer.name].listen
+
         starter = [
             "time",
-            "receptor",
-            "ping",
-            "--socket-path",
-            socket_path,
+            "python",
+            ping.__file__,
+            "--data-path",
+            self.data_path,
+            "--node-id",
+            node_ping_name,
+            "--peer",
+            peer_address,
+            "--id",
             self.name,
             "--count",
             str(count),
         ]
+        print(starter)
         start = time.time()
-        op = subprocess.Popen(" ".join(starter), shell=True, stdout=subprocess.PIPE)
+        op = subprocess.Popen(
+            " ".join(starter), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         op.wait()
         duration = time.time() - start
         cmd_output = op.stdout.readlines()
+        print(op.stderr.read())
         print(cmd_output)
         if b"Failed" in cmd_output[0]:
             return "Failed"
         else:
             return duration / count
+
+
+class PingNode(Node):
+    node_type = PING
+
+    def start(self):
+        return
+
+    def stop(self):
+        return
+
+    def validate_routes(self):
+        return True
+
+    def get_debug_dot(self):
+        raise NotImplementedError
+
+    def ping(self):
+        raise NotImplementedError
+
+    def create_from_config(config):
+        raise NotImplementedError
+
+    def _construct_run_command(self):
+        raise NotImplementedError
 
 
 @attr.s
@@ -173,21 +220,25 @@ class Topology:
             del self.nodes[node_name]
 
     @staticmethod
-    def generate_mesh(controller_port, node_count, conn_method, profile=False, socket_path=None):
+    def generate_mesh(controller_port, node_count, conn_method, profile=False):
         topology = Topology()
         topology.add_node(
             Node(
                 name="controller",
                 controller=True,
-                listen_port=controller_port,
+                listen=f"receptor://127.0.0.1:{controller_port}",
                 profile=profile,
-                socket_path=socket_path,
             )
         )
 
         for i in range(node_count):
             topology.add_node(
-                Node(name=f"node{i}", controller=False, listen_port=random_port(), profile=profile)
+                Node(
+                    name=f"node{i}",
+                    controller=False,
+                    listen=f"receptor://127.0.0.1:{random_port()}",
+                    profile=profile,
+                )
             )
 
         for k, node in topology.nodes.items():
@@ -198,7 +249,7 @@ class Topology:
         return topology
 
     @staticmethod
-    def generate_random_mesh(controller_port, node_count, max_conn_count, profile, socket_path):
+    def generate_random_mesh(controller_port, node_count, max_conn_count, profile):
         def peer_function(topology, cur_node):
             nconns = defaultdict(int)
             print(topology)
@@ -218,17 +269,17 @@ class Topology:
                 return random.choices(available_nodes, k=int(random.random() * max_conn_count))
 
         topology = Topology.generate_random_mesh(
-            controller_port, node_count, peer_function, profile, socket_path
+            controller_port, node_count, peer_function, profile
         )
         return topology
 
     @staticmethod
-    def generate_flat_mesh(controller_port, node_count, profile, socket_path):
+    def generate_flat_mesh(controller_port, node_count, profile):
         def peer_function(*args):
             return ["controller"]
 
         topology = Topology.generate_random_mesh(
-            controller_port, node_count, peer_function, profile, socket_path
+            controller_port, node_count, peer_function, profile
         )
         return topology
 
@@ -238,14 +289,12 @@ class Topology:
             for node, node_data in self.nodes.items():
                 data["nodes"][node] = {
                     "name": node_data.name,
-                    "listen_port": node_data.listen_port if node_data.controller else None,
+                    "listen": node_data.listen if node_data.controller else None,
                     "controller": node_data.controller,
                     "connections": node_data.connections,
                     "stats_enable": node_data.stats_enable,
                     "stats_port": node_data.stats_port,
                 }
-                if node_data.socket_path:
-                    data["nodes"][node]["socket_path"] = node_data.socket_path
                 if node_data.data_path:
                     data["nodes"][node]["data_path"] = node_data.data_path
 
@@ -272,7 +321,7 @@ class Topology:
 
         if wait:
             wait_for(self.validate_all_node_routes, delay=6, num_sec=30)
-            #for name, node in self.nodes.items():
+            # for name, node in self.nodes.items():
             #    wait_for(lambda: node.validate_routes)
 
     def stop(self):
@@ -295,9 +344,13 @@ class Topology:
     def find_controller(self):
         return list(filter(lambda o: o.controller, self.nodes.values()))
 
-    def ping(self, count=10, socket_path=None):
+    def ping(self, count=10):
         results = {}
-        for _, node in self.nodes.items():
+
+        # Need to grab the list of nodes prior to running as pinging adds a node
+        nodes = list(self.nodes.keys())
+        for node_name in nodes:
+            node = self.nodes[node_name]
             results[node.name] = node.ping(count)
         return results
 
@@ -317,13 +370,17 @@ class Topology:
             ds1 = read_and_parse_dot(dot1)
             ds2 = read_and_parse_dot(dot2)
             if ds1 != ds2:
-                print(f"MATCH FAIL")
+                print(f"****====MATCH FAIL")
                 print(ds1)
                 print(ds2)
                 return False
-            return True
+            else:
+                print("****====MATCH")
+                return True
         except ParseException:
             return False
 
     def validate_all_node_routes(self):
-        return all(node.validate_routes() for _, node in self.nodes.items())
+        return all(
+            node.validate_routes() for _, node in self.nodes.items() if node.node_type == STANDARD
+        )

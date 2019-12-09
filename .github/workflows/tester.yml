@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    name: Performance Tests
+    name: Integration Tests
     runs-on: ubuntu-latest
 
     steps:

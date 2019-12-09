@@ -2,16 +2,15 @@ nodes:
   controller:
     connections: []
     controller: true
-    listen_port: 8888
+    listen: receptor://127.0.0.1:8889
     name: controller
     stats_enable: true
     stats_port: null
-    socket_path: /tmp/receptor/flat-receptor.sock
   node1:
     connections:
     - controller
     controller: false
-    listen_port: 11111
+    listen: receptor://127.0.0.1:11111
     name: node1
     stats_enable: true
     stats_port: null
@@ -19,7 +18,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node10
     stats_enable: true
     stats_port: null
@@ -27,7 +26,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node11
     stats_enable: true
     stats_port: null
@@ -35,7 +34,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node12
     stats_enable: true
     stats_port: null
@@ -43,7 +42,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node2
     stats_enable: true
     stats_port: null
@@ -51,7 +50,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node3
     stats_enable: true
     stats_port: null
@@ -59,7 +58,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node4
     stats_enable: true
     stats_port: null
@@ -67,7 +66,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node5
     stats_enable: true
     stats_port: null
@@ -75,7 +74,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node6
     stats_enable: true
     stats_port: null
@@ -83,7 +82,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node7
     stats_enable: true
     stats_port: null
@@ -91,7 +90,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node8
     stats_enable: true
     stats_port: null
@@ -99,7 +98,7 @@ nodes:
     connections:
     - controller
     controller: false
-    listen_port: null
+    listen: null
     name: node9
     stats_enable: true
     stats_port: null

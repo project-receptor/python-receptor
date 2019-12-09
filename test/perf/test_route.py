@@ -37,8 +37,9 @@ def test_add_remove_node(random_topology):
     nodeX = Node("nodeX", connections=["controller"])
     random_topology.add_node(nodeX)
     nodeX.start()
-    wait_for(random_topology.validate_all_node_routes, num_sec=30)
+    wait_for(random_topology.validate_all_node_routes, delay=6, num_sec=30)
     assert nodeX.ping(1) != "Failed"
+    wait_for(random_topology.validate_all_node_routes, delay=6, num_sec=30)
     assert "nodeX" in random_topology.nodes["controller"].get_debug_dot()
     assert random_topology.validate_all_node_routes()
 
@@ -47,8 +48,9 @@ def test_alternative_route(tree_topology):
     nodeX = Node("nodeX", connections=["node4", "node3"])
     tree_topology.add_node(nodeX)
     nodeX.start()
-    wait_for(tree_topology.validate_all_node_routes, num_sec=30)
+    wait_for(tree_topology.validate_all_node_routes, delay=6, num_sec=30)
     assert nodeX.ping(1) != "Failed"
+    wait_for(tree_topology.validate_all_node_routes, delay=6, num_sec=30)
     assert "nodeX" in tree_topology.nodes["controller"].get_debug_dot()
     assert tree_topology.validate_all_node_routes()
     tree_topology.nodes["node3"].stop()
