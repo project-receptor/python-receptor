@@ -5,7 +5,7 @@ import pkg_resources
 
 from . import exceptions
 from .messages import envelope
-from .stats import active_work_gauge, work_counter
+from .stats import active_work_gauge, work_counter, work_info
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 class WorkManager:
     def __init__(self, receptor):
         self.receptor = receptor
+        work_info.info(dict(plugins=str(self.get_capabilities())))
         self.active_work = []
 
     def load_receptor_worker(self, name):

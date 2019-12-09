@@ -1,3 +1,4 @@
+import pkg_resources
 import asyncio
 import copy
 import json
@@ -9,7 +10,7 @@ import uuid
 from . import exceptions
 from .messages import directive, envelope
 from .router import MeshRouter
-from .stats import messages_received_counter
+from .stats import messages_received_counter, receptor_info
 from .work import WorkManager
 
 RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
@@ -31,6 +32,7 @@ class Receptor:
         self.connection_manifest_path = os.path.join(self.base_path, "connection_manifest")
         self.buffer_mgr = self.config.components_buffer_manager
         self.stop = False
+        receptor_info.info(dict(node_id=self.node_id, receptor_version=pkg_resources.get_distribution("receptor").version))
 
     def _find_node_id(self):
         if 'RECEPTOR_NODE_ID' in os.environ:
