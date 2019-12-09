@@ -27,6 +27,8 @@ async def watch_queue(conn, buf):
     while not conn.closed:
         try:
             msg = await asyncio.wait_for(buf.get(), 5.0)
+            if not msg:
+                return await conn.close()
         except asyncio.TimeoutError:
             continue
         except Exception:
@@ -58,6 +60,8 @@ class Worker:
     async def receive(self):
         try:
             async for msg in self.conn:
+                if self.conn.closed:
+                    break
                 await self.buf.put(msg)
         except Exception:
             logger.exception("receive")

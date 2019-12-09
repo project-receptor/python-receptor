@@ -14,15 +14,17 @@ class RawSocket(Transport):
 
     async def __anext__(self):
         bytes_ = await self.reader.read(self.chunk_size)
+        if not bytes_:
+            self.close()
         return bytes_
 
     @property
     def closed(self):
         return self._closed
 
-    async def close(self):
+    def close(self):
         self._closed = True
-        await self.writer.close()
+        self.writer.close()
 
     async def send(self, bytes_):
         self.writer.write(bytes_)
