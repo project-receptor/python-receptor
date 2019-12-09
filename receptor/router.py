@@ -7,7 +7,7 @@ from collections import defaultdict
 
 from .exceptions import ReceptorBufferError, UnrouteableError
 from .messages import envelope
-from .stats import route_counter
+from .stats import route_counter, route_info
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +20,7 @@ class MeshRouter:
     def __init__(self, receptor):
         self.receptor = receptor
         self.node_id = receptor.node_id
-
-    def debug_router(self):
-        logger.debug("Receptor Edges: {}".format(self._edges))
-        if self.receptor.config.default_debug:
-            fd = open("graph_{}.dot".format(self.receptor.node_id), "w")
-            fd.write("graph {")
-            for left, right, weight in self._edges:
-                fd.write("{} -- {};".format(left, right))
-            fd.write("}")
-            fd.close()
+        route_info.info(dict(edges="()"))
 
     def node_is_known(self, node_id):
         return node_id in self._nodes or node_id == self.node_id
@@ -57,7 +48,7 @@ class MeshRouter:
         edge = self.update_node(left, right, cost)
         if not edge:
             self._edges.add((*sorted([left, right]), cost))
-        self.debug_router()
+        route_info.info(dict(edges=str(self._edges)))
 
     def update_node(self, left, right, cost):
         edge = self.find_edge(left, right)
