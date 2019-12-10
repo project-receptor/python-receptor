@@ -129,7 +129,6 @@ class Receptor:
                 self.update_connection_manifest(connection_node)
                 self.connections[connection_node].remove(protocol_obj)
                 self.router.update_node(self.node_id, connection_node, 100)
-                self.router.debug_router()
                 self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
         loop.create_task(self.send_route_advertisement(self.router.get_edges()))
