@@ -74,13 +74,13 @@ class Node:
             st = ["receptor"]
 
         if self.controller:
-            st.extend(["--debug", "-d", self.data_path, "--node-id", self.name, "controller"])
+            st.extend(["-d", self.data_path, "--node-id", self.name, "controller"])
             st.extend([f"--listen={self.listen}"])
         else:
             peer_string = " ".join(
                 [f"--peer={self.topology.nodes[pnode].listen}" for pnode in self.connections]
             )
-            st.extend(["--debug", "-d", self.data_path, "--node-id", self.name, "node"])
+            st.extend(["-d", self.data_path, "--node-id", self.name, "node"])
             st.extend([f"--listen={self.listen}", peer_string])
 
         if self.stats_enable:
@@ -99,6 +99,7 @@ class Node:
             self.wait_for_ports()
 
     def wait_for_ports(self):
+        print("waiting for nodes ports" + self.name)
         wait_for(net_check, func_args=[self.port, self.hostname, True], num_sec=10)
         if self.stats_enable:
             wait_for(net_check, func_args=[self.stats_port, self.hostname, True], num_sec=10)
