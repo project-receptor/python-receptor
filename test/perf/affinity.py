@@ -1,3 +1,6 @@
+from prometheus_client.parser import text_string_to_metric_families
+from urllib.parse import urlparse
+import requests
 import atexit
 import os
 import random
@@ -7,8 +10,9 @@ import time
 import uuid
 from collections import defaultdict
 from test.perf import ping
-from test.perf.utils import random_port
-from test.perf.utils import read_and_parse_dot
+from test.perf.utils import random_port, net_check
+from test.perf.utils import read_and_parse_metrics
+from test.perf.utils import Conn
 
 import attr
 import yaml
@@ -84,17 +88,20 @@ class Node:
 
         return st
 
-    def start(self):
-        try:
-            os.remove(f"graph_{self.name}.dot")
-            os.sync()
-        except FileNotFoundError:
-            print(f"DIND'T FIND IT graph_{self.name}.dot")
+    def start(self, wait_for_ports=True):
         print(f"{time.time()} starting {self.name}({self.uuid})")
         op = subprocess.Popen(
             " ".join(self._construct_run_command()), shell=True, preexec_fn=os.setsid
         )
         procs[self.uuid] = op
+
+        if wait_for_ports:
+            self.wait_for_ports()
+
+    def wait_for_ports(self):
+        wait_for(net_check, func_args=[self.port, self.hostname, True], num_sec=10)
+        if self.stats_enable:
+            wait_for(net_check, func_args=[self.stats_port, self.hostname, True], num_sec=10)
 
     def stop(self):
         print(f"{time.time()} killing {self.name}({self.uuid})")
@@ -105,22 +112,32 @@ class Node:
         procs[self.uuid].wait()
         print(f"Service was kill {procs[self.uuid].returncode}")
 
-    def get_debug_dot(self):
-        try:
-            with open(f"graph_{self.name}.dot") as f:
-                dot_data = f.read()
-            print(f"FILE FOUND: graph_{self.name}.dot")
-            return dot_data
-        except FileNotFoundError:
-            print(f"FILE NOT FOUND: graph_{self.name}.dot")
-            return ""
+    @property
+    def hostname(self):
+        return urlparse(self.listen).hostname
+
+    @property
+    def port(self):
+        return urlparse(self.listen).port
+
+    def get_metrics(self):
+        stats = requests.get(f"http://{self.hostname}:{self.stats_port}/metrics")
+        metrics = {
+            metric.name: metric
+            for metric in text_string_to_metric_families(stats.text)
+        }
+        return metrics
+
+    def get_routes(self):
+        routes = self.get_metrics()['routing_table_info'].samples[0].labels['edges']
+        return read_and_parse_metrics(routes)
 
     def validate_routes(self):
         print(f"****====TRYING COMPARE {self.name}")
-        dot1 = self.get_debug_dot()
-        dot2 = self.topology.generate_dot()
-        if dot1 and dot2:
-            return self.topology.compare_dot(dot1, dot2)
+        node_routes = self.get_routes()
+        control_routes = self.topology.generate_routes()
+        if node_routes and control_routes:
+            return self.topology.compare_routes(node_routes, control_routes)
         else:
             return False
 
@@ -175,7 +192,7 @@ class Node:
 class PingNode(Node):
     node_type = PING
 
-    def start(self):
+    def start(self, *args):
         return
 
     def stop(self):
@@ -184,10 +201,7 @@ class PingNode(Node):
     def validate_routes(self):
         return True
 
-    def get_debug_dot(self):
-        raise NotImplementedError
-
-    def ping(self):
+    def ping(self, *args):
         raise NotImplementedError
 
     def create_from_config(config):
@@ -300,26 +314,25 @@ class Topology:
 
             yaml.dump(data, f)
 
-    def dump_dot(self, filename=".last-topology-graph.dot"):
-        with open(filename, "w") as f:
-            f.write(self.generate_dot())
-
-    def generate_dot(self):
-        dot_data = "graph {"
+    def generate_routes(self):
+        routes = set()
         for node, node_data in self.nodes.items():
             for conn in node_data.connections:
-                dot_data += f"{node} -- {conn}; "
-        dot_data += "}"
-        return dot_data
+                routes.add(
+                    Conn(node_data.name, conn, 1)
+                )
+        return routes
 
     def start(self, wait=True):
         self.dump_yaml()
-        self.dump_dot()
 
         for k, node in self.nodes.items():
-            node.start()
+            node.start(wait_for_ports=not wait)
 
         if wait:
+            print("Waiting for nodes")
+            for _, node in self.nodes.items():
+                node.wait_for_ports()
             wait_for(self.validate_all_node_routes, delay=6, num_sec=30)
             # for name, node in self.nodes.items():
             #    wait_for(lambda: node.validate_routes)
@@ -365,20 +378,15 @@ class Topology:
         return valid
 
     @staticmethod
-    def compare_dot(dot1, dot2):
-        try:
-            ds1 = read_and_parse_dot(dot1)
-            ds2 = read_and_parse_dot(dot2)
-            if ds1 != ds2:
-                print(f"****====MATCH FAIL")
-                print(ds1)
-                print(ds2)
-                return False
-            else:
-                print("****====MATCH")
-                return True
-        except ParseException:
+    def compare_routes(route1, route2):
+        if route1 != route2:
+            print(f"****====MATCH FAIL")
+            print(route1)
+            print(route2)
             return False
+        else:
+            print("****====MATCH")
+            return True
 
     def validate_all_node_routes(self):
         return all(
