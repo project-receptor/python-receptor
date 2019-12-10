@@ -5,12 +5,26 @@ from pyparsing import Group
 from pyparsing import OneOrMore
 from pyparsing import Suppress
 from pyparsing import Word
+from pyparsing import nums
+from pyparsing import Optional
+from _collections import defaultdict
+import logging
+import re
 
+
+logger = logging.getLogger(__name__)
+
+_ports = defaultdict(dict)
+_dns_cache = {}
+ip_address = re.compile(
+    r"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}" r"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+)
 
 class Conn:
-    def __init__(self, a, b):
+    def __init__(self, a, b, cost):
         self.a = a
         self.b = b
+        self.cost = cost
 
     def __eq__(self, other):
         if self.a == other.a and self.b == other.b or self.a == other.b and self.b == other.a:
@@ -26,12 +40,16 @@ class Conn:
         return f"{self.a} -- {self.b}"
 
 
-def read_and_parse_dot(raw_data):
-    group = Group(Word(alphanums + "_") + Suppress("--") + Word(alphanums + "_")) + Suppress(";")
-    dot = Suppress("graph {") + OneOrMore(group) + Suppress("}")
+def read_and_parse_metrics(raw_data):
+    token = Suppress("'") + Word(alphanums + "_") + Suppress("'")
+    group = Group(
+        Suppress("(") + token + Suppress(",") + token + Suppress(",") + Word(nums) + Suppress(
+            ")") + Suppress(Optional(',')))
+    dot = Suppress("{") + OneOrMore(group) + Suppress("}")
 
     data = dot.parseString(raw_data).asList()
-    return {Conn(c[0], c[1]) for c in data}
+
+    return {Conn(c[0], c[1], c[2]) for c in data}
 
 
 def random_port(tcp=True):
@@ -55,3 +73,25 @@ def random_port(tcp=True):
     addr, port = s.getsockname()
     s.close()
     return port
+
+
+def net_check(port, addr="localhost", force=False):
+    """Checks the availablility of a port"""
+    port = int(port)
+    if port not in _ports[addr] or force:
+        # First try DNS resolution
+        try:
+
+            addr = socket.gethostbyname(addr)
+
+            # Then try to connect to the port
+            try:
+                socket.create_connection((addr, port), timeout=10)
+                _ports[addr][port] = True
+            except socket.error:
+                logger.exception("failed connection")
+                _ports[addr][port] = False
+        except Exception as e:
+            logger.info(e)
+            _ports[addr][port] = False
+    return _ports[addr][port]
