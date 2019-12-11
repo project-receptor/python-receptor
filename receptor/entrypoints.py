@@ -32,7 +32,7 @@ def run_as_node(config):
     if not config.node_server_disable:
         controller.enable_server(config.node_listen)
     for peer in config.node_peers:
-        controller.loop.create_task(controller.add_peer(peer))
+        controller.add_peer(peer)
     if config.node_keepalive_interval > 1:
         controller.loop.create_task(node_keepalive())
     controller.loop.create_task(controller.receptor.watch_expire())
@@ -60,7 +60,7 @@ def run_as_ping(config):
 
     async def ping_entrypoint():
         read_task = controller.loop.create_task(read_responses())
-        await controller.add_peer(config.ping_peer)
+        controller.add_peer(config.ping_peer)
         start_wait = time.time()
         while not controller.receptor.router.node_is_known(config.ping_recipient) and (time.time() - start_wait < 5):
             await asyncio.sleep(0.1)
@@ -85,7 +85,7 @@ def run_as_ping(config):
 def run_as_send(config):
     async def send_entrypoint():
         read_task = controller.loop.create_task(read_responses())
-        await controller.add_peer(config.send_peer)
+        controller.add_peer(config.send_peer)
         start_wait = time.time()
         while not controller.receptor.router.node_is_known(config.ping_recipient) and (time.time() - start_wait < 5):
             await asyncio.sleep(0.1)

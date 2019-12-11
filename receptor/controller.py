@@ -32,9 +32,9 @@ class Controller:
             logger.info("Serving on %s", url)
             self.loop.create_task(listener)
 
-    async def add_peer(self, peer):
+    def add_peer(self, peer):
         logger.info("Connecting to peer {}".format(peer))
-        await self.loop.create_task(self.connection_manager.get_peer(peer))
+        self.connection_manager.get_peer(peer)
 
     async def recv(self):
         inner = await self.receptor.response_queue.get()
