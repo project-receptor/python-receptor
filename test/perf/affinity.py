@@ -1,7 +1,5 @@
-from prometheus_client.parser import text_string_to_metric_families
-from urllib.parse import urlparse
-import requests
 import atexit
+import json
 import os
 import random
 import signal
@@ -9,18 +7,23 @@ import subprocess
 import time
 import uuid
 from collections import defaultdict
+from test.perf import debugger
 from test.perf import ping
-from test.perf.utils import random_port, net_check
-from test.perf.utils import read_and_parse_metrics
 from test.perf.utils import Conn
+from test.perf.utils import net_check
+from test.perf.utils import random_port
+from test.perf.utils import read_and_parse_metrics
+from urllib.parse import quote
+from urllib.parse import urlparse
 
 import attr
+import requests
 import yaml
-from pyparsing import ParseException
+from prometheus_client.parser import text_string_to_metric_families
 from wait_for import wait_for
 
 STANDARD = 0
-PING = 1
+DIAG = 1
 
 procs = {}
 
@@ -45,6 +48,7 @@ class Node:
     data_path = attr.ib(default=None)
     topology = attr.ib(init=False, default=None)
     uuid = attr.ib(init=False, factory=uuid.uuid4)
+    active = attr.ib(init=False)
 
     node_type = STANDARD
 
@@ -97,9 +101,11 @@ class Node:
 
         if wait_for_ports:
             self.wait_for_ports()
+        self.active = True
 
     def wait_for_ports(self):
-        print("waiting for nodes ports" + self.name)
+        print("waiting for nodes ports " + self.name)
+        print(self.port, self.hostname)
         wait_for(net_check, func_args=[self.port, self.hostname, True], num_sec=10)
         if self.stats_enable:
             wait_for(net_check, func_args=[self.stats_port, self.hostname, True], num_sec=10)
@@ -107,11 +113,12 @@ class Node:
     def stop(self):
         print(f"{time.time()} killing {self.name}({self.uuid})")
         try:
-            os.killpg(os.getpgid(procs[self.uuid].pid), signal.SIGTERM)
+            os.killpg(os.getpgid(procs[self.uuid].pid), signal.SIGKILL)  # TODO NICE FOR DEBUGGER
         except ProcessLookupError:
-            print("Couldn't kill the process {procs[self.uuid].pid}")
+            print(f"Couldn't kill the process {procs[self.uuid].pid}")
         procs[self.uuid].wait()
         print(f"Service was kill {procs[self.uuid].returncode}")
+        self.active = False
 
     @property
     def hostname(self):
@@ -123,17 +130,19 @@ class Node:
 
     def get_metrics(self):
         stats = requests.get(f"http://{self.hostname}:{self.stats_port}/metrics")
-        metrics = {
-            metric.name: metric
-            for metric in text_string_to_metric_families(stats.text)
-        }
+        metrics = {metric.name: metric for metric in text_string_to_metric_families(stats.text)}
         return metrics
 
     def get_routes(self):
-        routes = self.get_metrics()['routing_table_info'].samples[0].labels['edges']
-        return read_and_parse_metrics(routes)
+        routes = self.get_metrics()["routing_table_info"].samples[0].labels["edges"]
+        if routes == "()":
+            return set()
+        else:
+            return read_and_parse_metrics(routes)
 
     def validate_routes(self):
+        if not self.active:
+            raise Exception("Can't get routes from a stopped node")
         print(f"****====TRYING COMPARE {self.name}")
         node_routes = self.get_routes()
         control_routes = self.topology.generate_routes()
@@ -144,11 +153,14 @@ class Node:
 
     def ping(self, count, peer=None, node_ping_name="ping_node"):
 
+        if self.topology.diag_node:
+            return self.topology.diag_node.ping(count=count, recipient=self.name)
+
         if not peer:
             peer = self.topology.find_controller()[0]
 
         if node_ping_name not in self.topology.nodes:
-            self.topology.add_node(PingNode(name=node_ping_name))
+            self.topology.add_node(DiagNode(name=node_ping_name))
 
         if peer.name not in self.topology.nodes[node_ping_name].connections:
             self.topology.nodes[node_ping_name].connections.append(peer.name)
@@ -190,31 +202,83 @@ class Node:
             return duration / count
 
 
-class PingNode(Node):
-    node_type = PING
-
-    def start(self, *args):
-        return
-
-    def stop(self):
-        return
-
-    def validate_routes(self):
-        return True
-
-    def ping(self, *args):
-        raise NotImplementedError
-
-    def create_from_config(config):
-        raise NotImplementedError
+@attr.s
+class DiagNode(Node):
+    api_address = attr.ib(default="0.0.0.0")
+    api_port = attr.ib(default=8080)
+    node_type = DIAG
 
     def _construct_run_command(self):
+        starter = [
+            "python",
+            debugger.__file__,
+            "--listen",
+            self.listen,
+            "--data-path",
+            self.data_path,
+            "--api-address",
+            self.api_address,
+            "--api-port",
+            str(self.api_port),
+        ]
+        print(starter)
+        return starter
+
+
+    def wait_for_ports(self):
+        print(f"waiting for {self.api_port}, {self.api_address}")
+        wait_for(net_check, func_args=[self.api_port, self.api_address, True])
+        super().wait_for_ports()
+
+    def validate_routes(self):
+        print(f"****====TRYING COMPARE {self.name}")
+        node_routes = self.get_routes()
+        control_routes = self.topology.generate_routes()
+        if node_routes and control_routes:
+            return self.topology.compare_routes(node_routes, control_routes)
+        else:
+            return False
+
+    def get_routes(self):
+        route_data = json.loads(
+            requests.get(f"http://{self.api_address}:{self.api_port}/connections").text
+        )
+        routes = set()
+        for route in route_data:
+            routes.add(Conn(route[0], route[1], route[2]))
+        return routes
+
+    def ping(self, count=5, recipient="controller"):
+        output = requests.get(
+            f"http://{self.api_address}:{self.api_port}/ping?count={count}&recipient={recipient}"
+        ).text
+
+        if "Failed" in output:
+            return "Failed"
+        else:
+            times = json.loads(output)
+            return sum(times) / len(times)
+
+    def add_peer(self, peer):
+        coded_peer = quote(peer.listen)
+        requests.get(f"http://{self.api_address}:{self.api_port}/add_peer?peer={coded_peer}")
+
+    def create_from_config(config):
         raise NotImplementedError
 
 
 @attr.s
 class Topology:
+    use_diag_node = attr.ib(default=False)
     nodes = attr.ib(init=False, factory=dict)
+    diag_node = attr.ib(init=False, default=None)
+
+    def __attrs_post_init__(self):
+        if self.use_diag_node:
+            self.diag_node = DiagNode(
+                name="diag_node", listen=f"receptor://127.0.0.1:{random_port()}"
+            )
+            self.add_node(self.diag_node)
 
     def add_node(self, node):
         if node.name not in self.nodes:
@@ -319,9 +383,7 @@ class Topology:
         routes = set()
         for node, node_data in self.nodes.items():
             for conn in node_data.connections:
-                routes.add(
-                    Conn(node_data.name, conn, 1)
-                )
+                routes.add(Conn(node_data.name, conn, 1))
         return routes
 
     def start(self, wait=True):
@@ -334,6 +396,9 @@ class Topology:
             print("Waiting for nodes")
             for _, node in self.nodes.items():
                 node.wait_for_ports()
+            if self.use_diag_node:
+                self.diag_node.add_peer(self.find_controller()[0])
+                self.nodes[self.diag_node.name].connections.append(self.find_controller()[0].name)
             wait_for(self.validate_all_node_routes, delay=6, num_sec=30)
             # for name, node in self.nodes.items():
             #    wait_for(lambda: node.validate_routes)
@@ -344,11 +409,11 @@ class Topology:
         print("all killed")
 
     @staticmethod
-    def load_topology_from_file(filename):
+    def load_topology_from_file(filename, use_diag_node=False):
         with open(filename) as f:
             data = yaml.safe_load(f)
 
-        topology = Topology()
+        topology = Topology(use_diag_node=use_diag_node)
         for node_name, definition in data["nodes"].items():
             node = Node.create_from_config(definition)
             topology.add_node(node)
@@ -390,6 +455,4 @@ class Topology:
             return True
 
     def validate_all_node_routes(self):
-        return all(
-            node.validate_routes() for _, node in self.nodes.items() if node.node_type == STANDARD
-        )
+        return all(node.validate_routes() for node in self.nodes.values() if node.active)

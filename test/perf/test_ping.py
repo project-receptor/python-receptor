@@ -14,7 +14,7 @@ import pytest
     ids=["flat", "tree", "random"],
 )
 def topology(request):
-    topo = Topology.load_topology_from_file(request.param)
+    topo = Topology.load_topology_from_file(request.param, use_diag_node=True)
     try:
         topo.start(wait=True)
         yield topo
