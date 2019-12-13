@@ -3,7 +3,7 @@ import json
 import socket
 import time
 import uuid
-from datetime import datetime
+import dateutil.parser
 
 import click
 from aiohttp import web
@@ -89,7 +89,7 @@ class DiagNode:
             for _ in ping_iter():
                 payload = await self.controller.recv()
                 dta = json.loads(payload)
-                duration = datetime.fromisoformat(dta["response_time"]) - datetime.fromisoformat(
+                duration = dateutil.parser.parse(dta["response_time"]) - dateutil.parser.parse(
                     dta["initial_time"]
                 )
                 responses.append(duration.total_seconds())
