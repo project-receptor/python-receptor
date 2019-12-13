@@ -20,6 +20,7 @@ ip_address = re.compile(
     r"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}" r"(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
 )
 
+
 class Conn:
     def __init__(self, a, b, cost):
         self.a = a
@@ -41,12 +42,11 @@ class Conn:
 
 
 def read_and_parse_metrics(raw_data):
-    token = Suppress("'") + Word(alphanums + "_") + Suppress("'")
+    token = Suppress("'") + Word(alphanums + "_" + "-") + Suppress("'")
     group = Group(
         Suppress("(") + token + Suppress(",") + token + Suppress(",") + Word(nums) + Suppress(
             ")") + Suppress(Optional(',')))
     dot = Suppress("{") + OneOrMore(group) + Suppress("}")
-
     data = dot.parseString(raw_data).asList()
 
     return {Conn(c[0], c[1], c[2]) for c in data}

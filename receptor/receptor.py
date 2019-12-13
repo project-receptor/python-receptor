@@ -117,9 +117,6 @@ class Receptor:
         self.update_connections(protocol_obj)
 
     def remove_connection(self, protocol_obj, id_=None, loop=None):
-        if id_ is None:
-            id_ = protocol_obj.id
-
         if loop is None:
             loop = protocol_obj.loop
 
