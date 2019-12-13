@@ -12,6 +12,29 @@ logger = logging.getLogger(__name__)
 pool = ThreadPoolExecutor()
 
 
+class ManifestEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, datetime.datetime):
+            return {
+                "_type": "datetime.datetime",
+                "value": o.isoformat(),
+            }
+        return super().default(o)
+
+
+class ManifestDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, o):
+        type_ = o.get("_type")
+        if type_ != "datetime.datetime":
+            return o
+
+        t = o['_type']
+        return datetime.datetime.fromisoformat(o["value"])
+
+
 class DurableBuffer:
 
     def __init__(self, dir_, key, loop):
@@ -31,7 +54,7 @@ class DurableBuffer:
     async def put(self, data):
         item = {
             "ident": str(uuid.uuid4()),
-            "expire_time": datetime.datetime.now() + datetime.timedelta(minutes=5),
+            "expire_time": datetime.datetime.utcnow() + datetime.timedelta(minutes=5),
         }
         await self._loop.run_in_executor(pool, self._write_file, data, item)
         await self.q.put(item)
@@ -42,7 +65,7 @@ class DurableBuffer:
             msg = await self.q.get()
             await self._save_manifest()
             try:
-                return await self._get_file(msg, handle_only=handle_only, delete=delete)
+                return await self._get_file(msg["ident"], handle_only=handle_only, delete=delete)
             except FileNotFoundError:
                 pass
 
@@ -52,12 +75,12 @@ class DurableBuffer:
 
     def _write_manifest(self):
         with open(self._manifest_path, "w") as fp:
-            json.dump(list(self.q._queue), fp)
+            json.dump(list(self.q._queue), fp, cls=ManifestEncoder)
 
     def _read_manifest(self):
         try:
             with open(self._manifest_path, "r") as fp:
-                return json.load(fp)
+                return json.load(fp, cls=ManifestDecoder)
         except FileNotFoundError:
             return []
         except json.decoder.JSONDecodeError:
@@ -97,7 +120,7 @@ class DurableBuffer:
                 item = await self.q.get()
                 ident = item["ident"]
                 expire_time = item["expire_time"]
-                if expire_time > datetime.datetime.now():
+                if expire_time > datetime.datetime.utcnow():
                     logger.info("Expiring message %s", ident)
                     # TODO: Do something with expired message
                     await self._loop.run_in_executor(pool, os.remove, self._path_for_ident(ident))
