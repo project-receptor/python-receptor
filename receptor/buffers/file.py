@@ -6,6 +6,8 @@ import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
+import dateutil.parser
+
 from .base import BaseBufferManager
 
 logger = logging.getLogger(__name__)
@@ -30,9 +32,7 @@ class ManifestDecoder(json.JSONDecoder):
         type_ = o.get("_type")
         if type_ != "datetime.datetime":
             return o
-
-        t = o['_type']
-        return datetime.datetime.fromisoformat(o["value"])
+        return dateutil.parser.parse(o["value"])
 
 
 class DurableBuffer:
