@@ -92,6 +92,9 @@ class Receptor:
         while True:
             try:
                 data = await buf.get()
+            except asyncio.CancelledError:
+                logger.debug("message_handler: cancel request received")
+                break
             except Exception:
                 logger.exception("message_handler")
                 break

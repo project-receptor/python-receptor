@@ -1,8 +1,7 @@
-import logging
-
 import asyncio
-from collections.abc import AsyncIterator
+import logging
 from abc import abstractmethod, abstractproperty
+from collections.abc import AsyncIterator
 
 from ..messages.envelope import FramedBuffer
 
@@ -24,23 +23,27 @@ class Transport(AsyncIterator):
 
 
 async def watch_queue(conn, buf):
-    while not conn.closed:
-        try:
-            msg = await asyncio.wait_for(buf.get(), 5.0)
-            if not msg:
-                return await conn.close()
-        except asyncio.TimeoutError:
-            continue
-        except Exception:
-            logger.exception("watch_queue: error getting data from buffer")
-            continue
+    try:
+        while not conn.closed:
+            try:
+                msg = await asyncio.wait_for(buf.get(), 5.0)
+                if not msg:
+                    return await conn.close()
+            except asyncio.TimeoutError:
+                continue
+            except Exception:
+                logger.exception("watch_queue: error getting data from buffer")
+                continue
 
-        try:
-            await conn.send(msg)
-        except Exception:
-            logger.exception("watch_queue: error received trying to write")
-            await buf.put(msg)
-            return await conn.close()
+            try:
+                await conn.send(msg)
+            except Exception:
+                logger.exception("watch_queue: error received trying to write")
+                await buf.put(msg)
+                return await conn.close()
+    except asyncio.CancelledError:
+        logger.debug("watch_queue: cancel request received")
+        await conn.close()
 
 
 class Worker:
@@ -63,6 +66,8 @@ class Worker:
                 if self.conn.closed:
                     break
                 await self.buf.put(msg)
+        except asyncio.CancelledError:
+            logger.debug("receive: cancel request received")
         except Exception:
             logger.exception("receive")
 
