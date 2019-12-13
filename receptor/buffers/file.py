@@ -120,7 +120,7 @@ class DurableBuffer:
                 item = await self.q.get()
                 ident = item["ident"]
                 expire_time = item["expire_time"]
-                if expire_time > datetime.datetime.utcnow():
+                if expire_time < datetime.datetime.utcnow():
                     logger.info("Expiring message %s", ident)
                     # TODO: Do something with expired message
                     await self._loop.run_in_executor(pool, os.remove, self._path_for_ident(ident))
