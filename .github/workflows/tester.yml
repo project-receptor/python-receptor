@@ -21,7 +21,7 @@ jobs:
         pip install -r ./test/perf/requirements.txt
     - name: Perform integration tests
       run: |
-        pytest ./test/perf/
+        pytest ./test/perf/ -s
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest
