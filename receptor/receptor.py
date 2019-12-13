@@ -1,4 +1,3 @@
-import pkg_resources
 import asyncio
 import copy
 import json
@@ -6,6 +5,8 @@ import logging
 import os
 import time
 import uuid
+
+import pkg_resources
 
 from . import exceptions
 from .messages import directive, envelope
