@@ -1,8 +1,8 @@
 import asyncio
+import datetime
 import json
 import logging
 import os
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -29,9 +29,12 @@ class DurableBuffer:
             self.q.put_nowait(item)
 
     async def put(self, data):
-        ident = str(uuid.uuid4())
-        await self._loop.run_in_executor(pool, self._write_file, data, ident)
-        await self.q.put(ident)
+        item = {
+            "ident": str(uuid.uuid4()),
+            "expire_time": datetime.datetime.now() + datetime.timedelta(minutes=5),
+        }
+        await self._loop.run_in_executor(pool, self._write_file, data, item)
+        await self.q.put(item)
         await self._save_manifest()
 
     async def get(self, handle_only=False, delete=True):
@@ -77,30 +80,29 @@ class DurableBuffer:
         fp = await self._loop.run_in_executor(pool, open, path, "rb")
         if handle_only:
             return fp
-        bytes = await self._loop.run_in_executor(pool, lambda: fp.read())
+        bytes_ = await self._loop.run_in_executor(pool, fp.read)
         fp.close()
         if delete:
             await self._loop.run_in_executor(pool, os.remove, path)
-        return bytes
+        return bytes_
 
-    def _write_file(self, data, ident):
-        with open(os.path.join(self._message_path, ident), "wb") as fp:
+    def _write_file(self, data, item):
+        with open(os.path.join(self._message_path, item["ident"]), "wb") as fp:
             fp.write(data)
 
     async def expire(self):
         async with self._manifest_lock:
             new_queue = asyncio.Queue()
             while self.q.qsize() > 0:
-                ident = await self.q.get()
-                data = await self._get_file(ident, handle_only=True, delete=False)
-                # TODO: This will never work, it's not pure json anymore
-                msg = json.load(data)
-                if "expire_time" in msg and msg['expire_time'] < time.time():
+                item = await self.q.get()
+                ident = item["ident"]
+                expire_time = item["expire_time"]
+                if expire_time > datetime.datetime.now():
                     logger.info("Expiring message %s", ident)
                     # TODO: Do something with expired message
                     await self._loop.run_in_executor(pool, os.remove, self._path_for_ident(ident))
                 else:
-                    await new_queue.put(ident)
+                    await new_queue.put(item)
             self.q = new_queue
 
 
