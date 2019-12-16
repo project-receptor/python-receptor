@@ -14,25 +14,20 @@ logger = logging.getLogger(__name__)
 pool = ThreadPoolExecutor()
 
 
-class ManifestEncoder(json.JSONEncoder):
-    def default(self, o):
-        if isinstance(o, datetime.datetime):
-            return {
-                "_type": "datetime.datetime",
-                "value": o.isoformat(),
-            }
-        return super().default(o)
+def encode_date(obj):
+    if isinstance(obj, datetime.datetime):
+        return {
+            "_type": "datetime.datetime",
+            "value": obj.isoformat(),
+        }
+    raise TypeError
 
 
-class ManifestDecoder(json.JSONDecoder):
-    def __init__(self, *args, **kwargs):
-        super().__init__(object_hook=self.object_hook, *args, **kwargs)
-
-    def object_hook(self, o):
-        type_ = o.get("_type")
-        if type_ != "datetime.datetime":
-            return o
-        return dateutil.parser.parse(o["value"])
+def decode_date(o):
+    type_ = o.get("_type")
+    if type_ != "datetime.datetime":
+        return o
+    return dateutil.parser.parse(o["value"])
 
 
 class DurableBuffer:
@@ -75,12 +70,12 @@ class DurableBuffer:
 
     def _write_manifest(self):
         with open(self._manifest_path, "w") as fp:
-            json.dump(list(self.q._queue), fp, cls=ManifestEncoder)
+            json.dump(list(self.q._queue), fp, default=encode_date)
 
     def _read_manifest(self):
         try:
             with open(self._manifest_path, "r") as fp:
-                return json.load(fp, cls=ManifestDecoder)
+                return json.load(fp, object_hook=decode_date)
         except FileNotFoundError:
             return []
         except json.decoder.JSONDecodeError:
