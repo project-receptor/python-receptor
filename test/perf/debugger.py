@@ -106,10 +106,12 @@ class DiagNode:
         # controller.loop = asyncio.get_event_loop()
         # return controller.run(ping_entrypoint)
         try:
-            await self.controller.loop.create_task(ping_entrypoint())
+            await asyncio.wait_for(ping_entrypoint(), timeout=10)
         except UnrouteableError:
             return web.Response(text="Failed", status=404)
         except ConnectionRefusedError:
+            return web.Response(text="Failed", status=404)
+        except asyncio.TimeoutError:
             return web.Response(text="Failed", status=404)
         print("RESPONSE")
         return web.Response(text=json.dumps(responses))
