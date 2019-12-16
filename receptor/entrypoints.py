@@ -41,6 +41,7 @@ def run_as_node(config):
 
 def run_as_controller(config):
     controller = Controller(config)
+    logger.info(f'Running as Receptor controller with ID: {controller.receptor.node_id}')
     if config.controller_stats_enable:
         logger.info(f'Starting stats on port {config.node_stats_port}')
         start_http_server(config.controller_stats_port)
