@@ -13,15 +13,18 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: 3.6
-    - name: Install dependencies
+    - name: Upgrade pip
       run: |
         python -m pip install --upgrade pip
-        pip install python-dateutil pytest
-        pip install .
-        pip install -r ./test/perf/requirements.txt
+    - name: Install poetry
+      run: |
+        pip install poetry
+    - name: Install receptor and its dev/test dependencies
+      run: |
+        poetry install
     - name: Perform integration tests
       run: |
-        pytest ./test/perf/ -s
+        poetry run pytest ./test/perf/ -s
   unit:
     name: Unit Tests
     runs-on: ubuntu-latest
