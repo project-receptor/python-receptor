@@ -61,7 +61,7 @@ class DurableBuffer:
             await self._save_manifest()
             try:
                 return await self._get_file(msg["ident"], handle_only=handle_only, delete=delete)
-            except FileNotFoundError:
+            except (FileNotFoundError, TypeError):
                 pass
 
     async def _save_manifest(self):

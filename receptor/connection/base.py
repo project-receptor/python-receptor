@@ -3,7 +3,7 @@ import logging
 from abc import abstractmethod, abstractproperty
 from collections.abc import AsyncIterator
 
-from ..messages.envelope import FramedBuffer
+from ..messages.framed import FramedBuffer
 
 logger = logging.getLogger(__name__)
 
