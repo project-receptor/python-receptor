@@ -1,6 +1,6 @@
 PYTHON ?= python
 ifeq ($(origin VIRTUAL_ENV), undefined)
-    DIST_PYTHON ?= pipenv run $(PYTHON)
+    DIST_PYTHON ?= poetry run $(PYTHON)
 else
     DIST_PYTHON ?= $(PYTHON)
 endif
@@ -35,10 +35,10 @@ image: dist
 	docker build --rm=true -t $(IMAGE_NAME) -f ./packaging/docker/Dockerfile .
 
 dev:
-	pipenv install
+	poetry install
 
 shell:
-	pipenv shell
+	poetry shell
 
 test:
 	tox
