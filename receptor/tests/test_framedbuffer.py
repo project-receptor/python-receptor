@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from receptor.messages.envelope import Frame, FramedBuffer, FramedMessage
+from receptor.messages.framed import Frame, FramedBuffer, FramedMessage
 
 
 @pytest.yield_fixture
@@ -35,7 +35,7 @@ async def test_framedbuffer(framed_buffer, msg_id):
     m = await framed_buffer.get()
 
     assert m.header == header
-    assert m.payload == payload + payload2
+    assert m.payload.readall() == payload + payload2
 
 
 @pytest.mark.asyncio
@@ -49,7 +49,7 @@ async def test_hi(msg_id, framed_buffer):
     m = await framed_buffer.get()
 
     assert m.header is None
-    assert m.payload == hi
+    assert m.payload.readall() == hi
 
 
 @pytest.mark.asyncio
@@ -93,7 +93,7 @@ async def test_overfull(framed_buffer, msg_id):
     m = await framed_buffer.get()
 
     assert m.header == header
-    assert m.payload == payload
+    assert m.payload.readall() == payload
 
 
 @pytest.mark.asyncio
@@ -109,7 +109,7 @@ async def test_underfull(framed_buffer, msg_id):
     m = await framed_buffer.get()
 
     assert m.header == header
-    assert m.payload == payload
+    assert m.payload.readall() == payload
 
 
 @pytest.mark.asyncio

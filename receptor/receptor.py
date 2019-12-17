@@ -9,7 +9,7 @@ import uuid
 import pkg_resources
 
 from . import exceptions
-from .messages import directive, envelope
+from .messages import directive, envelope, framed
 from .router import MeshRouter
 from .stats import messages_received_counter, receptor_info
 from .work import WorkManager
@@ -141,7 +141,7 @@ class Receptor:
             await asyncio.sleep(1)
 
     def _say_hi(self):
-        return envelope.CommandMessage(header={
+        return framed.CommandMessage(header={
             "cmd": "HI",
             "id": self.node_id,
             "expire_time": time.time() + 10,
@@ -228,7 +228,7 @@ class Receptor:
         if next_hop:
             return await self.router.forward(msg, next_hop)
 
-        inner = await envelope.Inner.deserialize(self, msg.payload)
+        inner = await envelope.Inner.deserialize(self, msg.payload.read())
 
         if inner.message_type not in handlers:
             raise exceptions.UnknownMessageType(
