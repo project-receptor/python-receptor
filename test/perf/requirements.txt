@@ -1,6 +1,0 @@
-attrs
-click
-pyparsing
-pyyaml
-requests
-wait_for
