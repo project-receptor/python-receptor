@@ -165,10 +165,6 @@ class Node:
         if peer.name not in self.topology.nodes[node_ping_name].connections:
             self.topology.nodes[node_ping_name].connections.append(peer.name)
 
-        if self.controller:
-            # TODO Remove this once a controller is pingable
-            return True
-
         peer_address = self.topology.nodes[peer.name].listen
 
         starter = [
