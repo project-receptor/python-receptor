@@ -386,6 +386,14 @@ class Topology:
                 routes.add(Conn(node_data.name, conn, 1))
         return routes
 
+    def generate_dot(self):
+        dot_data = "graph {"
+        for node, node_data in self.nodes.items():
+            for conn in node_data.connections:
+                dot_data += f"{node} -- {conn}; "
+        dot_data += "}"
+        return dot_data
+
     def start(self, wait=True):
         self.dump_yaml()
 
