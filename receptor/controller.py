@@ -42,6 +42,7 @@ class Controller:
 
     async def send(self, message, expect_response=True):
         new_id = uuid.uuid4()
+        message.fd.seek(0)
         inner_env = envelope.Inner(
             receptor=self.receptor,
             message_id=str(new_id),

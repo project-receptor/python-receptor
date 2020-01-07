@@ -21,7 +21,7 @@ class Message:
     __slots__ = ("fd", "recipient", "directive")
 
     def __init__(self, recipient, directive):
-        self.fd = io.BytesIO()
+        self.fd = io.StringIO()
         self.recipient = recipient
         self.directive = directive
 
