@@ -1,0 +1,44 @@
+%define name receptor
+%define version {{ version }}
+%define release {{ release }}
+
+Summary: UNKNOWN
+Name: %{name}
+Version: %{version}
+Release: %{release}
+Source0: https://github.com/project-receptor/%{name}/archive/%{version}.tar.gz
+
+License: Apache
+Group: Development/Libraries
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot
+Prefix: %{_prefix}
+BuildArch: noarch
+Vendor: Red Hat <UNKNOWN>
+Url: https://github.com/project-receptor/receptor
+
+BuildRequires: python3
+BuildRequires: python3-setuptools
+Requires: python3
+Requires: python3-setuptools
+Requires: python3-aiohttp
+Requires: python3-prometheus_client
+
+%description
+Receptor
+==============
+Project Receptor is a flexible multi-service relayer with remote execution and orchestration capabilities linking controllers with executors across a mesh of nodes. For the latest documentation see: [https://receptor.readthedocs.io](https://receptor.readthedocs.io/en/latest/)
+
+%prep
+%setup -n %{name}-%{version} -n %{name}-%{version}
+
+%build
+python3 setup.py build
+
+%install
+python3 setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%files -f INSTALLED_FILES
+%defattr(-,root,root)
