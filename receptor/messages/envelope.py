@@ -37,6 +37,8 @@ class Message:
         self.fd = buffered_io
 
     def data(self, raw_data):
+        if isinstance(raw_data, str):
+            raw_data = raw_data.encode()
         self.fd.write(raw_data)
 
 

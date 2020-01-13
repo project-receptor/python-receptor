@@ -34,7 +34,7 @@ class Control:
                 serial=serial
             )
             await router.send(enveloped_response)
-    
+
     async def ping(self, receptor, inner_env):
         logger.info(f'Received ping from {inner_env.sender}')
         return_data = dict(initial_time=inner_env.raw_payload,

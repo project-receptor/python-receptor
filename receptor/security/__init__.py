@@ -20,10 +20,15 @@ class MallCop:
 
     async def verify_response(self, response):
         return True
-    
+
     async def sign_response(self, inner_envelope):
+        def strattr(attr):
+            attrval = getattr(inner_envelope, attr)
+            if type(attrval) == bytes:
+                return attrval.decode()
+            return attrval
         return json.dumps(
-            {attr: getattr(inner_envelope, attr)
+            {attr: strattr(attr)
              for attr in ['message_id', 'sender', 'recipient', 'message_type',
                           'timestamp', 'raw_payload', 'directive',
                           'in_response_to', 'ttl', 'serial', 'code']}
