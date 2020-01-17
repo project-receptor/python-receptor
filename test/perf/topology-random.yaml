@@ -1,3 +1,4 @@
+---
 nodes:
   controller:
     connections: []
@@ -8,7 +9,7 @@ nodes:
     stats_port: null
   node1:
     connections:
-    - controller
+      - controller
     controller: false
     listen: receptor://127.0.0.1:11111
     name: node1
@@ -16,8 +17,8 @@ nodes:
     stats_port: null
   node10:
     connections:
-    - node12
-    - node4
+      - node12
+      - node4
     controller: false
     listen: null
     name: node10
@@ -25,7 +26,7 @@ nodes:
     stats_port: null
   node11:
     connections:
-    - node1
+      - node1
     controller: false
     listen: null
     name: node11
@@ -33,8 +34,8 @@ nodes:
     stats_port: null
   node12:
     connections:
-    - node11
-    - controller
+      - node11
+      - controller
     controller: false
     listen: null
     name: node12
@@ -42,7 +43,7 @@ nodes:
     stats_port: null
   node2:
     connections:
-    - node1
+      - node1
     controller: false
     listen: null
     name: node2
@@ -50,8 +51,8 @@ nodes:
     stats_port: null
   node3:
     connections:
-    - node6
-    - node4
+      - node6
+      - node4
     controller: false
     listen: null
     name: node3
@@ -59,8 +60,8 @@ nodes:
     stats_port: null
   node4:
     connections:
-    - node7
-    - node2
+      - node7
+      - node2
     controller: false
     listen: null
     name: node4
@@ -68,8 +69,8 @@ nodes:
     stats_port: null
   node5:
     connections:
-    - node8
-    - node12
+      - node8
+      - node12
     controller: false
     listen: null
     name: node5
@@ -77,8 +78,8 @@ nodes:
     stats_port: null
   node6:
     connections:
-    - node10
-    - node3
+      - node10
+      - node3
     controller: false
     listen: null
     name: node6
@@ -86,8 +87,8 @@ nodes:
     stats_port: null
   node7:
     connections:
-    - node3
-    - node1
+      - node3
+      - node1
     controller: false
     listen: null
     name: node7
@@ -95,7 +96,7 @@ nodes:
     stats_port: null
   node8:
     connections:
-    - node1
+      - node1
     controller: false
     listen: null
     name: node8
@@ -103,8 +104,8 @@ nodes:
     stats_port: null
   node9:
     connections:
-    - node10
-    - node5
+      - node10
+      - node5
     controller: false
     listen: null
     name: node9

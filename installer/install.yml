@@ -1,6 +1,9 @@
+---
 - name: Deploy Receptor Mesh Network
   hosts: all
   vars:
-    receptor_version: git+https://github.com/project-receptor/receptor # could be "1.0", etc.
+    # could be "1.0", etc.
+    receptor_version: git+https://github.com/project-receptor/receptor
   roles:
-    - { role: receptor_install, become: yes }
+    - role: receptor_install
+      become: true
