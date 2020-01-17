@@ -4,7 +4,7 @@ from test.perf.utils import random_port
 import time
 
 import pytest
-from wait_for import wait_for, TimedOutError
+from wait_for import wait_for
 
 
 @pytest.fixture(scope="function")

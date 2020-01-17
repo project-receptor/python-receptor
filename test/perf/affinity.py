@@ -220,7 +220,6 @@ class DiagNode(Node):
         print(starter)
         return starter
 
-
     def wait_for_ports(self):
         print(f"waiting for {self.api_port}, {self.api_address}")
         wait_for(net_check, func_args=[self.api_port, self.api_address, True])
