@@ -15,18 +15,12 @@ jobs:
         uses: actions/setup-python@v1
         with:
           python-version: 3.6
-      - name: Upgrade pip
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-      - name: Install poetry
-        run: |
-          pip install poetry
-      - name: Install receptor and its dev/test dependencies
-        run: |
-          poetry install
-      - name: Perform integration tests
-        run: |
-          poetry run pytest ./test/perf/ -s
+          pip install .[dev]
+      - name: Run integration tests
+        run: pytest ./test/perf -s
 
   unit:
     name: Unit Tests
@@ -40,11 +34,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install python-dateutil pytest pytest-asyncio
-          pip install .
-      - name: pytest unit tests
-        run: |
-          pytest test/integration
+          pip install .[dev]
+      - name: Run unit tests
+        run: pytest ./test/integration
 
   flake8:
     name: flake8
@@ -57,10 +49,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install poetry
-          poetry install
+          pip install .[dev]
       - name: Run flake8
-        run: poetry run flake8
+        run: flake8
 
   yamllint:
     name: yamllint

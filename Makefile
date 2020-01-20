@@ -1,9 +1,5 @@
 PYTHON ?= python
-ifeq ($(origin VIRTUAL_ENV), undefined)
-    DIST_PYTHON ?= poetry run $(PYTHON)
-else
-    DIST_PYTHON ?= $(PYTHON)
-endif
+DIST_PYTHON ?= $(PYTHON)
 
 NAME = receptor
 IMAGE_NAME ?= $(NAME)
@@ -50,10 +46,9 @@ image: dist
 	docker build --rm=true -t $(IMAGE_NAME) -f ./packaging/docker/Dockerfile .
 
 dev:
-	poetry install
+	pip install -e .[dev]
 
 shell:
-	poetry shell
 
 test:
 	tox
