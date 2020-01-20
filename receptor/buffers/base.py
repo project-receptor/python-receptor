@@ -22,9 +22,9 @@ class BaseBuffer:
 
     def push(self, message):
         raise NotImplementedError()
-    
+
     def pop(self):
         raise NotImplementedError()
-    
+
     def flush(self):
         raise NotImplementedError()

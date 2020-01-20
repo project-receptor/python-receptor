@@ -20,7 +20,7 @@ class MallCop:
 
     async def verify_response(self, response):
         return True
-    
+
     async def sign_response(self, inner_envelope):
         return json.dumps(
             {attr: getattr(inner_envelope, attr)

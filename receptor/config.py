@@ -4,7 +4,6 @@ import importlib
 import logging
 import os
 import ssl
-import urllib.parse
 
 from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_controller
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
@@ -19,7 +18,7 @@ SUBCOMMAND_EXTRAS = {
     },
     'controller': {
         'hint': 'Run a Receptor controller',
-        'entrypoint': run_as_controller, # TODO: New entrypoint
+        'entrypoint': run_as_controller,  # TODO: New entrypoint
     },
     'ping': {
         'hint': 'Tell the local controller to ping a node',
@@ -176,7 +175,10 @@ class ReceptorConfig:
             key='listen',
             default_value=['receptor://0.0.0.0:8888'],
             value_type='list',
-            hint='Set IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0/0:8888. This option can be passed multiple times.',
+            hint=(
+                'Set IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0/0:8888. This option can be '
+                'passed multiple times.'
+            ),
         )
         self.add_config_option(
             section='controller',
