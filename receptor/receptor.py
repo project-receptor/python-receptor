@@ -236,7 +236,7 @@ class Receptor:
         for target in destinations:
             buf = self.buffer_mgr.get_buffer_for_node(target, self)
             try:
-                msg = envelope.CommandMessage(header={
+                msg = framed.CommandMessage(header={
                     "cmd": "ROUTE",
                     "id": self.node_id,
                     "capabilities": self.work_manager.get_capabilities(),

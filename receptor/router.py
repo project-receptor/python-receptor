@@ -8,7 +8,7 @@ import itertools
 from collections import defaultdict
 
 from .exceptions import ReceptorBufferError, UnrouteableError
-from .messages import envelope
+from .messages import envelope, framed
 from .stats import route_counter, route_info
 
 logger = logging.getLogger(__name__)
@@ -215,13 +215,16 @@ class MeshRouter:
         if not next_node_id:
             # TODO: This probably needs to emit an error response
             raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
-        signed = await inner_envelope.sign_and_serialize()
+
+        # TODO: Not signing/serializing in order to finish buffered output work
+        # signed = await inner_envelope.sign_and_serialize()
+
         header = {
             "sender": self.node_id,
             "recipient": inner_envelope.recipient,
             "route_list": [self.node_id]
         }
-        msg = envelope.FramedMessage(msg_id=uuid.uuid4().int, header=header, payload=signed)
+        msg = framed.FramedMessage(msg_id=uuid.uuid4().int, header=header, payload=inner_envelope.raw_payload)
         logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
         if expected_response and inner_envelope.message_type == 'directive':
             self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
