@@ -31,13 +31,13 @@ class RawSocket(Transport):
         await self.writer.drain()
 
 
-async def connect(host, port, factory, loop=None):
+async def connect(host, port, factory, loop=None, ssl=None):
     if not loop:
         loop = asyncio.get_event_loop()
 
     worker = factory()
     try:
-        r, w = await asyncio.open_connection(host, port, loop=loop)
+        r, w = await asyncio.open_connection(host, port, loop=loop, ssl=ssl)
         t = RawSocket(r, w)
         await worker.client(t)
     except Exception:

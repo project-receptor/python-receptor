@@ -37,6 +37,6 @@ class Manager:
     def get_peer(self, peer):
         service = parse_peer(peer)
         if service.scheme == "receptor":
-            self.loop.create_task(sock.connect(service.hostname, service.port, self.factory, self.loop))
+            self.loop.create_task(sock.connect(service.hostname, service.port, self.factory, self.loop, self.ssl_context))
         elif service.scheme in ("ws", "wss"):
-            self.loop.create_task(ws.connect(peer, self.factory, self.loop))
+            self.loop.create_task(ws.connect(peer, self.factory, self.loop, self.ssl_context))
