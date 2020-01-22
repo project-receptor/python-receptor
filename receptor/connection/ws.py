@@ -42,7 +42,7 @@ async def connect(uri, factory, loop=None, ssl_context=None):
     finally:
         await asyncio.sleep(5)
         logger.debug("ws.connect: reconnecting")
-        loop.create_task(connect(uri, factory=factory, loop=loop))
+        loop.create_task(connect(uri, factory=factory, loop=loop, ssl_context=ssl_context))
 
 
 async def serve(request, factory):
