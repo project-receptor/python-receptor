@@ -107,3 +107,6 @@ venv.bak/
 # mypy
 .mypy_cache/
 graph_*.dot
+
+# Created by affinity test framework
+/.last-mesh.yaml
