@@ -181,10 +181,7 @@ class Node:
         ]
         print(starter)
         start = time.time()
-        op = subprocess.Popen(
-            " ".join(starter), shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        op.wait()
+        op = subprocess.run(starter, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         duration = time.time() - start
         cmd_output = op.stdout.readlines()
         print(op.stderr.read())
