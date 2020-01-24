@@ -81,11 +81,10 @@ class Node:
             st.extend(["-d", self.data_path, "--node-id", self.name, "controller"])
             st.extend([f"--listen={self.listen}"])
         else:
-            peer_string = " ".join(
-                [f"--peer={self.mesh.nodes[pnode].listen}" for pnode in self.connections]
-            )
             st.extend(["-d", self.data_path, "--node-id", self.name, "node"])
-            st.extend([f"--listen={self.listen}", peer_string])
+            st.extend([f"--listen={self.listen}"])
+            for pnode in self.connections:
+                st.append(f"--peer={self.mesh.nodes[pnode].listen}")
 
         if self.stats_enable:
             st.extend(["--stats-enable", f"--stats-port={self.stats_port}"])
@@ -94,9 +93,7 @@ class Node:
 
     def start(self, wait_for_ports=True):
         print(f"{time.time()} starting {self.name}({self.uuid})")
-        op = subprocess.Popen(
-            " ".join(self._construct_run_command()), shell=True, preexec_fn=os.setsid
-        )
+        op = subprocess.Popen(self._construct_run_command(), start_new_session=True)
         procs[self.uuid] = op
 
         if wait_for_ports:
