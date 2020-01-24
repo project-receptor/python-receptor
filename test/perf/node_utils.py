@@ -1,5 +1,5 @@
 import sys
-from test.perf.affinity import Topology
+from test.perf.affinity import Mesh
 from time import sleep
 
 import click
@@ -17,13 +17,13 @@ RECEPTOR_METRICS = (
 )
 
 
-def do_loop(topology):
-    topology.start()
+def do_loop(mesh):
+    mesh.start()
     try:
         while True:
             sleep(1)
     except KeyboardInterrupt:
-        topology.stop()
+        mesh.stop()
 
 
 @click.group(help="Helper commands for application")
@@ -43,11 +43,11 @@ def randomize(controller_port, node_count, max_conn_count, debug, profile, socke
         global DEBUG
         DEBUG = True
 
-    topology = Topology.generate_random_mesh(
+    mesh = Mesh.generate_random_mesh(
         controller_port, node_count, max_conn_count, profile, socket_path
     )
-    print(topology)
-    do_loop(topology)
+    print(mesh)
+    do_loop(mesh)
 
 
 @main.command("flat")
@@ -61,17 +61,17 @@ def flat(controller_port, node_count, debug, profile, socket_path):
         global DEBUG
         DEBUG = True
 
-    topology = Topology.generate_flat_mesh(controller_port, node_count, profile, socket_path)
-    print(topology)
-    do_loop(topology)
+    mesh = Mesh.generate_flat_mesh(controller_port, node_count, profile, socket_path)
+    print(mesh)
+    do_loop(mesh)
 
 
 @main.command("file")
 @click.option("--debug", is_flag=True, default=False)
 @click.argument("filename", type=click.File("r"))
 def file(filename, debug):
-    topology = Topology.load_topology_from_file(filename)
-    do_loop(topology)
+    mesh = Mesh.load_mesh_from_file(filename)
+    do_loop(mesh)
 
 
 @main.command("ping")
@@ -80,10 +80,10 @@ def file(filename, debug):
 @click.option("--socket-path", default=None)
 @click.argument("filename", type=click.File("r"))
 def ping(filename, count, validate, socket_path):
-    topology = Topology.load_topology_from_file(filename)
+    mesh = Mesh.load_mesh_from_file(filename)
 
-    results = topology.ping(count, socket_path=socket_path)
-    Topology.validate_ping_results(results, validate)
+    results = mesh.ping(count, socket_path=socket_path)
+    Mesh.validate_ping_results(results, validate)
 
 
 @main.command("check-stats")
@@ -91,10 +91,10 @@ def ping(filename, count, validate, socket_path):
 @click.option("--profile", is_flag=True, default=False)
 @click.argument("filename", type=click.File("r"))
 def check_stats(filename, debug, profile):
-    topology = Topology.load_topology_from_file(filename)
+    mesh = Mesh.load_mesh_from_file(filename)
     failures = []
 
-    for node in topology.nodes.values():
+    for node in mesh.nodes.values():
         if not node.stats_enable:
             continue
         stats = requests.get(f"http://localhost:{node.stats_port}/metrics")
@@ -104,7 +104,7 @@ def check_stats(filename, debug, profile):
             if metric.name in RECEPTOR_METRICS
         }
         expected_connected_peers = len(
-            [n for n in topology.nodes.values() if node.name in n.connections]
+            [n for n in mesh.nodes.values() if node.name in n.connections]
         ) + len(node.connections)
         connected_peers = metrics["connected_peers"].samples[0].value
         if expected_connected_peers != connected_peers:

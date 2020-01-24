@@ -46,7 +46,7 @@ class Node:
     stats_port = attr.ib(default=None)
     profile = attr.ib(default=False)
     data_path = attr.ib(default=None)
-    topology = attr.ib(init=False, default=None)
+    mesh = attr.ib(init=False, default=None)
     uuid = attr.ib(init=False, factory=uuid.uuid4)
     active = attr.ib(init=False)
 
@@ -82,7 +82,7 @@ class Node:
             st.extend([f"--listen={self.listen}"])
         else:
             peer_string = " ".join(
-                [f"--peer={self.topology.nodes[pnode].listen}" for pnode in self.connections]
+                [f"--peer={self.mesh.nodes[pnode].listen}" for pnode in self.connections]
             )
             st.extend(["-d", self.data_path, "--node-id", self.name, "node"])
             st.extend([f"--listen={self.listen}", peer_string])
@@ -145,27 +145,27 @@ class Node:
             raise Exception("Can't get routes from a stopped node")
         print(f"****====TRYING COMPARE {self.name}")
         node_routes = self.get_routes()
-        control_routes = self.topology.generate_routes()
+        control_routes = self.mesh.generate_routes()
         if node_routes and control_routes:
-            return self.topology.compare_routes(node_routes, control_routes)
+            return self.mesh.compare_routes(node_routes, control_routes)
         else:
             return False
 
     def ping(self, count, peer=None, node_ping_name="ping_node"):
 
-        if self.topology.diag_node:
-            return self.topology.diag_node.ping(count=count, recipient=self.name)
+        if self.mesh.diag_node:
+            return self.mesh.diag_node.ping(count=count, recipient=self.name)
 
         if not peer:
-            peer = self.topology.find_controller()[0]
+            peer = self.mesh.find_controller()[0]
 
-        if node_ping_name not in self.topology.nodes:
-            self.topology.add_node(DiagNode(name=node_ping_name))
+        if node_ping_name not in self.mesh.nodes:
+            self.mesh.add_node(DiagNode(name=node_ping_name))
 
-        if peer.name not in self.topology.nodes[node_ping_name].connections:
-            self.topology.nodes[node_ping_name].connections.append(peer.name)
+        if peer.name not in self.mesh.nodes[node_ping_name].connections:
+            self.mesh.nodes[node_ping_name].connections.append(peer.name)
 
-        peer_address = self.topology.nodes[peer.name].listen
+        peer_address = self.mesh.nodes[peer.name].listen
 
         starter = [
             "time",
@@ -228,9 +228,9 @@ class DiagNode(Node):
     def validate_routes(self):
         print(f"****====TRYING COMPARE {self.name}")
         node_routes = self.get_routes()
-        control_routes = self.topology.generate_routes()
+        control_routes = self.mesh.generate_routes()
         if node_routes and control_routes:
-            return self.topology.compare_routes(node_routes, control_routes)
+            return self.mesh.compare_routes(node_routes, control_routes)
         else:
             return False
 
@@ -263,7 +263,7 @@ class DiagNode(Node):
 
 
 @attr.s
-class Topology:
+class Mesh:
     use_diag_node = attr.ib(default=False)
     nodes = attr.ib(init=False, factory=dict)
     diag_node = attr.ib(init=False, default=None)
@@ -278,9 +278,9 @@ class Topology:
     def add_node(self, node):
         if node.name not in self.nodes:
             self.nodes[node.name] = node
-            node.topology = self
+            node.mesh = self
         else:
-            raise Exception("Topology already has a node by the same name")
+            raise Exception("Mesh already has a node by the same name")
 
     def remove_node(self, node_or_name):
         if isinstance(node_or_name, Node):
@@ -288,15 +288,15 @@ class Topology:
         else:
             node_name = node_or_name
         if node_name not in self.nodes:
-            raise Exception("Topology has no node by that name")
+            raise Exception("Mesh has no node by that name")
         else:
-            self.nodes[node_name].topology = None
+            self.nodes[node_name].mesh = None
             del self.nodes[node_name]
 
     @staticmethod
     def generate_mesh(controller_port, node_count, conn_method, profile=False):
-        topology = Topology()
-        topology.add_node(
+        mesh = Mesh()
+        mesh.add_node(
             Node(
                 name="controller",
                 controller=True,
@@ -306,7 +306,7 @@ class Topology:
         )
 
         for i in range(node_count):
-            topology.add_node(
+            mesh.add_node(
                 Node(
                     name=f"node{i}",
                     controller=False,
@@ -315,22 +315,22 @@ class Topology:
                 )
             )
 
-        for k, node in topology.nodes.items():
+        for k, node in mesh.nodes.items():
             if node.controller:
                 continue
             else:
-                node.connections.extend(conn_method(topology, node))
-        return topology
+                node.connections.extend(conn_method(mesh, node))
+        return mesh
 
     @staticmethod
     def generate_random_mesh(controller_port, node_count, max_conn_count, profile):
-        def peer_function(topology, cur_node):
+        def peer_function(mesh, cur_node):
             nconns = defaultdict(int)
-            print(topology)
-            for k, node in topology.nodes.items():
+            print(mesh)
+            for k, node in mesh.nodes.items():
                 for conn in node.connections:
                     nconns[conn] += 1
-            available_nodes = list(filter(lambda o: nconns[o] < max_conn_count, topology.nodes))
+            available_nodes = list(filter(lambda o: nconns[o] < max_conn_count, mesh.nodes))
             print("------")
             print(nconns)
             print(available_nodes)
@@ -342,22 +342,22 @@ class Topology:
             else:
                 return random.choices(available_nodes, k=int(random.random() * max_conn_count))
 
-        topology = Topology.generate_random_mesh(
+        mesh = Mesh.generate_random_mesh(
             controller_port, node_count, peer_function, profile
         )
-        return topology
+        return mesh
 
     @staticmethod
     def generate_flat_mesh(controller_port, node_count, profile):
         def peer_function(*args):
             return ["controller"]
 
-        topology = Topology.generate_random_mesh(
+        mesh = Mesh.generate_random_mesh(
             controller_port, node_count, peer_function, profile
         )
-        return topology
+        return mesh
 
-    def dump_yaml(self, filename=".last-topology.yaml"):
+    def dump_yaml(self, filename=".last-mesh.yaml"):
         with open(filename, "w") as f:
             data = {"nodes": {}}
             for node, node_data in self.nodes.items():
@@ -412,16 +412,16 @@ class Topology:
         print("all killed")
 
     @staticmethod
-    def load_topology_from_file(filename, use_diag_node=False):
+    def load_mesh_from_file(filename, use_diag_node=False):
         with open(filename) as f:
             data = yaml.safe_load(f)
 
-        topology = Topology(use_diag_node=use_diag_node)
+        mesh = Mesh(use_diag_node=use_diag_node)
         for node_name, definition in data["nodes"].items():
             node = Node.create_from_config(definition)
-            topology.add_node(node)
+            mesh.add_node(node)
 
-        return topology
+        return mesh
 
     def find_controller(self):
         return list(filter(lambda o: o.controller, self.nodes.values()))

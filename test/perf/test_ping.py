@@ -1,4 +1,4 @@
-from test.perf.affinity import Topology
+from test.perf.affinity import Mesh
 from wait_for import TimedOutError
 import time
 import pytest
@@ -7,25 +7,25 @@ import pytest
 @pytest.yield_fixture(
     scope="function",
     params=[
-        "test/perf/topology-flat.yaml",
-        "test/perf/topology-tree.yaml",
-        "test/perf/topology-random.yaml",
+        "test/perf/flat-mesh.yaml",
+        "test/perf/tree-mesh.yaml",
+        "test/perf/random-mesh.yaml",
     ],
     ids=["flat", "tree", "random"],
 )
-def topology(request):
-    topo = Topology.load_topology_from_file(request.param, use_diag_node=True)
+def mesh(request):
+    mesh = Mesh.load_mesh_from_file(request.param, use_diag_node=True)
     try:
-        topo.start(wait=True)
-        yield topo
+        mesh.start(wait=True)
+        yield mesh
     except TimedOutError:
         raise
     finally:
-        print(f"{time.time()} - Stopping current topo")
-        print(topo.nodes['controller'])
-        topo.stop()
+        print(f"{time.time()} - Stopping current mesh")
+        print(mesh.nodes['controller'])
+        mesh.stop()
 
 
-def test_pings_perf(topology):
-    results = topology.ping()
-    topology.validate_ping_results(results)
+def test_pings_perf(mesh):
+    results = mesh.ping()
+    mesh.validate_ping_results(results)
