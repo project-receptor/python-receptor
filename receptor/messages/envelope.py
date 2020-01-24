@@ -26,14 +26,15 @@ class Message:
         self.directive = directive
 
     def open(self):
+        self.fd.seek(0)
         return self.fd
 
     def file(self, path):
-        self.fd = open(path)
+        self.fd = open(path, 'r+b')
 
     def buffer(self, buffered_io):
-        if not isinstance(buffered_io, io.IOBase):
-            raise ReceptorRuntimeError("buffer must be of type IOBase")
+        if not isinstance(buffered_io, io.BytesIO):
+            raise ReceptorRuntimeError("buffer must be of type io.BytesIO")
         self.fd = buffered_io
 
     def data(self, raw_data):
