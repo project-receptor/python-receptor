@@ -5,7 +5,7 @@ import logging
 import os
 import ssl
 
-from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_controller
+from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_controller, run_as_status
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,10 @@ SUBCOMMAND_EXTRAS = {
     'send': {
         'hint': 'Send a directive to a node',
         'entrypoint': run_as_send,
+    },
+    'status': {
+        'hint': 'Display status of the Receptor network',
+        'entrypoint': run_as_status,
     },
 }
 
@@ -194,6 +198,13 @@ class ReceptorConfig:
             default_value='',
             value_type='str',
             hint='The peer to relay the ping directive through'
+        )
+        self.add_config_option(
+            section='status',
+            key='peer',
+            default_value='',
+            value_type='str',
+            hint='The peer to access the mesh through'
         )
         self.add_config_option(
             section='controller',

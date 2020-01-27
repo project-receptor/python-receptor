@@ -111,3 +111,22 @@ def run_as_send(config):
     logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
     controller = Controller(config)
     controller.run(send_entrypoint)
+
+
+def run_as_status(config):
+
+    async def status_entrypoint():
+        controller.add_peer(config.status_peer)
+        start_wait = time.time()
+        while not controller.receptor.router.node_is_known(config.status_peer) and (time.time() - start_wait < 5):
+            await asyncio.sleep(0.1)
+        print("Nodes:")
+        print("  Myself:", controller.receptor.router.node_id)
+        print("  Others:", ", ".join(list(controller.receptor.router.get_nodes())))
+        print("Edges:")
+        for edge in controller.receptor.router.get_edges():
+           print("  ", edge)
+
+    controller = Controller(config)
+    controller.run(status_entrypoint)
+
