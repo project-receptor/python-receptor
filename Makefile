@@ -27,6 +27,7 @@ RESULTDIR = rpm-build/results-$(DIST)-$(ARCH)
 .PHONY: clean version release dist sdist image dev shell test \
 	mock-rpm mock-srpm image
 
+
 clean:
 	rm -rf dist
 	rm -rf receptor.egg-info
