@@ -86,6 +86,12 @@ class DurableBuffer:
     def _path_for_ident(self, ident):
         return os.path.join(self._message_path, ident)
 
+    def _remove_path(self, path):
+        if os.path.exists(path):
+            os.remove(path)
+        else:
+            logger.info("Can't remove {}, doesn't exist".format(path))
+
     async def _get_file(self, ident, handle_only=False, delete=True):
         """
         Retrieves a file from disk. If handle_only is True then we will
@@ -118,10 +124,11 @@ class DurableBuffer:
                 if expire_time < datetime.datetime.utcnow():
                     logger.info("Expiring message %s", ident)
                     # TODO: Do something with expired message
-                    await self._loop.run_in_executor(pool, os.remove, self._path_for_ident(ident))
+                    await self._loop.run_in_executor(pool, self._remove_path, self._path_for_ident(ident))
                 else:
                     await new_queue.put(item)
             self.q = new_queue
+            self._write_manifest()
 
 
 class FileBufferManager(BaseBufferManager):
