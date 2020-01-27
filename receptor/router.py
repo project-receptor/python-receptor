@@ -154,7 +154,6 @@ class MeshRouter:
             # TODO: This probably needs to emit an error response
             raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
         signed = await inner_envelope.sign_and_serialize()
-
         header = {
             "sender": self.node_id,
             "recipient": inner_envelope.recipient,

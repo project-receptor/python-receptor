@@ -92,11 +92,15 @@ def run_as_send(config):
             await asyncio.sleep(0.1)
         msg = Message(config.send_recipient, config.send_directive)
         if config.send_payload == "-":
-            msg.buffer(sys.stdin)
+            msg.data(sys.stdin.buffer.read())
         elif os.path.exists(config.send_payload):
             msg.file(config.send_payload)
         else:
-            msg.data(config.send_payload)
+            if isinstance(config.send_payload, str):
+                send_payload = config.send_payload.encode()
+            else:
+                send_payload = config.send_payload
+            msg.data(send_payload)
         await controller.send(msg)
         await read_task
 

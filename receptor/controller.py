@@ -50,7 +50,7 @@ class Controller:
             message_type="directive",
             directive=message.directive,
             timestamp=datetime.datetime.utcnow().isoformat(),
-            raw_payload=message.fd.read(),
+            raw_payload=message.open().read(),
         )
         await self.receptor.router.send(inner_env, expected_response=expect_response)
         return new_id
