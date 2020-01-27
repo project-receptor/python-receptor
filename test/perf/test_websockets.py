@@ -1,6 +1,6 @@
-from test.perf.affinity import Node
-from test.perf.affinity import Mesh
-from test.perf.utils import random_port
+from receptor_affinity.mesh import Node
+from receptor_affinity.mesh import Mesh
+from receptor_affinity.utils import random_port
 import time
 
 import pytest
