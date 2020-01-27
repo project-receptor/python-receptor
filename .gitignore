@@ -6,6 +6,7 @@
 [._]ss[a-gi-z]
 [._]sw[a-p]
 .vscode/*
+.idea/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
