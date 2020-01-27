@@ -33,7 +33,12 @@ class Receptor:
         self.connection_manifest_path = os.path.join(self.base_path, "connection_manifest")
         self.buffer_mgr = self.config.components_buffer_manager
         self.stop = False
-        receptor_info.info(dict(node_id=self.node_id, receptor_version=pkg_resources.get_distribution("receptor").version))
+        try:
+            receptor_dist = pkg_resources.get_distribution("receptor")
+            receptor_version = receptor_dist.version
+        except pkg_resources.DistributionNotFound:
+            receptor_version = 'unknown'
+        receptor_info.info(dict(node_id=self.node_id, receptor_version=receptor_version))
 
     def _find_node_id(self):
         if 'RECEPTOR_NODE_ID' in os.environ:
