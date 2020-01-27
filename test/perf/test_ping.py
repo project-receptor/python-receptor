@@ -1,4 +1,4 @@
-from test.perf.affinity import Mesh
+from receptor_affinity.mesh import Mesh
 from wait_for import TimedOutError
 import time
 import pytest
