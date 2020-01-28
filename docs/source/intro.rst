@@ -59,48 +59,79 @@ information is automatically broadcast to the rest of the Receptor network.
 Example of running a basic Receptor Network
 -------------------------------------------
 
-First lets install Receptor, you can do this from pip or a source checkout::
+First lets install Receptor, you can do this from pip or a source checkout:
 
-  $ pip install receptor
+.. code-block:: sh
+
+    pip install receptor
 
 We're going to launch a very simple Receptor network that looks like this::
 
-  controller <--> node-a <--> node-b
+    controller <--> node-a <--> node-b
 
 Then we're going to send a ping request from the ``controller`` to ``node-b``.
 
 Now that we have **Receptor** installed we're going to start the 3 nodes in the
 following configuration:
 
-* ``controller``: Will listen on port 8888 and for controller requests on
-  ``/tmp/receptor.sock``
-* ``node-a``: Will listen on port 8889 and connect to ``controller`` on port
-  8888
-* ``node-b``: Will not start a listening server but will connect directly to
-  ``node-a`` on port 8889
+``controller``
+    Will listen on port 8888 and for controller requests on
+    ``/tmp/receptor.sock``
+
+``node-a``
+    Will listen on port 8889 and connect to ``controller`` on port 8888
+
+``node-b``
+    Will not start a listening server but will connect directly to ``node-a`` on
+    port 8889
 
 In the video below you'll see these 3 nodes launched in a ``tmux`` 4-pane layout
-with the following commands::
+with the following commands:
 
-  $ receptor --node-id=controller -d /tmp/controller controller --socket-path=/tmp/receptor.sock --listen-port=8888
-  $ receptor --node-id=node-a -d /tmp/node-a node --listen-port=8889 --peer=localhost:8888
-  $ receptor --node-id=node-b -d /tmp/node-b node --listen-port=8890 --peer=localhost:8889
+.. code-block:: sh
 
-In the last pane we execute the ``ping`` command::
+    receptor \
+        --node-id=controller \
+        --data-dir /tmp/controller \
+        controller \
+        --socket-path=/tmp/receptor.sock \
+        --listen-port=8888
+    receptor \
+        --node-id=node-a \
+        --data-dir /tmp/node-a \
+        node \
+        --listen-port=8889 \
+        --peer=localhost:8888
+    receptor \
+        --node-id=node-b \
+        --data-dir /tmp/node-b \
+        node \
+        --listen-port=8890 \
+        --peer=localhost:8889
 
-  $ receptor ping --socket-path=/tmp/receptor.sock node-b
+In the last pane we execute the ``ping`` command:
+
+.. code-block:: sh
+
+    receptor ping --socket-path=/tmp/receptor.sock node-b
 
 .. image:: ../receptor_demo_basic.gif
    :scale: 80%
-           
+
 That's just a ping, though, what if we wanted to do some real work?
 `Ansible Runner <https://github.com/ansible/ansible-runner>`_ adds support for
 **Receptor** in `this pull request <https://github.com/ansible/ansible-runner/pull/308>`_
 
 In the video below you'll see a very similar workflow but instead of running the
-built-in ping command we'll call the Ansible ping module with::
+built-in ping command we'll call the Ansible ping module with:
 
-  $ receptor send --socket-path=/tmp/receptor.sock --directive=runner:execute --recipient =node-b '{"module": "ping", "inventory": "localhost", "extravars": {"ansible_connection": "local"}, "host_pattern": "localhost"}'
+.. code-block:: sh
+
+    receptor send \
+        --socket-path=/tmp/receptor.sock \
+        --directive=runner:execute \
+        --recipient=node-b \
+        '{"module": "ping", "inventory": "localhost", "extravars": {"ansible_connection": "local"}, "host_pattern": "localhost"}'
 
 .. image:: ../receptor_demo_runner.gif
    :scale: 80%
