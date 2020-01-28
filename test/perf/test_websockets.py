@@ -9,7 +9,7 @@ from wait_for import wait_for
 
 @pytest.fixture(scope="function")
 def random_mesh():
-    mesh = Mesh.load_mesh_from_file("test/perf/random-mesh.yaml", use_diag_node=True)
+    mesh = Mesh.load_from_file("test/perf/random-mesh.yaml", use_diag_node=True)
     try:
         mesh.start(wait=True)
         yield mesh
