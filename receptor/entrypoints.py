@@ -125,8 +125,7 @@ def run_as_status(config):
         print("  Others:", ", ".join(list(controller.receptor.router.get_nodes())))
         print("Edges:")
         for edge in controller.receptor.router.get_edges():
-           print("  ", edge)
+            print("  ", edge)
 
     controller = Controller(config)
     controller.run(status_entrypoint)
-
