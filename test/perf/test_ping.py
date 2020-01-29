@@ -14,7 +14,7 @@ import pytest
     ids=["flat", "tree", "random"],
 )
 def mesh(request):
-    mesh = Mesh.load_mesh_from_file(request.param, use_diag_node=True)
+    mesh = Mesh.load_from_file(request.param, use_diag_node=True)
     try:
         mesh.start(wait=True)
         yield mesh
