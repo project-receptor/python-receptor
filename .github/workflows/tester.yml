@@ -44,7 +44,7 @@ jobs:
           pip install .
       - name: pytest unit tests
         run: |
-          pytest test/integration
+          pytest test/integration test/unit
 
   flake8:
     name: flake8
