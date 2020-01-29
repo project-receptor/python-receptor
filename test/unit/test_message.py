@@ -15,19 +15,19 @@ def afile():
 
 def test_message_file_handling(afile):
     os.write(afile[0], b"test")
-    m = Message("receipient", "test")
+    m = Message("recipient", "test")
     m.file(afile[1])
     assert m.open().read() == b"test"
 
 
 def test_message_data_handling():
-    m = Message("receipient", "test")
+    m = Message("recipient", "test")
     m.data(b"test")
     assert m.open().read() == b"test"
 
-    with pytest.raises(TypeError):
-        m.data("test")
-        assert m.open().read() == b"test"
+    m = Message("recipient", "test")
+    m.data("test")
+    assert m.open().read() == b"test"
 
 
 def test_message_buffer_handling():
@@ -37,5 +37,6 @@ def test_message_buffer_handling():
     assert m.open().read() == b"test"
 
     with pytest.raises(ReceptorRuntimeError):
+        m = Message("recipient", "test")
         i = io.StringIO("test")
         m.buffer(i)

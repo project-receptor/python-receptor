@@ -33,6 +33,7 @@ async def test_manifest(event_loop, tempdir):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Waiting on more durable buffer work")
 async def test_unreadable_file(event_loop, tempdir):
     b = DurableBuffer(tempdir, "test_unreadable_file", event_loop)
     b.q._queue.appendleft("junk")
@@ -43,6 +44,7 @@ async def test_unreadable_file(event_loop, tempdir):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="Waiting on more durable buffer work")
 async def test_deletes_messages(event_loop, tempdir):
     b = DurableBuffer(tempdir, "test_deletes_messages", event_loop)
     await b.put(b"some data")
