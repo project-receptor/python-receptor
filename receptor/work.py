@@ -62,9 +62,7 @@ class WorkManager:
                 raise exceptions.InvalidDirectiveAction(f'Invalid action {action} for {namespace}')
             self.add_work(inner_env)
             response_queue = queue.Queue()
-            work_exec = self.thread_pool.submit(action_method, inner_env,
-                self.receptor.config.plugins.get(namespace, {}),
-                response_queue)
+            work_exec = self.thread_pool.submit(action_method, inner_env, self.receptor.config.plugins.get(namespace, {}), response_queue)
             while True:
                 # Collect 'done' status here so we drain the response queue
                 # after the work is complete
