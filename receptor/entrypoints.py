@@ -70,8 +70,8 @@ def run_as_ping(config):
 
     async def read_responses():
         for _ in ping_iter():
-            payload = await controller.recv()
-            print("{}".format(payload))
+            message = await controller.recv()
+            print("{}".format(message.raw_payload))
 
     async def send_pings():
         for _ in ping_iter():
@@ -106,7 +106,13 @@ def run_as_send(config):
 
     async def read_responses():
         while True:
-            print("{}".format(await controller.recv()))
+            message = await controller.recv()
+            if message.message_type == 'response':
+                print("{}".format(message.raw_payload))
+            elif message.message_type == 'eof':
+                break
+            else:
+                print("Got unknown message type {}".format(message.message_type))
 
     logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
     controller = Controller(config)

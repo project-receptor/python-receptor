@@ -227,6 +227,7 @@ class Receptor:
         handlers = dict(
             directive=self.handle_directive,
             response=self.handle_response,
+            eof=self.handle_response,
         )
         messages_received_counter.inc()
         next_hop = self.router.next_hop(msg.header["recipient"])

@@ -37,8 +37,7 @@ class Controller:
         self.connection_manager.get_peer(peer)
 
     async def recv(self):
-        inner = await self.receptor.response_queue.get()
-        return inner.raw_payload
+        return await self.receptor.response_queue.get()
 
     async def send(self, message, expect_response=True):
         new_id = uuid.uuid4()

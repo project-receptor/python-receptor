@@ -251,7 +251,7 @@ class Inner:
         self.message_id = message_id
         self.sender = sender
         self.recipient = recipient
-        self.message_type = message_type  # 'directive' or 'response'
+        self.message_type = message_type  # 'directive', 'response' or 'eof'
         self.timestamp = timestamp  # ISO format
         self.raw_payload = raw_payload
         self.directive = directive  # None if response, 'namespace:action' if not
@@ -290,6 +290,25 @@ class Inner:
             in_response_to=in_response_to,
             ttl=ttl,
             serial=serial,
+            code=code,
+        )
+
+    @classmethod
+    def make_eof(
+        cls, receptor, recipient, in_response_to, ttl=None, code=0
+    ):
+        return cls(
+            receptor=receptor,
+            message_id=str(uuid.uuid4()),
+            sender=receptor.node_id,
+            recipient=recipient,
+            message_type="eof",
+            timestamp=datetime.datetime.utcnow().isoformat(),
+            raw_payload=None,
+            directive=None,
+            in_response_to=in_response_to,
+            ttl=ttl,
+            serial=None,
             code=code,
         )
 
