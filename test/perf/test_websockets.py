@@ -4,7 +4,6 @@ from receptor_affinity.utils import random_port
 import time
 
 import pytest
-from wait_for import wait_for
 
 
 @pytest.fixture(scope="function")
@@ -26,14 +25,14 @@ def test_websocket_reconnect(random_mesh):
     random_mesh.add_node(nodeY)
     nodeX.start()
     nodeY.start()
-    wait_for(random_mesh.validate_all_node_routes, delay=6, num_sec=30)
+    random_mesh.settle()
     assert nodeY.ping(1) != "Failed"
     nodeX.stop()
     time.sleep(7)
     assert nodeY.ping(1) == "Failed"
     nodeX.start()
     time.sleep(7)
-    wait_for(random_mesh.validate_all_node_routes, delay=6, num_sec=30)
+    random_mesh.settle()
     assert nodeY.ping(1) != "Failed"
     nodeY.stop()
     nodeX.stop()
