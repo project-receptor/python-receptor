@@ -3,6 +3,7 @@ import time
 import asyncio
 import sys
 import os
+import shutil
 
 from prometheus_client import start_http_server
 
@@ -10,6 +11,20 @@ from .controller import Controller
 from .messages import Message
 
 logger = logging.getLogger(__name__)
+
+
+def cleanup_tmpdir(controller):
+    try:
+        is_ephemeral = controller.receptor.config._is_ephemeral
+        base_path = controller.receptor.base_path
+    except AttributeError:
+        return
+    if is_ephemeral:
+        try:
+            logger.debug(f"Removing temporary directory {base_path}")
+            shutil.rmtree(base_path)
+        except Exception:
+            logger.error(f"Error while removing temporary directory {base_path}", exc_info=True)
 
 
 def run_as_node(config):
@@ -24,30 +39,36 @@ def run_as_node(config):
                                 controller.loop.create_task,
                                 node_keepalive())
 
-    controller = Controller(config)
-    logger.info(f'Running as Receptor node with ID: {controller.receptor.node_id}')
-    if config.node_stats_enable:
-        logger.info(f'Starting stats on port {config.node_stats_port}')
-        start_http_server(config.node_stats_port)
-    if not config.node_server_disable:
-        controller.enable_server(config.node_listen)
-    for peer in config.node_peers:
-        controller.add_peer(peer)
-    if config.node_keepalive_interval > 1:
-        controller.loop.create_task(node_keepalive())
-    controller.loop.create_task(controller.receptor.watch_expire())
-    controller.run()
+    try:
+        controller = Controller(config)
+        logger.info(f'Running as Receptor node with ID: {controller.receptor.node_id}')
+        if config.node_stats_enable:
+            logger.info(f'Starting stats on port {config.node_stats_port}')
+            start_http_server(config.node_stats_port)
+        if not config.node_server_disable:
+            controller.enable_server(config.node_listen)
+        for peer in config.node_peers:
+            controller.add_peer(peer)
+        if config.node_keepalive_interval > 1:
+            controller.loop.create_task(node_keepalive())
+        controller.loop.create_task(controller.receptor.watch_expire())
+        controller.run()
+    finally:
+        cleanup_tmpdir(controller)
 
 
 def run_as_controller(config):
-    controller = Controller(config)
-    logger.info(f'Running as Receptor controller with ID: {controller.receptor.node_id}')
-    if config.controller_stats_enable:
-        logger.info(f'Starting stats on port {config.node_stats_port}')
-        start_http_server(config.controller_stats_port)
-    controller.enable_server(config.controller_listen)
-    controller.loop.create_task(controller.receptor.watch_expire())
-    controller.run()
+    try:
+        controller = Controller(config)
+        logger.info(f'Running as Receptor controller with ID: {controller.receptor.node_id}')
+        if config.controller_stats_enable:
+            logger.info(f'Starting stats on port {config.node_stats_port}')
+            start_http_server(config.controller_stats_port)
+        controller.enable_server(config.controller_listen)
+        controller.loop.create_task(controller.receptor.watch_expire())
+        controller.run()
+    finally:
+        cleanup_tmpdir()
 
 
 def run_as_ping(config):
@@ -78,9 +99,12 @@ def run_as_ping(config):
             await controller.ping(config.ping_recipient)
             await asyncio.sleep(config.ping_delay)
 
-    logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')
-    controller = Controller(config)
-    controller.run(ping_entrypoint)
+    try:
+        logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')
+        controller = Controller(config)
+        controller.run(ping_entrypoint)
+    finally:
+        cleanup_tmpdir(controller)
 
 
 def run_as_send(config):
@@ -108,15 +132,19 @@ def run_as_send(config):
         while True:
             message = await controller.recv()
             if message.message_type == 'response':
+                logger.debug(f'Received response messsage')
                 print("{}".format(message.raw_payload))
             elif message.message_type == 'eof':
+                logger.info(f'Received EOF')
                 break
             else:
-                print("Got unknown message type {}".format(message.message_type))
-
-    logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
-    controller = Controller(config)
-    controller.run(send_entrypoint)
+                logger.warning("Received unknown message type {}".format(message.message_type))
+    try:
+        logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
+        controller = Controller(config)
+        controller.run(send_entrypoint)
+    finally:
+        cleanup_tmpdir(controller)
 
 
 def run_as_status(config):
@@ -133,5 +161,8 @@ def run_as_status(config):
         for edge in controller.receptor.router.get_edges():
             print("  ", edge)
 
-    controller = Controller(config)
-    controller.run(status_entrypoint)
+    try:
+        controller = Controller(config)
+        controller.run(status_entrypoint)
+    finally:
+        cleanup_tmpdir(controller)

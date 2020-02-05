@@ -63,6 +63,7 @@ class ReceptorConfig:
         self._cli_sub_args = self._cli_args.add_subparsers()
         self._parsed_args = None
         self._config_file = configparser.ConfigParser(allow_no_value=True, delimiters=('=',))
+        self._is_ephemeral = False
 
         # Default options, which apply to all sub-commands.
         self.add_config_option(
@@ -357,7 +358,7 @@ class ReceptorConfig:
                     if sub_extra:
                         subparser = self._cli_sub_args.add_parser(section, help=sub_extra['hint'])
                         subparser.set_defaults(func=sub_extra['entrypoint'])
-                        subparser.set_defaults(is_ephemeral=sub_extra['is_ephemeral'])
+                        self._is_ephemeral = sub_extra['is_ephemeral']
                 subparser.add_argument(*args, **kwargs)
 
         # finally, we add the ConfigOption to the internal dict for tracking
@@ -419,7 +420,7 @@ class ReceptorConfig:
                 self._config_options['plugins'][section.replace("plugin_", "")] = dict(self._config_file[section])
         # If we did not get a data_dir from anywhere else, use a default
         if self._config_options['default_data_dir'].value is None:
-            if hasattr(self._parsed_args, 'is_ephemeral') and self._parsed_args.is_ephemeral:
+            if self._is_ephemeral:
                 self._config_options['default_data_dir'].value = '/tmp/receptor'
             else:
                 self._config_options['default_data_dir'].value = '/var/lib/receptor'
