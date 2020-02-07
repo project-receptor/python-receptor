@@ -30,8 +30,16 @@ class WorkManager:
         return entry_points[0].load()
 
     def get_capabilities(self):
-        return [(x.name, pkg_resources.get_distribution(x.resolve().__package__).version)
-                for x in pkg_resources.iter_entry_points('receptor.worker')]
+        caps = {
+            'worker_versions': {
+                x.name: pkg_resources.get_distribution(x.resolve().__package__).version
+                for x in pkg_resources.iter_entry_points('receptor.worker')
+                },
+            'max_work_threads': self.receptor.config.default_max_workers,
+        }
+        if self.receptor.config._is_ephemeral:
+            caps['ephemeral'] = True
+        return caps
 
     def get_work(self):
         return self.active_work

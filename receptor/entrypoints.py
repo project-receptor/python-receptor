@@ -152,14 +152,27 @@ def run_as_status(config):
     async def status_entrypoint():
         controller.add_peer(config.status_peer)
         start_wait = time.time()
-        while not controller.receptor.router.node_is_known(config.status_peer) and (time.time() - start_wait < 5):
+        r = controller.receptor
+        while not r.router.node_is_known(config.status_peer) and (time.time() - start_wait < 5):
             await asyncio.sleep(0.1)
+
+        # This output should be formatted so as to be parseable as YAML
+
         print("Nodes:")
-        print("  Myself:", controller.receptor.router.node_id)
-        print("  Others:", ", ".join(list(controller.receptor.router.get_nodes())))
-        print("Edges:")
-        for edge in controller.receptor.router.get_edges():
-            print("  ", edge)
+        print("  Myself:", r.router.node_id)
+        print("  Others:")
+        for node in r.router.get_nodes():
+            print("  -", node)
+        print()
+        print("Route Map:")
+        for edge in r.router.get_edges():
+            print("-", str(tuple(edge)))
+        print()
+        print("Known Node Capabilities:")
+        for node, node_caps in r.node_capabilities.items():
+            print("  ", node, ":", sep="")
+            for cap, cap_value in node_caps.items():
+                print("    ", cap, ": ", str(cap_value), sep="")
 
     try:
         controller = Controller(config)
