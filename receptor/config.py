@@ -358,7 +358,7 @@ class ReceptorConfig:
                     if sub_extra:
                         subparser = self._cli_sub_args.add_parser(section, help=sub_extra['hint'])
                         subparser.set_defaults(func=sub_extra['entrypoint'])
-                        self._is_ephemeral = sub_extra['is_ephemeral']
+                        subparser.set_defaults(ephemeral=sub_extra['is_ephemeral'])
                 subparser.add_argument(*args, **kwargs)
 
         # finally, we add the ConfigOption to the internal dict for tracking
@@ -473,6 +473,7 @@ class ReceptorConfig:
             raise ReceptorRuntimeError("there are no parsed args yet")
         elif not hasattr(self._parsed_args, 'func'):
             raise ReceptorRuntimeError("you must specify a subcommand (%s)." % (", ".join(SUBCOMMAND_EXTRAS.keys()),))
+        self._is_ephemeral = self._parsed_args.ephemeral
         self._parsed_args.func(self)
 
     def get_client_ssl_context(self):
