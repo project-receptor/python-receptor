@@ -68,6 +68,10 @@ class WorkManager:
             except AttributeError:
                 logger.exception(f'Could not load action {action} from {namespace}')
                 raise exceptions.InvalidDirectiveAction(f'Invalid action {action} for {namespace}')
+            if not getattr(action_method, "receptor_export", False):
+                logger.exception(f'Not allowed to call {action} from {namespace} because it is not marked for export')
+                raise exceptions.InvalidDirectiveAction(f'Access denied calling {action} for {namespace}')
+
             self.add_work(inner_env)
             response_queue = queue.Queue()
             work_exec = self.thread_pool.submit(action_method, inner_env, self.receptor.config.plugins.get(namespace, {}), response_queue)
