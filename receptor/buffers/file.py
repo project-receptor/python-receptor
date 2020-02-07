@@ -140,6 +140,6 @@ class FileBufferManager(BaseBufferManager):
         # make sure we only construct a single instance of DurableBuffer
         # per-node so.. doing this the hard way.
         if node_id not in self._buffers:
-            path = os.path.join(os.path.expanduser(receptor.config.default_data_dir))
+            path = os.path.join(os.path.expanduser(receptor.base_path))
             self._buffers[node_id] = DurableBuffer(path, node_id, asyncio.get_event_loop())
         return self._buffers[node_id]
