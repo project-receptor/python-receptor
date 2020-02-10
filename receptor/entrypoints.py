@@ -75,7 +75,7 @@ def run_as_ping(config):
 
     async def send_pings():
         for _ in ping_iter():
-            await controller.ping(config.ping_recipient)
+            await controller.ping(config.ping_recipient, config.ping_flags or 0)
             await asyncio.sleep(config.ping_delay)
 
     logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')

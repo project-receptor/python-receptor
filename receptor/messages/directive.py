@@ -37,9 +37,18 @@ class Control:
 
     async def ping(self, receptor, inner_env):
         logger.info(f'Received ping from {inner_env.sender}')
-        return_data = dict(initial_time=inner_env.raw_payload,
-                           response_time=str(datetime.datetime.utcnow()),
-                           active_work=receptor.work_manager.get_work())
+        ping_packet = json.loads(inner_env.raw_payload)
+        return_data = dict(initial_time=ping_packet['ts'],
+                           response_time=datetime.datetime.utcnow().isoformat())
+        if ping_packet['flags'] & 0b1:
+            return_data['active_work'] = receptor.work_manager.get_work()
+        if ping_packet['flags'] & 0b10:
+            return_data['peering'] = receptor.get_connection_manifest()
+        if ping_packet['flags'] & 0b100:
+            return_data['capabilities'] = receptor.work_manager.get_capabilities()
+        if ping_packet['flags'] & 0b1000:
+            return_data['receptor'] = dict(version=receptor.receptor_version)
+
         yield json.dumps(return_data)
 
 

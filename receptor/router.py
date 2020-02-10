@@ -1,5 +1,6 @@
 import datetime
 import heapq
+import json
 import logging
 import random
 import uuid
@@ -73,7 +74,7 @@ class MeshRouter:
     def get_nodes(self):
         return self._nodes
 
-    async def ping_node(self, node_id, expected_response=True):
+    async def ping_node(self, node_id, flags=0, expected_response=True):
         logger.info(f'Sending ping to node {node_id}')
         now = datetime.datetime.utcnow().isoformat()
         ping_envelope = envelope.Inner(
@@ -83,7 +84,7 @@ class MeshRouter:
             recipient=node_id,
             message_type='directive',
             timestamp=now,
-            raw_payload=now,
+            raw_payload=json.dumps(dict(ts=now, flags=flags)),
             directive='receptor:ping',
             ttl=15
         )

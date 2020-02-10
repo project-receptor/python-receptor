@@ -55,8 +55,8 @@ class Controller:
         await self.receptor.router.send(inner_env, expected_response=expect_response)
         return new_id
 
-    async def ping(self, destination, expected_response=True):
-        return await self.receptor.router.ping_node(destination, expected_response)
+    async def ping(self, destination, flags=0b0, expected_response=True):
+        return await self.receptor.router.ping_node(destination, flags, expected_response)
 
     def run(self, app=None):
         try:

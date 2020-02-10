@@ -44,6 +44,17 @@ def py_class(class_spec):
     return SINGLETONS[class_spec]
 
 
+class BitwiseOrAction(argparse.Action):
+    """A way to build up a bitwise flag value using multiple arguments"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.nargs = 0
+
+    def __call__(self, parser, namespace, values, option_string):
+        current_value = getattr(namespace, self.dest, None) or 0
+        setattr(namespace, self.dest, current_value | self.const)
+
+
 class ConfigOption:
     def __init__(self, value, value_type, listof=None):
         self.value = value
@@ -244,6 +255,34 @@ class ReceptorConfig:
             value_type='str',
             hint='Node ID of the Receptor node or controller to ping.',
         )
+        self.add_config_option(
+            section='ping',
+            key='flags',
+            long_option='--with-work',
+            set_value=1,
+            value_type='flag',
+        )
+        self.add_config_option(
+            section='ping',
+            key='flags',
+            long_option='--with-peering',
+            set_value=2,
+            value_type='flag'
+        )
+        self.add_config_option(
+            section='ping',
+            key='flags',
+            long_option='--with-capabilities',
+            set_value=4,
+            value_type='flag'
+        )
+        self.add_config_option(
+            section='ping',
+            key='flags',
+            long_option='--with-status',
+            set_value=8,
+            value_type='flag'
+        )
         # send options
         self.add_config_option(
             section='send',
@@ -308,6 +347,8 @@ class ReceptorConfig:
                 action = 'append'
             if value_type == 'bool':
                 action = 'store_const'
+            if value_type == 'flag':
+                action = BitwiseOrAction
             # unless specified, the long_option name is the key (with underscores turned into dashes)
             if not long_option:
                 long_option = '--%s' % (key.replace('_', '-'),)
@@ -330,6 +371,9 @@ class ReceptorConfig:
             # precedence options with the cli default (which happens if we tried to use
             # store_true or store_false for bools).
             if value_type == 'bool':
+                kwargs['const'] = set_value
+            # flags need to be constructed bitwise, and so the set_value is the flag value
+            if value_type == 'flag':
                 kwargs['const'] = set_value
             # if we're in the default section, or if we explictly don't want this section
             # turned into a subparser, we add the option directly, otherwise we put it in

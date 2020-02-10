@@ -35,10 +35,10 @@ class Receptor:
         self.stop = False
         try:
             receptor_dist = pkg_resources.get_distribution("receptor")
-            receptor_version = receptor_dist.version
+            self.receptor_version = receptor_dist.version
         except pkg_resources.DistributionNotFound:
-            receptor_version = 'unknown'
-        receptor_info.info(dict(node_id=self.node_id, receptor_version=receptor_version))
+            self.receptor_version = 'unknown'
+        receptor_info.info(dict(node_id=self.node_id, receptor_version=self.receptor_version))
 
     def _find_node_id(self):
         if 'RECEPTOR_NODE_ID' in os.environ:
