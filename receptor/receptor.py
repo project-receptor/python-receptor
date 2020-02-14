@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import json
 import logging
 import os
@@ -33,6 +32,9 @@ class Receptor:
         self.connection_manifest_path = os.path.join(self.base_path, "connection_manifest")
         self.buffer_mgr = self.config.components_buffer_manager
         self.stop = False
+        self.node_capabilities = {
+                self.node_id: self.work_manager.get_capabilities()
+                }
         try:
             receptor_dist = pkg_resources.get_distribution("receptor")
             receptor_version = receptor_dist.version
@@ -57,27 +59,23 @@ class Receptor:
                 buffer = self.buffer_mgr.get_buffer_for_node(connection["id"], self)
                 await buffer.expire()
                 if connection["last"] + 86400 < time.time():
-                    logger.info("Expiring connection {}".format(connection["id"]))
-                    write_manifest = copy.copy(current_manifest)
-                    write_manifest.remove(connection)
-                    self.write_connection_manifest(write_manifest)
+                    self.remove_connection_manifest(connection["id"])
             await asyncio.sleep(600)
 
     def get_connection_manifest(self):
         if not os.path.exists(self.connection_manifest_path):
             return []
         try:
-            fd = open(self.connection_manifest_path, "r")
-            manifest = json.load(fd)
+            with open(self.connection_manifest_path, "r") as fd:
+                manifest = json.load(fd)
             return manifest
         except Exception as e:
             logger.warn("Failed to read connection manifest: {}".format(e))
             return []
 
     def write_connection_manifest(self, manifest):
-        fd = open(self.connection_manifest_path, "w")
-        json.dump(manifest, fd)
-        fd.close()
+        with open(self.connection_manifest_path, "w") as fd:
+            json.dump(manifest, fd)
 
     def update_connection_manifest(self, connection):
         manifest = self.get_connection_manifest()
@@ -91,6 +89,13 @@ class Receptor:
             manifest.append(dict(id=connection,
                             last=time.time()))
         self.write_connection_manifest(manifest)
+
+    def remove_connection_manifest(self, connection):
+        logger.info("Expiring connection {}".format(connection))
+        manifest = self.get_connection_manifest()
+        if connection in manifest:
+            manifest.remove(connection)
+            self.write_connection_manifest(manifest)
 
     async def message_handler(self, buf):
         logger.debug("spawning message_handler")
@@ -132,10 +137,17 @@ class Receptor:
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
                 logger.info("Removing connection {} for node {}".format(protocol_obj, connection_node))
-                self.update_connection_manifest(connection_node)
-                self.connections[connection_node].remove(protocol_obj)
-                self.router.update_node(self.node_id, connection_node, 100)
-                self.update_connection_manifest(connection_node)
+                if (connection_node in self.node_capabilities and
+                        "ephemeral" in self.node_capabilities[connection_node] and
+                        self.node_capabilities[connection_node]["ephemeral"]):
+                    self.connections[connection_node].remove(protocol_obj)
+                    self.router.remove_node(connection_node)
+                    self.remove_connection_manifest(connection_node)
+                    del self.node_capabilities[connection_node]
+                else:
+                    self.connections[connection_node].remove(protocol_obj)
+                    self.router.update_node(self.node_id, connection_node, 100)
+                    self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
         loop.create_task(self.send_route_advertisement(self.router.get_edges()))
 
@@ -156,6 +168,7 @@ class Receptor:
         })
 
     async def handle_route_advertisement(self, data):
+        self.node_capabilities[data["id"]] = data["capabilities"]
         self.router.add_edges(data["edges"])
         await self.send_route_advertisement(data["edges"], data["seen"])
 
@@ -227,6 +240,7 @@ class Receptor:
         handlers = dict(
             directive=self.handle_directive,
             response=self.handle_response,
+            eof=self.handle_response,
         )
         messages_received_counter.inc()
         next_hop = self.router.next_hop(msg.header["recipient"])

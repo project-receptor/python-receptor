@@ -15,22 +15,27 @@ SUBCOMMAND_EXTRAS = {
     'node': {
         'hint': 'Run a Receptor node',
         'entrypoint': run_as_node,
+        'is_ephemeral': False,
     },
     'controller': {
         'hint': 'Run a Receptor controller',
         'entrypoint': run_as_controller,  # TODO: New entrypoint
+        'is_ephemeral': False,
     },
     'ping': {
         'hint': 'Tell the local controller to ping a node',
         'entrypoint': run_as_ping,
+        'is_ephemeral': True,
     },
     'send': {
         'hint': 'Send a directive to a node',
         'entrypoint': run_as_send,
+        'is_ephemeral': True,
     },
     'status': {
         'hint': 'Display status of the Receptor network',
         'entrypoint': run_as_status,
+        'is_ephemeral': True,
     },
 }
 
@@ -58,6 +63,7 @@ class ReceptorConfig:
         self._cli_sub_args = self._cli_args.add_subparsers()
         self._parsed_args = None
         self._config_file = configparser.ConfigParser(allow_no_value=True, delimiters=('=',))
+        self._is_ephemeral = False
 
         # Default options, which apply to all sub-commands.
         self.add_config_option(
@@ -79,7 +85,7 @@ class ReceptorConfig:
             section='default',
             key='data_dir',
             short_option='-d',
-            default_value='/var/lib/receptor',
+            default_value=None,
             value_type='path',
             hint='Path to the directory where Receptor stores its database and metadata.',
         )
@@ -91,6 +97,14 @@ class ReceptorConfig:
             value_type='bool',
             hint='Emit debugging output.',
         )
+        default_max_workers = min(32, os.cpu_count() + 4)
+        self.add_config_option(
+            section='default',
+            key='max_workers',
+            default_value=default_max_workers,
+            value_type='int',
+            hint='Size of the thread pool for worker threads. If unspecified, defaults to {}'.format(default_max_workers),
+        ),
         # Auth section options. This is a new section for the config file only,
         # so all of these options use `subparse=False`.
         self.add_config_option(
@@ -195,16 +209,16 @@ class ReceptorConfig:
         self.add_config_option(
             section='ping',
             key='peer',
-            default_value='',
+            default_value='localhost:8888',
             value_type='str',
-            hint='The peer to relay the ping directive through'
+            hint='The peer to relay the ping directive through. If unspecified here or in a config file, localhost:8888 will be used.'
         )
         self.add_config_option(
             section='status',
             key='peer',
-            default_value='',
+            default_value='localhost:8888',
             value_type='str',
-            hint='The peer to access the mesh through'
+            hint='The peer to access the mesh through. If unspecified here or in a config file, localhost:8888 will be used.'
         )
         self.add_config_option(
             section='controller',
@@ -224,17 +238,17 @@ class ReceptorConfig:
         self.add_config_option(
             section='ping',
             key='count',
-            default_value=0,
+            default_value=4,
             value_type='int',
-            hint='Number of pings to send. If unspecified here or in a config file pings will be continuously sent until interrupted.',
+            hint='Number of pings to send. If set to zero, pings will be continuously sent until interrupted.',
         )
         self.add_config_option(
             section='ping',
             key='delay',
-            default_value=0,
+            default_value=1,
             value_type='float',
-            hint='The delay (in seconds) to wait between pings. If unspecified here or in a'
-                 'config file pings will be sent as soon as the previous response is received.',
+            hint='The delay (in seconds) to wait between pings. If set to zero,'
+                 'pings will be sent as soon as the previous response is received.',
         )
         self.add_config_option(
             section='ping',
@@ -248,9 +262,9 @@ class ReceptorConfig:
         self.add_config_option(
             section='send',
             key='peer',
-            default_value='',
+            default_value='localhost:8888',
             value_type='str',
-            hint='The peer to relay the directive through'
+            hint='The peer to relay the directive through. If unspecified here or in a config file, localhost:8888 will be used.'
         )
         self.add_config_option(
             section='send',
@@ -344,6 +358,7 @@ class ReceptorConfig:
                     if sub_extra:
                         subparser = self._cli_sub_args.add_parser(section, help=sub_extra['hint'])
                         subparser.set_defaults(func=sub_extra['entrypoint'])
+                        subparser.set_defaults(ephemeral=sub_extra['is_ephemeral'])
                 subparser.add_argument(*args, **kwargs)
 
         # finally, we add the ConfigOption to the internal dict for tracking
@@ -403,6 +418,12 @@ class ReceptorConfig:
         if self._config_file:
             for section in filter(lambda x: x.startswith("plugin_"), self._config_file.sections()):
                 self._config_options['plugins'][section.replace("plugin_", "")] = dict(self._config_file[section])
+        # If we did not get a data_dir from anywhere else, use a default
+        if self._config_options['default_data_dir'].value is None:
+            if self._is_ephemeral:
+                self._config_options['default_data_dir'].value = '/tmp/receptor'
+            else:
+                self._config_options['default_data_dir'].value = '/var/lib/receptor'
 
     def _enforce_entry_type(self, entry):
         if entry.value is not None:
@@ -452,6 +473,7 @@ class ReceptorConfig:
             raise ReceptorRuntimeError("there are no parsed args yet")
         elif not hasattr(self._parsed_args, 'func'):
             raise ReceptorRuntimeError("you must specify a subcommand (%s)." % (", ".join(SUBCOMMAND_EXTRAS.keys()),))
+        self._is_ephemeral = self._parsed_args.ephemeral
         self._parsed_args.func(self)
 
     def get_client_ssl_context(self):
