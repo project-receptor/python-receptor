@@ -132,13 +132,16 @@ def run_as_send(config):
         while True:
             message = await controller.recv()
             if message.message_type == 'response':
-                logger.debug(f'Received response messsage')
-                print("{}".format(message.raw_payload))
+                logger.debug('Received response message')
+                print(f'{message.raw_payload}')
             elif message.message_type == 'eof':
-                logger.info(f'Received EOF')
+                logger.info('Received EOF')
+                if message.code != 0:
+                    logger.error(f'EOF was an error result: {message.raw_payload}')
+                    print(f'ERROR: {message.raw_payload}')
                 break
             else:
-                logger.warning("Received unknown message type {}".format(message.message_type))
+                logger.warning(f'Received unknown message type {message.message_type}')
     try:
         logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
         controller = Controller(config)

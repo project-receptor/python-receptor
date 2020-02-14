@@ -61,6 +61,7 @@ class WorkManager:
         logger.info(f'Handling work for {inner_env.message_id} as {inner_env.directive}')
         namespace, action = inner_env.directive.split(':', 1)
         serial = 0
+        eof_response = None
         try:
             worker_module = self.load_receptor_worker(namespace)
             try:
@@ -100,22 +101,26 @@ class WorkManager:
                     break
                 await asyncio.sleep(0)
         except Exception as e:
-            serial += 1
             logger.error(f'Error encountered while handling the response, replying with an error message ({e})')
             logger.error(traceback.format_tb(e.__traceback__))
-            enveloped_response = envelope.Inner.make_response(
+            eof_response = envelope.Inner.make_response(
                 receptor=self.receptor,
                 recipient=inner_env.sender,
                 payload=str(e),
                 in_response_to=inner_env.message_id,
-                serial=serial,
+                serial=serial+1,
                 code=1,
+                message_type="eof",
             )
             self.remove_work(inner_env)
-            await self.receptor.router.send(enveloped_response)
-        eof_response = envelope.Inner.make_eof(
-            receptor=self.receptor,
-            recipient=inner_env.sender,
-            in_response_to=inner_env.message_id,
-        )
+        if eof_response is None:
+            eof_response = envelope.Inner.make_response(
+                receptor=self.receptor,
+                recipient=inner_env.sender,
+                payload=None,
+                in_response_to=inner_env.message_id,
+                serial=serial+1,
+                code=0,
+                message_type="eof",
+            )
         await self.receptor.router.send(eof_response)
