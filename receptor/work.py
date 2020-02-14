@@ -95,15 +95,10 @@ class WorkManager:
                     except queue.Empty:
                         break
                 if is_done:
+                    # Calling result() will raise any exceptions from the worker thread, on this thread
+                    work_exec.result()
                     break
                 await asyncio.sleep(0)
-            eof_response = envelope.Inner.make_eof(
-                receptor=self.receptor,
-                recipient=inner_env.sender,
-                in_response_to=inner_env.message_id,
-            )
-            await self.receptor.router.send(eof_response)
-
         except Exception as e:
             serial += 1
             logger.error(f'Error encountered while handling the response, replying with an error message ({e})')
@@ -118,3 +113,9 @@ class WorkManager:
             )
             self.remove_work(inner_env)
             await self.receptor.router.send(enveloped_response)
+        eof_response = envelope.Inner.make_eof(
+            receptor=self.receptor,
+            recipient=inner_env.sender,
+            in_response_to=inner_env.message_id,
+        )
+        await self.receptor.router.send(eof_response)
