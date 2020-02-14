@@ -272,7 +272,8 @@ class Inner:
 
     @classmethod
     def make_response(
-        cls, receptor, recipient, payload, in_response_to, serial, ttl=None, code=0
+        cls, receptor, recipient, payload, in_response_to, serial, ttl=None,
+        code=0, message_type="response"
     ):
         if isinstance(payload, bytes):
             encoded_payload = base64.encodebytes(payload)
@@ -283,32 +284,13 @@ class Inner:
             message_id=str(uuid.uuid4()),
             sender=receptor.node_id,
             recipient=recipient,
-            message_type="response",
+            message_type=message_type,
             timestamp=datetime.datetime.utcnow().isoformat(),
             raw_payload=encoded_payload,
             directive=None,
             in_response_to=in_response_to,
             ttl=ttl,
             serial=serial,
-            code=code,
-        )
-
-    @classmethod
-    def make_eof(
-        cls, receptor, recipient, in_response_to, ttl=None, code=0
-    ):
-        return cls(
-            receptor=receptor,
-            message_id=str(uuid.uuid4()),
-            sender=receptor.node_id,
-            recipient=recipient,
-            message_type="eof",
-            timestamp=datetime.datetime.utcnow().isoformat(),
-            raw_payload=None,
-            directive=None,
-            in_response_to=in_response_to,
-            ttl=ttl,
-            serial=None,
             code=code,
         )
 
