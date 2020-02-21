@@ -124,3 +124,5 @@ class WorkManager:
                 message_type="eof",
             )
         await self.receptor.router.send(eof_response)
+        if self.receptor.is_ephemeral(inner_env.sender):
+            self.receptor.remove_connection_by_id(inner_env.sender)

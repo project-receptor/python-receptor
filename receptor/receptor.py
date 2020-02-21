@@ -130,16 +130,11 @@ class Receptor:
         self.update_connections(protocol_obj)
 
     def remove_connection(self, protocol_obj, id_=None, loop=None):
-        if loop is None:
-            loop = protocol_obj.loop
-
         notify_connections = []
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
                 logger.info("Removing connection {} for node {}".format(protocol_obj, connection_node))
-                if (connection_node in self.node_capabilities and
-                        "ephemeral" in self.node_capabilities[connection_node] and
-                        self.node_capabilities[connection_node]["ephemeral"]):
+                if self.is_ephemeral(connection_node):
                     self.connections[connection_node].remove(protocol_obj)
                     self.router.remove_node(connection_node)
                     self.remove_connection_manifest(connection_node)
@@ -149,7 +144,20 @@ class Receptor:
                     self.router.update_node(self.node_id, connection_node, 100)
                     self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
-        loop.create_task(self.send_route_advertisement(self.router.get_edges()))
+        if loop is None:
+            loop = getattr(protocol_obj, "loop", None)
+        if loop is not None:
+            loop.create_task(self.send_route_advertisement(self.router.get_edges()))
+
+    def is_ephemeral(self, id_):
+        return (id_ in self.node_capabilities and
+                "ephemeral" in self.node_capabilities[id_] and
+                self.node_capabilities[id_]["ephemeral"])
+
+    def remove_connection_by_id(self, id_, loop=None):
+        if id_ in self.connections:
+            for protocol_obj in self.connections[id_]:
+                self.remove_connection(protocol_obj, id_, loop)
 
     async def shutdown_handler(self):
         while True:
