@@ -1,9 +1,9 @@
-import logging
-import time
 import asyncio
-import sys
+import logging
 import os
 import shutil
+import sys
+import time
 
 from prometheus_client import start_http_server
 

@@ -33,6 +33,17 @@ async def test_manifest(event_loop, tempdir):
 
 
 @pytest.mark.asyncio
+async def test_chunks(event_loop, tempdir):
+    b = DurableBuffer(tempdir, "test_chunks", event_loop)
+    await b.put((b"one", b"two", b"three"))
+    assert b.q.qsize() == 1
+
+    assert len(b._read_manifest()) == 1
+
+    data = await b.get()
+    assert data == b"onetwothree"
+
+@pytest.mark.asyncio
 @pytest.mark.skip(reason="Waiting on more durable buffer work")
 async def test_unreadable_file(event_loop, tempdir):
     b = DurableBuffer(tempdir, "test_unreadable_file", event_loop)

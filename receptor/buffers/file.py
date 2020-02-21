@@ -46,12 +46,12 @@ class DurableBuffer:
         for item in self._read_manifest():
             self.q.put_nowait(item)
 
-    async def put(self, data):
+    async def put(self, framed_message):
         item = {
             "ident": str(uuid.uuid4()),
             "expire_time": datetime.datetime.utcnow() + datetime.timedelta(minutes=5),
         }
-        await self._loop.run_in_executor(pool, self._write_file, data, item)
+        await self._loop.run_in_executor(pool, self._write_file, framed_message, item)
         await self.q.put(item)
         await self._save_manifest()
 
@@ -112,7 +112,11 @@ class DurableBuffer:
 
     def _write_file(self, data, item):
         with open(os.path.join(self._message_path, item["ident"]), "wb") as fp:
-            fp.write(data)
+            if isinstance(data, bytes):
+                fp.write(data)
+            else:
+                for chunk in data:
+                    fp.write(chunk)
 
     async def expire(self):
         async with self._manifest_lock:

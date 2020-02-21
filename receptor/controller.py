@@ -2,13 +2,12 @@ import asyncio
 import datetime
 import logging
 import uuid
-
 from contextlib import suppress
 
-from .receptor import Receptor
-from .messages import envelope
 from .connection.base import Worker
 from .connection.manager import Manager
+from .messages import envelope
+from .receptor import Receptor
 
 logger = logging.getLogger(__name__)
 
