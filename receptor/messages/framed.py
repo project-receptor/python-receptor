@@ -1,11 +1,15 @@
 import asyncio
 import functools
+import io
 import json
 import logging
+import os
 import struct
 import tempfile
 import uuid
 from enum import IntEnum
+
+from ..exceptions import ReceptorRuntimeError
 
 logger = logging.getLogger(__name__)
 
@@ -14,9 +18,33 @@ MAX_INT64 = 2 ** 64 - 1
 
 class FileBackedBuffer:
 
-    def __init__(self, dir=None):
-        self.length = 0
-        self.fp = tempfile.NamedTemporaryFile(dir=dir, delete=False)
+    def __init__(self, fp, length=0):
+        self.length = length
+        self.fp = fp
+
+    @classmethod
+    def from_temp(cls, dir=None, delete=False):
+        return cls(tempfile.NamedTemporaryFile(dir=dir, delete=delete))
+
+    @classmethod
+    def from_buffer(cls, buffered_io, dir=None, delete=False):
+        if not isinstance(buffered_io, io.BytesIO):
+            raise ReceptorRuntimeError("buffer must be of type io.BytesIO")
+        fbb = cls.from_temp(dir=dir, delete=delete)
+        fbb.write(buffered_io)
+        return fbb
+
+    @classmethod
+    def from_data(cls, raw_data, dir=None, delete=False):
+        if isinstance(raw_data, str):
+            raw_data = raw_data.encode()
+        fbb = cls.from_temp(dir=dir, delete=delete)
+        fbb.write(raw_data)
+        return fbb
+
+    @classmethod
+    def from_path(cls, path):
+        return cls(open(path, 'r+b'), os.path.getsize(path))
 
     @property
     def name(self):
@@ -61,17 +89,6 @@ class FramedMessage:
 
     def __repr__(self):
         return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload})"
-
-    def serialize(self):
-        h = json.dumps(self.header).encode("utf-8")
-        return b"".join(
-            [
-                Frame.wrap(h, type_=Frame.Types.HEADER, msg_id=self.msg_id).serialize(),
-                h,
-                Frame.wrap(self.payload, msg_id=self.msg_id).serialize(),
-                self.payload,
-            ]
-        )
 
     def __iter__(self):
         header_bytes = json.dumps(self.header).encode("utf-8")
@@ -121,7 +138,7 @@ class FramedBuffer:
         self.q = asyncio.Queue(loop=loop)
         self.header = None
         self.framebuffer = bytearray()
-        self.bb = FileBackedBuffer()
+        self.bb = FileBackedBuffer.from_temp()
         self.current_frame = None
         self.to_read = 0
 
@@ -173,7 +190,7 @@ class FramedBuffer:
         else:
             raise Exception("Unknown Frame Type")
         self.to_read = 0
-        self.bb = FileBackedBuffer()
+        self.bb = FileBackedBuffer.from_temp()
 
     async def get(self):
         return await self.q.get()

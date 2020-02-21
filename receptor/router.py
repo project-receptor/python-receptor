@@ -200,7 +200,7 @@ class MeshRouter:
         logger.debug(f'Forwarding frame {msg.msg_id} to {next_hop}')
         try:
             route_counter.inc()
-            await buffer_obj.put(msg.serialize())
+            await buffer_obj.put(msg)
         except ReceptorBufferError as e:
             logger.exception("Receptor Buffer Write Error forwarding message to {}: {}".format(next_hop, e))
             # TODO: Possible to find another route? This might be a hard failure

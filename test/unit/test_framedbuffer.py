@@ -4,7 +4,8 @@ import uuid
 
 import pytest
 
-from receptor.messages.framed import Frame, FramedBuffer, FramedMessage
+from receptor.messages.framed import (FileBackedBuffer, Frame, FramedBuffer,
+                                      FramedMessage)
 
 
 @pytest.fixture
@@ -86,9 +87,10 @@ async def test_command(framed_buffer, msg_id):
 async def test_overfull(framed_buffer, msg_id):
     header = {"foo": "bar"}
     payload = b"this is a test"
-    msg = FramedMessage(header=header, payload=payload)
+    fbb = FileBackedBuffer.from_data(payload)
+    msg = FramedMessage(header=header, payload=fbb)
 
-    await framed_buffer.put(msg.serialize())
+    await framed_buffer.put(b''.join(msg))
 
     m = await framed_buffer.get()
 
@@ -100,8 +102,9 @@ async def test_overfull(framed_buffer, msg_id):
 async def test_underfull(framed_buffer, msg_id):
     header = {"foo": "bar"}
     payload = b"this is a test"
-    msg = FramedMessage(header=header, payload=payload)
-    b = msg.serialize()
+    fbb = FileBackedBuffer.from_data(payload)
+    msg = FramedMessage(header=header, payload=fbb)
+    b = b''.join(msg)
 
     await framed_buffer.put(b[:10])
     await framed_buffer.put(b[10:])

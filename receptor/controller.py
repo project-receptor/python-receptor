@@ -63,17 +63,17 @@ class Controller:
     async def recv(self):
         return await self.receptor.response_queue.get()
 
-    async def send(self, message, expect_response=True):
+    async def send(self, message, recipient, directive, expect_response=True):
         new_id = uuid.uuid4()
         inner_env = envelope.Inner(
             receptor=self.receptor,
             message_id=str(new_id),
             sender=self.receptor.node_id,
-            recipient=message.recipient,
+            recipient=recipient,
             message_type="directive",
-            directive=message.directive,
+            directive=directive,
             timestamp=datetime.datetime.utcnow().isoformat(),
-            raw_payload=message.open().read(),
+            raw_payload=message,
         )
         await self.receptor.router.send(inner_env, expected_response=expect_response)
         return new_id
