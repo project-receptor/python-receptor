@@ -3,12 +3,11 @@ import asyncio
 import datetime
 import heapq
 import logging
-import uuid
 import itertools
 from collections import defaultdict
 
 from .exceptions import ReceptorBufferError, UnrouteableError
-from .messages import envelope, framed
+from .messages.framed import CommandMessage
 from .stats import route_counter, route_info
 
 logger = logging.getLogger(__name__)
@@ -177,18 +176,15 @@ class MeshRouter:
     async def ping_node(self, node_id, expected_response=True):
         logger.info(f'Sending ping to node {node_id}')
         now = datetime.datetime.utcnow().isoformat()
-        ping_envelope = envelope.Inner(
-            receptor=self.receptor,
-            message_id=str(uuid.uuid4()),
+        message = CommandMessage(header=dict(
             sender=self.node_id,
             recipient=node_id,
             message_type='directive',
             timestamp=now,
-            raw_payload=now,
             directive='receptor:ping',
             ttl=15
-        )
-        return await self.send(ping_envelope, expected_response)
+        ))
+        return await self.send(message, expected_response)
 
     async def forward(self, msg, next_hop):
         """
@@ -207,28 +203,27 @@ class MeshRouter:
         except Exception as e:
             logger.exception("Error trying to forward message to {}: {}".format(next_hop, e))
 
-    async def send(self, inner_envelope, expected_response=False):
+    async def send(self, message, expected_response=False):
         """
         Send a new message with the given outer envelope.
         """
-        next_node_id = self.next_hop(inner_envelope.recipient)
+        recipient = message.header["recipient"]
+        next_node_id = self.next_hop(recipient)
         if not next_node_id:
             # TODO: This probably needs to emit an error response
-            raise UnrouteableError(f'No route found to {inner_envelope.recipient}')
+            raise UnrouteableError(f'No route found to {recipient}')
 
         # TODO: Not signing/serializing in order to finish buffered output work
         # signed = await inner_envelope.sign_and_serialize()
 
-        header = {
+        message.header.update({
             "sender": self.node_id,
-            "recipient": inner_envelope.recipient,
             "route_list": [self.node_id]
-        }
-        msg = framed.FramedMessage(msg_id=uuid.uuid4().int, header=header, payload=inner_envelope.raw_payload)
-        logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
-        if expected_response and inner_envelope.message_type == 'directive':
-            self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
+        })
+        logger.debug(f'Sending {message.msg_id} to {recipient} via {next_node_id}')
+        if expected_response and message.header["message_type"] == 'directive':
+            self.response_registry[message.msg_id] = dict(message_sent_time=message.header["timestamp"])
         if next_node_id == self.node_id:
-            asyncio.ensure_future(self.receptor.handle_message(msg))
+            asyncio.ensure_future(self.receptor.handle_message(message))
         else:
-            await self.forward(msg, next_node_id)
+            await self.forward(message, next_node_id)

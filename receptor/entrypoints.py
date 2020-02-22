@@ -95,7 +95,7 @@ def run_as_ping(config):
     async def read_responses():
         for _ in ping_iter():
             message = await controller.recv()
-            print("{}".format(message.raw_payload))
+            logger.info(message)
 
     async def send_pings():
         for _ in ping_iter():

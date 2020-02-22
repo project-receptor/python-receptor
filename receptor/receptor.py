@@ -8,7 +8,7 @@ import uuid
 import pkg_resources
 
 from . import exceptions
-from .messages import directive, envelope, framed
+from .messages import directive, framed
 from .router import MeshRouter
 from .stats import messages_received_counter, receptor_info
 from .work import WorkManager
@@ -249,16 +249,17 @@ class Receptor:
             except Exception as e:
                 logger.exception("Error trying to broadcast routes and capabilities: {}".format(e))
 
-    async def handle_directive(self, inner):
+    async def handle_directive(self, msg):
         try:
-            namespace, _ = inner.directive.split(':', 1)
+            namespace, _ = msg.header["directive"].split(':', 1)
+            logger.debug(f"directive namespace is {namespace}")
             if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
-                await directive.control(self.router, inner)
+                await directive.control(self.router, msg)
             else:
                 # other namespace/work directives
-                await self.work_manager.handle(inner)
+                await self.work_manager.handle(msg)
         except ValueError:
-            logger.error("error in handle_message: Invalid directive -> '%s'. Sending failure response back." % (inner.directive,))
+            logger.error(f"error in handle_message: Invalid directive -> '{msg}'. Sending failure response back.")
             err_resp = inner.make_response(
                 receptor=self,
                 recipient=inner.sender,
@@ -282,11 +283,12 @@ class Receptor:
             )
             await self.router.send(err_resp)
 
-    async def handle_response(self, inner):
-        in_response_to = inner.in_response_to
+    async def handle_response(self, msg):
+        logger.debug("handle_response: %s", msg)
+        in_response_to = msg.header["in_response_to"]
         if in_response_to in self.router.response_registry:
             logger.info(f'Handling response to {in_response_to} with callback.')
-            await self.response_queue.put(inner)
+            await self.response_queue.put(msg)
         else:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
 
@@ -303,12 +305,16 @@ class Receptor:
                 next_hop = self.router.next_hop(msg.header["recipient"])
                 return await self.router.forward(msg, next_hop)
 
-            inner = await envelope.Inner.deserialize(self, msg.payload.read())
 
-            if inner.message_type not in handlers:
+            # inner = await envelope.Inner.deserialize(self, msg.payload.read())
+
+            message_type = msg.header["message_type"]
+            logger.debug(f"message type is {message_type}")
+
+            if message_type not in handlers:
                 raise exceptions.UnknownMessageType(
-                    f'Unknown message type: {inner.message_type}')
+                    f'Unknown message type: {message_type}')
 
-            await handlers[inner.message_type](inner)
+            await handlers[message_type](msg)
         except Exception:
             logger.exception("handle_message")

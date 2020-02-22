@@ -1,9 +1,8 @@
 import datetime
-import json
 import logging
 
 from ..exceptions import UnknownDirective
-from . import envelope
+from .framed import FileBackedBuffer, FramedMessage
 
 logger = logging.getLogger(__name__)
 
@@ -17,30 +16,28 @@ class Directive:
 class Control:
     CONTROL_DIRECTIVES = ['ping']
 
-    async def __call__(self, router, inner_env):
-        _, action = inner_env.directive.split(':', 1)
+    async def __call__(self, router, msg):
+        _, action = msg.header["directive"].split(':', 1)
         if action not in self.CONTROL_DIRECTIVES:
             raise UnknownDirective(f'Unknown control directive: {action}')
         action_method = getattr(self, action)
-        responses = action_method(router.receptor, inner_env)
         serial = 0
-        async for response in responses:
+        async for response in action_method(router.receptor, msg):
             serial += 1
-            enveloped_response = envelope.Inner.make_response(
-                receptor=router.receptor,
-                recipient=inner_env.sender,
-                payload=response,
-                in_response_to=inner_env.message_id,
+            resp_msg = FramedMessage(header=dict(
+                message_type="response",
+                recipient=msg.header["sender"],
+                in_response_to=msg.msg_id,
                 serial=serial
-            )
-            await router.send(enveloped_response)
+            ), payload=FileBackedBuffer.from_dict(response))
+            await router.send(resp_msg)
 
-    async def ping(self, receptor, inner_env):
-        logger.info(f'Received ping from {inner_env.sender}')
-        return_data = dict(initial_time=inner_env.raw_payload,
-                           response_time=str(datetime.datetime.utcnow()),
-                           active_work=receptor.work_manager.get_work())
-        yield json.dumps(return_data)
+    async def ping(self, receptor, msg):
+        logger.info(f'Received ping from {msg.header["sender"]}')
+        yield dict(
+            initial_time=msg.header["timestamp"],
+            response_time=str(datetime.datetime.utcnow()),
+            active_work=receptor.work_manager.get_work())
 
 
 control = Control()

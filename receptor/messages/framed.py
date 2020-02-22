@@ -16,6 +16,73 @@ logger = logging.getLogger(__name__)
 MAX_INT64 = 2 ** 64 - 1
 
 
+class Frame:
+    """
+    A Frame represents the minimal metadata about a transmission.
+
+    Usually you should not create one directly, but rather use the
+    FramedMessage or CommandMessage classes.
+    """
+
+    class Types(IntEnum):
+        HEADER = 0
+        PAYLOAD = 1
+        COMMAND = 2
+
+    fmt = struct.Struct(">ccIIQQ")
+
+    __slots__ = ("type", "version", "length", "msg_id", "id")
+
+    def __init__(self, type_, version, length, msg_id, id_):
+        self.type = type_
+        self.version = version
+        self.length = length
+        self.msg_id = msg_id
+        self.id = id_
+
+    def __repr__(self):
+        return f"Frame({self.type}, {self.version}, {self.length}, {self.msg_id}, {self.id})"
+
+    def serialize(self):
+        return self.fmt.pack(
+            bytes([self.type]),
+            bytes([self.version]),
+            self.id,
+            self.length,
+            *split_uuid(self.msg_id),
+        )
+
+    @classmethod
+    def deserialize(cls, buf):
+        t, v, i, length, hi, lo = Frame.fmt.unpack(buf)
+        msg_id = join_uuid(hi, lo)
+        return cls(Frame.Types(ord(t)), ord(v), length, msg_id, i)
+
+    @classmethod
+    def from_data(cls, data):
+        return cls.deserialize(data[:Frame.fmt.size]), data[Frame.fmt.size:]
+
+    @classmethod
+    def wrap(cls, data, type_=Types.PAYLOAD, msg_id=None):
+        """
+        Returns a frame for the passed data.
+        """
+        if not msg_id:
+            msg_id = uuid.uuid4().int
+
+        return cls(type_, 1, len(data), msg_id, 1)
+
+
+def split_uuid(data):
+    "Splits a 128 bit int into two 64 bit words for binary encoding"
+    return ((data >> 64) & MAX_INT64, data & MAX_INT64)
+
+
+def join_uuid(hi, lo):
+    "Joins two 64 bit words into a 128bit int from binary encoding"
+    return (hi << 64) | lo
+
+
 class FileBackedBuffer:
 
     def __init__(self, fp, length=0):
@@ -40,6 +107,16 @@ class FileBackedBuffer:
             raw_data = raw_data.encode()
         fbb = cls.from_temp(dir=dir, delete=delete)
         fbb.write(raw_data)
+        return fbb
+
+    @classmethod
+    def from_dict(cls, raw_data, dir=None, delete=False):
+        try:
+            d = json.dumps(raw_data).encode("utf-8")
+        except Exception as e:
+            raise ReceptorRuntimeError("failed to encode raw data into json") from e
+        fbb = cls.from_temp(dir=dir, delete=delete)
+        fbb.write(d)
         return fbb
 
     @classmethod
@@ -78,14 +155,15 @@ class FramedMessage:
     A complete, two-part message.
     """
 
-    __slots__ = ("msg_id", "header", "payload")
+    __slots__ = ("msg_id", "header", "payload", "header_type")
 
-    def __init__(self, msg_id=None, header=None, payload=None):
+    def __init__(self, msg_id=None, header=None, payload=None, _type=Frame.Types.HEADER):
         if msg_id is None:
             msg_id = uuid.uuid4().int
         self.msg_id = msg_id
         self.header = header
         self.payload = payload
+        self.header_type = _type
 
     def __repr__(self):
         return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload})"
@@ -94,7 +172,7 @@ class FramedMessage:
         header_bytes = json.dumps(self.header).encode("utf-8")
         yield Frame.wrap(
             header_bytes,
-            type_=Frame.Types.HEADER,
+            type_=self.header_type,
             msg_id=self.msg_id).serialize()
         yield header_bytes
         if self.payload:
@@ -113,12 +191,15 @@ class CommandMessage(FramedMessage):
     commands or naive broadcasts.
     """
 
+    def __init__(self, msg_id=None, header=None, payload=None, _type=Frame.Types.COMMAND):
+        super().__init__(msg_id, header, payload, _type)
+
     def serialize(self):
         h = json.dumps(self.header).encode("utf-8")
         return b"".join(
             [
                 Frame.wrap(
-                    h, type_=Frame.Types.COMMAND, msg_id=self.msg_id
+                    h, type_=self.header_type, msg_id=self.msg_id
                 ).serialize(),
                 h,
             ]
@@ -197,70 +278,3 @@ class FramedBuffer:
 
     def get_nowait(self):
         return self.q.get_nowait()
-
-
-class Frame:
-    """
-    A Frame represents the minimal metadata about a transmission.
-
-    Usually you should not create one directly, but rather use the
-    FramedMessage or CommandMessage classes.
-    """
-
-    class Types(IntEnum):
-        HEADER = 0
-        PAYLOAD = 1
-        COMMAND = 2
-
-    fmt = struct.Struct(">ccIIQQ")
-
-    __slots__ = ("type", "version", "length", "msg_id", "id")
-
-    def __init__(self, type_, version, length, msg_id, id_):
-        self.type = type_
-        self.version = version
-        self.length = length
-        self.msg_id = msg_id
-        self.id = id_
-
-    def __repr__(self):
-        return f"Frame({self.type}, {self.version}, {self.length}, {self.msg_id}, {self.id})"
-
-    def serialize(self):
-        return self.fmt.pack(
-            bytes([self.type]),
-            bytes([self.version]),
-            self.id,
-            self.length,
-            *split_uuid(self.msg_id),
-        )
-
-    @classmethod
-    def deserialize(cls, buf):
-        t, v, i, length, hi, lo = Frame.fmt.unpack(buf)
-        msg_id = join_uuid(hi, lo)
-        return cls(Frame.Types(ord(t)), ord(v), length, msg_id, i)
-
-    @classmethod
-    def from_data(cls, data):
-        return cls.deserialize(data[:Frame.fmt.size]), data[Frame.fmt.size:]
-
-    @classmethod
-    def wrap(cls, data, type_=Types.PAYLOAD, msg_id=None):
-        """
-        Returns a frame for the passed data.
-        """
-        if not msg_id:
-            msg_id = uuid.uuid4().int
-
-        return cls(type_, 1, len(data), msg_id, 1)
-
-
-def split_uuid(data):
-    "Splits a 128 bit int into two 64 bit words for binary encoding"
-    return ((data >> 64) & MAX_INT64, data & MAX_INT64)
-
-
-def join_uuid(hi, lo):
-    "Joins two 64 bit words into a 128bit int from binary encoding"
-    return (hi << 64) | lo
