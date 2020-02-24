@@ -99,7 +99,14 @@ class ReceptorConfig:
             default_value=default_max_workers,
             value_type='int',
             hint='Size of the thread pool for worker threads. If unspecified, defaults to {}'.format(default_max_workers),
-        ),
+        )
+        self.add_config_option(
+            section='default',
+            key='logging_format',
+            default_value='simple',
+            value_type='str',
+            hint='Format of logging output.  Options are "simple" and "structured", default is "simple"',
+        )
         # Auth section options. This is a new section for the config file only,
         # so all of these options use `subparse=False`.
         self.add_config_option(
