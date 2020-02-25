@@ -31,7 +31,7 @@ class RawSocket(Transport):
         await self.writer.drain()
 
 
-async def connect(host, port, factory, loop=None, ssl=None):
+async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):
     if not loop:
         loop = asyncio.get_event_loop()
 
@@ -42,10 +42,14 @@ async def connect(host, port, factory, loop=None, ssl=None):
         await worker.client(t)
     except Exception:
         logger.exception("sock.connect")
+        if not reconnect:
+            return False
     finally:
-        await asyncio.sleep(5)
-        logger.debug("sock.connect: reconnection")
-        loop.create_task(connect(host, port, factory, loop))
+        if reconnect:
+            await asyncio.sleep(5)
+            logger.debug("sock.connect: reconnection")
+            loop.create_task(connect(host, port, factory, loop))
+    return True
 
 
 async def serve(reader, writer, factory):

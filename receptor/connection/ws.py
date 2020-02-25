@@ -28,7 +28,7 @@ class WebSocket(Transport):
         await self.ws.send_bytes(bytes_)
 
 
-async def connect(uri, factory, loop=None, ssl_context=None):
+async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True):
     if not loop:
         loop = asyncio.get_event_loop()
 
@@ -39,10 +39,13 @@ async def connect(uri, factory, loop=None, ssl_context=None):
             await worker.client(t)
     except Exception:
         logger.exception("ws.connect")
+        return False
     finally:
-        await asyncio.sleep(5)
-        logger.debug("ws.connect: reconnecting")
-        loop.create_task(connect(uri, factory=factory, loop=loop, ssl_context=ssl_context))
+        if reconnect:
+            await asyncio.sleep(5)
+            logger.debug("ws.connect: reconnecting")
+            loop.create_task(connect(uri, factory=factory, loop=loop, ssl_context=ssl_context))
+        return True
 
 
 async def serve(request, factory):
