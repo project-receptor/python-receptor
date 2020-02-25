@@ -6,7 +6,7 @@ from receptor.messages.envelope import Message
 from receptor.exceptions import ReceptorRuntimeError
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def afile():
     f = mkstemp()
     yield f
