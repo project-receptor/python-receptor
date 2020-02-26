@@ -95,12 +95,13 @@ def run_as_ping(config):
     async def read_responses():
         for _ in ping_iter():
             message = await controller.recv()
-            logger.info(message)
+            print(message.payload.readall())
 
     async def send_pings():
-        for _ in ping_iter():
+        for x in ping_iter():
             await controller.ping(config.ping_recipient)
-            await asyncio.sleep(config.ping_delay)
+            if x+1 < config.ping_count:
+                await asyncio.sleep(config.ping_delay)
 
     try:
         logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')

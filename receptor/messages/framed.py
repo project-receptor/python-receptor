@@ -166,7 +166,7 @@ class FramedMessage:
         self.header_type = _type
 
     def __repr__(self):
-        return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload})"
+        return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload}, type={self.header_type})"
 
     def __iter__(self):
         header_bytes = json.dumps(self.header).encode("utf-8")
@@ -266,7 +266,7 @@ class FramedBuffer:
         elif self.current_frame.type == Frame.Types.COMMAND:
             self.bb.seek(0)
             await self.q.put(
-                FramedMessage(self.current_frame.msg_id, header=json.load(self.bb))
+                CommandMessage(msg_id=self.current_frame.msg_id, header=json.load(self.bb))
             )
         else:
             raise Exception("Unknown Frame Type")
