@@ -31,19 +31,21 @@ def decode_date(o):
 
 class DurableBuffer:
 
-    def __init__(self, dir_, key, loop):
+    def __init__(self, dir_, key, loop, write_time=1.0):
         self.q = asyncio.Queue()
         self._base_path = os.path.join(os.path.expanduser(dir_))
         self._message_path = os.path.join(self._base_path, "messages")
         self._manifest_path = os.path.join(self._base_path, f"manifest-{key}")
         self._loop = loop
         self._manifest_lock = asyncio.Lock(loop=self._loop)
+        self._manifest_dirty = False
         try:
             os.makedirs(self._message_path, mode=0o700)
         except Exception:
             pass
         for item in self._read_manifest():
             self.q.put_nowait(item)
+        self._loop.create_task(self.manifest_writer(write_time))
 
     async def put(self, framed_message):
         item = {
@@ -52,25 +54,17 @@ class DurableBuffer:
         }
         await self._loop.run_in_executor(pool, self._write_file, framed_message, item)
         await self.q.put(item)
-        await self._save_manifest()
-
-    async def put_ident(self, ident):
-        await self.q.put(ident)
         self._manifest_dirty = True
 
     async def get(self, handle_only=False, delete=True):
         while True:
-            ident = await self.q.get()
+            msg = await self.q.get()
             self._manifest_dirty = True
             try:
                 f = await self._get_file(ident["ident"], handle_only=handle_only, delete=delete)
                 return (ident, f)
             except (FileNotFoundError, TypeError):
                 pass
-
-    async def _save_manifest(self):
-        async with self._manifest_lock:
-            await self._loop.run_in_executor(pool, self._write_manifest)
 
     def _write_manifest(self):
         with open(self._manifest_path, "w") as fp:
@@ -137,6 +131,14 @@ class DurableBuffer:
                     await new_queue.put(item)
             self.q = new_queue
             self._write_manifest()
+
+    async def manifest_writer(self, write_time):
+        while True:
+            if self._manifest_dirty:
+                async with self._manifest_lock:
+                    await self._loop.run_in_executor(pool, self._write_manifest)
+                    self._manifest_dirty = False
+            await asyncio.sleep(write_time)
 
 
 class FileBufferManager(defaultdict):
