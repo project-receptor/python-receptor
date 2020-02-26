@@ -1,12 +1,13 @@
 import asyncio
 import datetime
+import io
 import logging
-import uuid
+import os
 from contextlib import suppress
 
 from .connection.base import Worker
 from .connection.manager import Manager
-from .messages import envelope
+from .messages.framed import FileBackedBuffer, FramedMessage
 from .receptor import Receptor
 
 logger = logging.getLogger(__name__)
@@ -63,20 +64,28 @@ class Controller:
     async def recv(self):
         return await self.receptor.response_queue.get()
 
-    async def send(self, message, recipient, directive, expect_response=True):
-        new_id = uuid.uuid4()
-        inner_env = envelope.Inner(
-            receptor=self.receptor,
-            message_id=str(new_id),
-            sender=self.receptor.node_id,
-            recipient=recipient,
-            message_type="directive",
-            directive=directive,
-            timestamp=datetime.datetime.utcnow().isoformat(),
-            raw_payload=message,
+    async def send(self, payload, recipient, directive, expect_response=True):
+        if os.path.exists(payload):
+            buffer = FileBackedBuffer.from_path(payload)
+        elif isinstance(payload, str) or isinstance(payload, bytes):
+            buffer = FileBackedBuffer.from_data(payload)
+        elif isinstance(payload, dict):
+            buffer = FileBackedBuffer.from_dict(payload)
+        elif isinstance(payload, io.BytesIO):
+            buffer = FileBackedBuffer.from_buffer(payload)
+        message = FramedMessage(
+            header=dict(
+                sender=self.receptor.node_id,
+                recipient=recipient,
+                message_type="directive",
+                timestamp=datetime.datetime.utcnow().isoformat(),
+                directive=directive,
+                ttl=15
+            ),
+            payload=buffer,
         )
-        await self.receptor.router.send(inner_env, expected_response=expect_response)
-        return new_id
+        await self.receptor.router.send(message, expected_response=expect_response)
+        return message.msg_id
 
     async def ping(self, destination, expected_response=True):
         return await self.receptor.router.ping_node(destination, expected_response)

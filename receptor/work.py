@@ -4,7 +4,6 @@ import traceback
 import pkg_resources
 
 from . import exceptions
-from .messages import envelope
 from .stats import active_work_gauge, work_counter, work_info
 
 import concurrent.futures

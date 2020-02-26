@@ -115,9 +115,7 @@ class FileBackedBuffer:
     def from_buffer(cls, buffered_io, dir=None, delete=False):
         if not isinstance(buffered_io, io.BytesIO):
             raise ReceptorRuntimeError("buffer must be of type io.BytesIO")
-        fbb = cls.from_temp(dir=dir, delete=delete)
-        fbb.write(buffered_io)
-        return fbb
+        return cls(fp=buffered_io, length=buffered_io.getbuffer().nbytes)
 
     @classmethod
     def from_data(cls, raw_data, dir=None, delete=False):
