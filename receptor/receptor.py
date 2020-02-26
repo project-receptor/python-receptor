@@ -192,7 +192,7 @@ class Receptor:
             await asyncio.sleep(1)
 
     def _say_hi(self):
-        return framed.CommandMessage(header={
+        return framed.FramedMessage(header={
             "cmd": "HI",
             "id": self.node_id,
             "expire_time": time.time() + 10,
@@ -236,7 +236,7 @@ class Receptor:
         for target in destinations:
             buf = self.buffer_mgr.get_buffer_for_node(target, self)
             try:
-                msg = framed.CommandMessage(header={
+                msg = framed.FramedMessage(header={
                     "cmd": "ROUTE",
                     "id": self.node_id,
                     "capabilities": self.work_manager.get_capabilities(),
@@ -260,27 +260,26 @@ class Receptor:
                 await self.work_manager.handle(msg)
         except ValueError:
             logger.error(f"error in handle_message: Invalid directive -> '{msg}'. Sending failure response back.")
-            err_resp = inner.make_response(
-                receptor=self,
-                recipient=inner.sender,
-                payload="An invalid directive ('%s') was specified." % (inner.directive,),
-                in_response_to=inner.message_id,
-                serial=inner.serial + 1,
+            err_resp = framed.FramedMessage(header=dict(
+                recipient=msg.header['sender'],
+                in_response_to=msg.header['message_id'],
+                serial=msg.header['serial'] + 1,
                 ttl=15,
                 code=1,
+                ),
+                payload="An invalid directive ('{}') was specified.".format(msg.header["directive"]),
             )
             await self.router.send(err_resp)
         except Exception as e:
-            logger.error("error in handle_message: '%s'. Sending failure response back." % (str(e),))
-            err_resp = inner.make_response(
-                receptor=self,
-                recipient=inner.sender,
-                payload=str(e),
-                in_response_to=inner.message_id,
-                serial=inner.serial + 1,
+            logger.error("error in handle_message: '%s'. Sending failure response back.", str(e))
+            err_resp = framed.FramedMessage(header=dict(
+                recipient=msg.header['sender'],
+                in_response_to=msg.header['message_id'],
+                serial=msg.header['serial'] + 1,
                 ttl=15,
                 code=1,
-            )
+                ),
+                payload=f"{e}")
             await self.router.send(err_resp)
 
     async def handle_response(self, msg):

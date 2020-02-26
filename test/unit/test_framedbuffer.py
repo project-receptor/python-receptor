@@ -4,8 +4,7 @@ import uuid
 
 import pytest
 
-from receptor.messages.framed import (FileBackedBuffer, Frame, FramedBuffer,
-                                      FramedMessage, CommandMessage)
+from receptor.messages.framed import FileBackedBuffer, Frame, FramedBuffer, FramedMessage
 
 
 @pytest.fixture
@@ -135,10 +134,3 @@ async def test_too_short(framed_buffer, msg_id):
 
     with pytest.raises(asyncio.QueueEmpty):
         framed_buffer.get_nowait()
-
-
-def test_command_framed_msg(framed_buffer, msg_id):
-    msg = CommandMessage(header=dict(foo="bar"))
-    assert msg.header_type = Frame.Type.COMMAND
-    all_bytes = b''.join(msg)
-    print(all_bytes)

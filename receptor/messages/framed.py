@@ -21,7 +21,7 @@ class Frame:
     A Frame represents the minimal metadata about a transmission.
 
     Usually you should not create one directly, but rather use the
-    FramedMessage or CommandMessage classes.
+    FramedMessage class.
     """
 
     class Types(IntEnum):
@@ -155,24 +155,23 @@ class FramedMessage:
     A complete, two-part message.
     """
 
-    __slots__ = ("msg_id", "header", "payload", "header_type")
+    __slots__ = ("msg_id", "header", "payload")
 
-    def __init__(self, msg_id=None, header=None, payload=None, _type=Frame.Types.HEADER):
+    def __init__(self, msg_id=None, header=None, payload=None):
         if msg_id is None:
             msg_id = uuid.uuid4().int
         self.msg_id = msg_id
         self.header = header
         self.payload = payload
-        self.header_type = _type
 
     def __repr__(self):
-        return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload}, type={self.header_type})"
+        return f"FramedMessage(msg_id={self.msg_id}, header={self.header}, payload={self.payload})"
 
     def __iter__(self):
         header_bytes = json.dumps(self.header).encode("utf-8")
         yield Frame.wrap(
             header_bytes,
-            type_=self.header_type,
+            type_=Frame.Types.HEADER if self.payload else Frame.Types.COMMAND,
             msg_id=self.msg_id).serialize()
         yield header_bytes
         if self.payload:
@@ -184,26 +183,8 @@ class FramedMessage:
             for chunk in iter(reader, b''):
                 yield chunk
 
-
-class CommandMessage(FramedMessage):
-    """
-    A complete, single part message, meant to encapsulate point to point
-    commands or naive broadcasts.
-    """
-
-    def __init__(self, msg_id=None, header=None, payload=None, _type=Frame.Types.COMMAND):
-        super().__init__(msg_id, header, payload, _type)
-
     def serialize(self):
-        h = json.dumps(self.header).encode("utf-8")
-        return b"".join(
-            [
-                Frame.wrap(
-                    h, type_=self.header_type, msg_id=self.msg_id
-                ).serialize(),
-                h,
-            ]
-        )
+        return b''.join(self)
 
 
 class FramedBuffer:
@@ -266,7 +247,7 @@ class FramedBuffer:
         elif self.current_frame.type == Frame.Types.COMMAND:
             self.bb.seek(0)
             await self.q.put(
-                CommandMessage(msg_id=self.current_frame.msg_id, header=json.load(self.bb))
+                FramedMessage(msg_id=self.current_frame.msg_id, header=json.load(self.bb))
             )
         else:
             raise Exception("Unknown Frame Type")
