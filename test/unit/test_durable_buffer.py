@@ -1,3 +1,4 @@
+import asyncio
 import os
 import shutil
 import tempfile
@@ -21,13 +22,20 @@ async def test_create(event_loop, tempdir):
     assert await b.get() == b"some data"
 
 
+# this test is flaky because the manifest is written on a timer
+# even with the timer set to 0.0, the order of operations can land
+# in such a way that a very short (0.0) sleep isn't enough to ensure
+# that the manifest will have all the items it should by the time we
+# check
 @pytest.mark.asyncio
 async def test_manifest(event_loop, tempdir):
-    b = DurableBuffer(tempdir, "test_manifest", event_loop)
+    b = DurableBuffer(tempdir, "test_manifest", event_loop, write_time=0.0)
     await b.put(b"one")
     await b.put(b"two")
     await b.put(b"three")
     assert b.q.qsize() == 3
+
+    await asyncio.sleep(0.2)
 
     assert len(b._read_manifest()) == 3
 

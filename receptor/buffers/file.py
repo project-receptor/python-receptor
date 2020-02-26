@@ -32,7 +32,7 @@ def decode_date(o):
 
 class DurableBuffer:
 
-    def __init__(self, dir_, key, loop):
+    def __init__(self, dir_, key, loop, write_time=1.0):
         self.q = asyncio.Queue()
         self._base_path = os.path.join(os.path.expanduser(dir_))
         self._message_path = os.path.join(self._base_path, "messages")
@@ -46,7 +46,7 @@ class DurableBuffer:
             pass
         for item in self._read_manifest():
             self.q.put_nowait(item)
-        self._loop.create_task(self.manifest_writer())
+        self._loop.create_task(self.manifest_writer(write_time))
 
     async def put(self, data):
         item = {
@@ -128,13 +128,13 @@ class DurableBuffer:
             self.q = new_queue
             self._write_manifest()
 
-    async def manifest_writer(self):
+    async def manifest_writer(self, write_time):
         while True:
             if self._manifest_dirty:
                 async with self._manifest_lock:
                     await self._loop.run_in_executor(pool, self._write_manifest)
                     self._manifest_dirty = False
-            await asyncio.sleep(1)
+            await asyncio.sleep(write_time)
 
 
 class FileBufferManager(BaseBufferManager):
