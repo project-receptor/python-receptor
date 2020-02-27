@@ -67,7 +67,7 @@ class Controller:
     async def send(self, payload, recipient, directive, expect_response=True):
         if os.path.exists(payload):
             buffer = FileBackedBuffer.from_path(payload)
-        elif isinstance(payload, str) or isinstance(payload, bytes):
+        elif isinstance(payload, (str, bytes)):
             buffer = FileBackedBuffer.from_data(payload)
         elif isinstance(payload, dict):
             buffer = FileBackedBuffer.from_dict(payload)

@@ -256,7 +256,7 @@ class Receptor:
             if namespace == RECEPTOR_DIRECTIVE_NAMESPACE:
                 await directive.control(self.router, msg)
             else:
-                # other namespace/work directives
+                # TODO: other namespace/work directives
                 await self.work_manager.handle(msg)
         except ValueError:
             logger.error(f"error in handle_message: Invalid directive -> '{msg}'. Sending failure response back.")
