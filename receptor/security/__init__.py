@@ -29,7 +29,7 @@ class MallCop:
             return attrval
         return json.dumps(
             {attr: strattr(attr)
-             for attr in ['message_id', 'sender', 'recipient', 'message_type',
+             for attr in ['message_id', 'sender', 'recipient',
                           'timestamp', 'raw_payload', 'directive',
                           'in_response_to', 'ttl', 'serial', 'code']}
         ).encode("utf-8")

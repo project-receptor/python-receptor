@@ -25,7 +25,6 @@ class Control:
         async for response in action_method(router.receptor, msg):
             serial += 1
             resp_msg = FramedMessage(header=dict(
-                message_type="response",
                 recipient=msg.header["sender"],
                 in_response_to=msg.msg_id,
                 serial=serial

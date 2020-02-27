@@ -77,7 +77,6 @@ class Controller:
             header=dict(
                 sender=self.receptor.node_id,
                 recipient=recipient,
-                message_type="directive",
                 timestamp=datetime.datetime.utcnow().isoformat(),
                 directive=directive,
                 ttl=15

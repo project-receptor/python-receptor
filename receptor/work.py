@@ -47,18 +47,18 @@ class WorkManager:
     def add_work(self, message):
         work_counter.inc()
         active_work_gauge.inc()
-        self.active_work.append(dict(id=message.header["message_id"],
+        self.active_work.append(dict(id=message.msg_id,
                                      directive=message.header["directive"],
                                      sender=message.header["sender"]))
 
     def remove_work(self, message):
         for work in self.active_work:
-            if message.header["message_id"] == work["id"]:
+            if message.msg_id == work["id"]:
                 active_work_gauge.dec()
                 self.active_work.remove(work)
 
     async def handle(self, message):
-        logger.info(f'Handling work for {message.header["message_id"]} as {message.header["directive"]}')
+        logger.info(f'Handling work for {message.msg_id} as {message.header["directive"]}')
         namespace, action = message.header["directive"].split(':', 1)
         serial = 0
         eof_response = None
@@ -75,7 +75,7 @@ class WorkManager:
 
             self.add_work(message)
             response_queue = queue.Queue()
-            work_exec = self.thread_pool.submit(action_method, message, self.receptor.config.plugins.get(namespace, {}), response_queue)
+            work_exec = self.thread_pool.submit(action_method, message.payload.readall(), self.receptor.config.plugins.get(namespace, {}), response_queue)
             while True:
                 # Collect 'done' status here so we drain the response queue
                 # after the work is complete
@@ -84,17 +84,17 @@ class WorkManager:
                     try:
                         response = response_queue.get(False)
                         serial += 1
-                        logger.debug(f'Response emitted for {message.header["message_id"]}, serial {serial}')
-                        message = FramedMessage(
+                        logger.debug(f'Response emitted for {message.msg_id}, serial {serial}')
+                        response_message = FramedMessage(
                             header=dict(
                                 recipient=message.header["sender"],
-                                in_response_to=message.header["message_id"],
+                                in_response_to=message.msg_id,
                                 serial=serial,
                                 timestamp=datetime.datetime.now().isoformat()
                             ),
                             payload=FileBackedBuffer.from_data(response)
                         )
-                        await self.receptor.router.send(message)
+                        await self.receptor.router.send(response_message)
                     except queue.Empty:
                         break
                 if is_done:
@@ -108,11 +108,11 @@ class WorkManager:
             eof_response = FramedMessage(
                 header=dict(
                     recipient=message.header["sender"],
-                    in_response_to=message.header["message_id"],
+                    in_response_to=message.msg_id,
                     serial=serial+1,
                     code=1,
                     timestamp=datetime.datetime.now().isoformat(),
-                    message_type="eof"  # TODO: Not message type (eof=True|False?)
+                    eof=True
                 ),
                 payload=FileBackedBuffer.from_data(str(e))
             )
@@ -122,11 +122,11 @@ class WorkManager:
             eof_response = FramedMessage(
                 header=dict(
                     recipient=message.header["sender"],
-                    in_response_to=message.header["message_id"],
+                    in_response_to=message.msg_id,
                     serial=serial+1,
                     code=0,
                     timestamp=datetime.datetime.now().isoformat(),
-                    message_type="eof"  # TODO: Not message type
+                    eof=True
                 )
             )
         await self.receptor.router.send(eof_response)

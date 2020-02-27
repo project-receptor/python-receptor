@@ -48,7 +48,6 @@ async def watch_queue(conn, buf):
                 continue
 
             try:
-                logger.debug(f'Sending message {str(msg)}')
                 if conn.closed:
                     logger.debug('Message not sent: connection already closed')
                 else:
@@ -105,12 +104,10 @@ class Worker:
             task.cancel()
 
     async def hello(self):
-        logger.debug("sending HI")
         msg = self.receptor._say_hi().serialize()
         await self.conn.send(msg)
 
     async def start_processing(self):
-        logger.debug("sending routes")
         await self.receptor.send_route_advertisement()
         logger.debug("starting normal loop")
         self.handle_task = self.loop.create_task(
