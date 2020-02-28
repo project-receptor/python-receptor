@@ -51,7 +51,7 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True):
 
 async def serve(request, factory):
     ws = aiohttp.web.WebSocketResponse()
-    log_ssl_detail(ws)
+    log_ssl_detail(request.transport)
     await ws.prepare(request)
 
     t = WebSocket(ws)
