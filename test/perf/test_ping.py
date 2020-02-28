@@ -4,7 +4,7 @@ import time
 import pytest
 
 
-@pytest.yield_fixture(
+@pytest.fixture(
     scope="function",
     params=[
         "test/perf/flat-mesh.yaml",

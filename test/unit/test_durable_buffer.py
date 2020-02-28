@@ -7,7 +7,7 @@ import pytest
 from receptor.buffers.file import DurableBuffer
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def tempdir():
     dir_ = tempfile.mkdtemp()
     yield dir_

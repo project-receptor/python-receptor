@@ -7,12 +7,12 @@ import pytest
 from receptor.messages.envelope import Frame, FramedBuffer, FramedMessage
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def msg_id():
     return uuid.uuid4().int
 
 
-@pytest.yield_fixture
+@pytest.fixture
 def framed_buffer(event_loop):
     return FramedBuffer(loop=event_loop)
 
