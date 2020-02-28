@@ -131,6 +131,30 @@ class ReceptorConfig:
             subparse=False,
             hint='Path to the CA bundle used by clients to verify servers.',
         )
+        self.add_config_option(
+            section='auth',
+            key='client_cert',
+            default_value='',
+            value_type='str',
+            subparse=False,
+            hint='Path to the SSL/TLS client certificate file.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='client_key',
+            default_value='',
+            value_type='str',
+            subparse=False,
+            hint='Path to the SSL/TLS client certificate key file.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='client_verification_ca',
+            default_value=None,
+            value_type='str',
+            subparse=False,
+            hint='Path to the CA bundle used by servers to verify clients.',
+        )
         # Receptor node options
         self.add_config_option(
             section='node',
@@ -494,12 +518,29 @@ class ReceptorConfig:
 
     def get_client_ssl_context(self):
         logger.debug("Loading TLS Client Context")
-        sc = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+        ca_bundle = self.auth_server_ca_bundle
+        ca_bundle = ca_bundle if ca_bundle else None   # Make false-like values like '' explicitly None
+        sc = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        sc.verify_mode = ssl.CERT_REQUIRED
+        if self.auth_server_ca_bundle:
+            sc.load_verify_locations(self.auth_server_ca_bundle)
+        else:
+            sc.load_default_certs(ssl.Purpose.SERVER_AUTH)
+        if self.auth_client_cert and self.auth_client_key:
+            sc.load_cert_chain(self.auth_client_cert, self.auth_client_key)
         return sc
 
     def get_server_ssl_context(self):
         logger.debug("Loading TLS Server Context")
-        sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH, cafile=self.auth_server_ca_bundle)
+        ca_bundle = self.auth_client_verification_ca
+        ca_bundle = ca_bundle if ca_bundle else None   # Make false-like values like '' explicitly None
+        sc = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        if self.auth_client_verification_ca:
+            sc.load_verify_locations(self.auth_client_verification_ca)
+            sc.verify_mode = ssl.CERT_REQUIRED
+            sc.check_hostname = False
+        else:
+            sc.load_default_certs(ssl.Purpose.CLIENT_AUTH)
         sc.load_cert_chain(self.auth_server_cert, self.auth_server_key)
         return sc
 
