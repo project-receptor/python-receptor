@@ -79,7 +79,7 @@ class Receptor:
         while True:
             current_manifest = self.get_connection_manifest()
             for connection in current_manifest:
-                buffer = self.buffer_mgr.get(connection["id"])
+                buffer = self.buffer_mgr[connection["id"]]
                 await buffer.expire()
                 if connection["last"] + 86400 < time.time():
                     self.remove_connection_manifest(connection["id"])
@@ -236,7 +236,7 @@ class Receptor:
 
         # TODO: This should be a broadcast call to the connection manager
         for node_id in destinations:
-            buf = self.buffer_mgr.get(node_id)
+            buf = self.buffer_mgr[node_id]
             try:
                 msg = framed.FramedMessage(header={
                     "cmd": "ROUTE",
