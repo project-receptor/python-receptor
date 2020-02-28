@@ -109,7 +109,8 @@ class FileBackedBuffer:
 
     @classmethod
     def from_temp(cls, dir=None, delete=False):
-        return cls(tempfile.NamedTemporaryFile(dir=dir, delete=delete))
+        # return cls(tempfile.NamedTemporaryFile(dir=dir, delete=delete))
+        return cls(tempfile.SpooledTemporaryFile(dir=dir, max_size=2 ** 12))
 
     @classmethod
     def from_buffer(cls, buffered_io, dir=None, delete=False):
