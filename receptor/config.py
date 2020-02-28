@@ -155,6 +155,22 @@ class ReceptorConfig:
             subparse=False,
             hint='Path to the CA bundle used by servers to verify clients.',
         )
+        self.add_config_option(
+            section='auth',
+            key='server_cipher_list',
+            default_value=None,
+            value_type='str',
+            subparse=False,
+            hint='TLS cipher list for use by the server.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='client_cipher_list',
+            default_value=None,
+            value_type='str',
+            subparse=False,
+            hint='TLS cipher list for use by the client.',
+        )
         # Receptor node options
         self.add_config_option(
             section='node',
@@ -521,6 +537,9 @@ class ReceptorConfig:
         ca_bundle = self.auth_server_ca_bundle
         ca_bundle = ca_bundle if ca_bundle else None   # Make false-like values like '' explicitly None
         sc = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        sc.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2
+        if self.auth_client_cipher_list:
+            sc.set_ciphers(self.auth_client_cipher_list)
         sc.verify_mode = ssl.CERT_REQUIRED
         if self.auth_server_ca_bundle:
             sc.load_verify_locations(self.auth_server_ca_bundle)
@@ -535,6 +554,9 @@ class ReceptorConfig:
         ca_bundle = self.auth_client_verification_ca
         ca_bundle = ca_bundle if ca_bundle else None   # Make false-like values like '' explicitly None
         sc = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        sc.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2
+        if self.auth_server_cipher_list:
+            sc.set_ciphers(self.auth_server_cipher_list)
         if self.auth_client_verification_ca:
             sc.load_verify_locations(self.auth_client_verification_ca)
             sc.verify_mode = ssl.CERT_REQUIRED

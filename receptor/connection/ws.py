@@ -4,7 +4,7 @@ import aiohttp
 import aiohttp.web
 import asyncio
 
-from .base import Transport
+from .base import Transport, log_ssl_detail
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True):
     worker = factory()
     try:
         async with aiohttp.ClientSession().ws_connect(uri, ssl=ssl_context) as ws:
+            log_ssl_detail(ws)
             t = WebSocket(ws)
             await worker.client(t)
     except Exception:
@@ -50,6 +51,7 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True):
 
 async def serve(request, factory):
     ws = aiohttp.web.WebSocketResponse()
+    log_ssl_detail(ws)
     await ws.prepare(request)
 
     t = WebSocket(ws)

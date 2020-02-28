@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from .base import Transport
+from .base import Transport, log_ssl_detail
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):
     worker = factory()
     try:
         r, w = await asyncio.open_connection(host, port, loop=loop, ssl=ssl)
+        log_ssl_detail(w._transport)
         t = RawSocket(r, w)
         await worker.client(t)
     except Exception:
@@ -53,5 +54,6 @@ async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):
 
 
 async def serve(reader, writer, factory):
+    log_ssl_detail(writer._transport)
     t = RawSocket(reader, writer)
     await factory().server(t)

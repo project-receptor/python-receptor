@@ -8,6 +8,16 @@ from ..messages.envelope import FramedBuffer
 logger = logging.getLogger(__name__)
 
 
+def log_ssl_detail(transport):
+    peername = transport.get_extra_info('peername')
+    if transport.get_extra_info('ssl_object', None):
+        cipher = transport.get_extra_info('cipher')
+        peercert = transport.get_extra_info('peercert')
+        logger.debug(f"{cipher[1]} connection with {str(peername)} using cipher {cipher[0]} and certificate {str(peercert)}.")
+    else:
+        logger.debug(f"Unencrypted connection with {str(peername)}.")
+
+
 class Transport(AsyncIterator):
     @abstractmethod
     async def close(self):
