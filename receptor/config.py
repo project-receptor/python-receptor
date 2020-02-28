@@ -1,6 +1,5 @@
 import argparse
 import configparser
-import importlib
 import logging
 import os
 import ssl
@@ -33,15 +32,6 @@ SUBCOMMAND_EXTRAS = {
         'is_ephemeral': True,
     },
 }
-
-
-def py_class(class_spec):
-    if class_spec not in SINGLETONS:
-        module_name, class_name = class_spec.rsplit('.', 1)
-        module_obj = importlib.import_module(module_name)
-        class_obj = getattr(module_obj, class_name)
-        SINGLETONS[class_spec] = class_obj()
-    return SINGLETONS[class_spec]
 
 
 class ConfigOption:
@@ -326,25 +316,6 @@ class ReceptorConfig:
             listof='str',
             hint='Set additional headers to provide when connecting to websocket peers.',
         )
-        # Component options. These are also only used in a config section
-        # like auth, so they also set `subparse=False`.
-        self.add_config_option(
-            'components',
-            'security_manager',
-            default_value='receptor.security.MallCop',
-            value_type=py_class,
-            subparse=False,
-            hint='',
-        )
-        self.add_config_option(
-            'components',
-            'buffer_manager',
-            default_value='receptor.buffers.file.FileBufferManager',
-            value_type=py_class,
-            subparse=False,
-            hint='',
-        )
-
         self.parse_options(args)
 
     def add_config_option(self, section, key, cli=True, short_option='', long_option='',

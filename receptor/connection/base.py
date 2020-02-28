@@ -113,9 +113,7 @@ class Worker:
         self.handle_task = self.loop.create_task(
             self.receptor.message_handler(self.buf)
         )
-        out = self.receptor.buffer_mgr.get_buffer_for_node(
-            self.remote_id, self.receptor
-        )
+        out = self.receptor.buffer_mgr.get(self.remote_id)
         self.write_task = self.loop.create_task(watch_queue(self.conn, out))
         return await self.write_task
 

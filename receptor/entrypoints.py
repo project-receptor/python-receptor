@@ -93,7 +93,7 @@ def run_as_ping(config):
     async def read_responses():
         for _ in ping_iter():
             message = await controller.recv()
-            print(message.payload.readall())
+            print(message.payload.readall().decode())
 
     async def send_pings():
         for x in ping_iter():
@@ -132,18 +132,18 @@ def run_as_send(config):
             if message.header.get("in_response_to", None):
                 logger.debug('Received response message')
                 if message.payload:
-                    print(message.payload.readall())
+                    print(message.payload.readall().decode())
                 else:
                     print("---")
-            elif message.header.get("eof", False):
-                logger.info('Received EOF')
-                if message.code != 0:
-                    logger.error(f'EOF was an error result')
-                    if message.payload:
-                        print(f'ERROR: {message.payload.readall()}')
-                    else:
-                        print(f"No EOF Error Payload")
-                break
+                if message.header.get("eof", False):
+                    logger.info('Received EOF')
+                    if message.header.get("code", 0) != 0:
+                        logger.error(f'EOF was an error result')
+                        if message.payload:
+                            print(f'ERROR: {message.payload.readall().decode()}')
+                        else:
+                            print(f"No EOF Error Payload")
+                    break
             else:
                 logger.warning(f'Received unknown message {message}')
     try:

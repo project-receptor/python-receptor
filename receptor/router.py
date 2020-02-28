@@ -213,7 +213,6 @@ class MeshRouter:
             raise UnrouteableError(f'No route found to {recipient}')
 
         # TODO: Not signing/serializing in order to finish buffered output work
-        # signed = await inner_envelope.sign_and_serialize()
 
         message.header.update({
             "sender": self.node_id,

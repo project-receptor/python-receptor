@@ -4,11 +4,10 @@ import json
 import logging
 import os
 import uuid
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 
 import dateutil.parser
-
-from .base import BaseBufferManager
 
 logger = logging.getLogger(__name__)
 pool = ThreadPoolExecutor()
@@ -135,15 +134,10 @@ class DurableBuffer:
             self._write_manifest()
 
 
-class FileBufferManager(BaseBufferManager):
-    _buffers = {}
+class FileBufferManager:
 
-    def get_buffer_for_node(self, node_id, receptor):
-        # due to the way that the manager is constructed, we won't have enough
-        # information to build a proper defaultdict at the time, and we want to
-        # make sure we only construct a single instance of DurableBuffer
-        # per-node so.. doing this the hard way.
-        if node_id not in self._buffers:
-            path = os.path.join(os.path.expanduser(receptor.base_path))
-            self._buffers[node_id] = DurableBuffer(path, node_id, asyncio.get_event_loop())
+    def __init__(self, path, loop=asyncio.get_event_loop()):
+        self._buffers = defaultdict(lambda node_id: DurableBuffer(path, node_id, loop))
+
+    def get(self, node_id):
         return self._buffers[node_id]
