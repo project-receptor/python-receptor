@@ -20,20 +20,28 @@ class Manager:
         self.loop = loop or asyncio.get_event_loop()
 
     def get_listener(self, listen_url):
+
+        default_port = {
+            "rnp": 8888,
+            "rnps": 8899,
+            "ws": 80,
+            "wss": 443,
+        }
+
         service = parse_peer(listen_url)
         ssl_context = self.ssl_context_factory("server") if service.scheme in ("rnps", "wss") else None
         if service.scheme in ("rnp", "rnps"):
             return asyncio.start_server(
                 functools.partial(sock.serve, factory=self.factory),
                 host=service.hostname,
-                port=service.port,
+                port=service.port or default_port[service.scheme],
                 ssl=ssl_context,
             )
         elif service.scheme in ("ws", "wss"):
             return self.loop.create_server(
                 ws.app(self.factory).make_handler(),
                 service.hostname,
-                service.port,
+                service.port or default_port[service.scheme],
                 ssl=ssl_context,
             )
         else:
