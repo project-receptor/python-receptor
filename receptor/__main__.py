@@ -57,6 +57,8 @@ def main(args=None):
 
     try:
         config.go()
+    except asyncio.CancelledError:
+        pass
     except Exception:
         logger.exception("main: an error occured while running receptor")
         sys.exit(1)
