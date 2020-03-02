@@ -8,7 +8,7 @@ description = "A flexible multi-service relayer with remote execution and orches
 license = "Apache-2.0"
 name = "receptor"
 repository = "https://github.com/project-receptor/receptor"
-version = "0.1.0"
+version = "1.0.0"
 
 [tool.poetry.dependencies]
 aiohttp = "^3.6.2"
