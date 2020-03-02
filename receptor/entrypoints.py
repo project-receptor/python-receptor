@@ -71,6 +71,27 @@ def run_as_controller(config):
         cleanup_tmpdir()
 
 
+async def run_oneshot_command(controller, peer, recipient, send_func, read_func):
+    add_peer_task = controller.add_peer(peer)
+    start_wait = time.time()
+    while True:
+        if add_peer_task and add_peer_task.done() and not add_peer_task.result():
+            print("Connection failed. Exiting.")
+            break
+        if ((recipient and controller.receptor.router.node_is_known(recipient)) or
+                (not recipient and len(controller.receptor.router.get_nodes()) > 0)):
+            read_task = controller.loop.create_task(read_func())
+            await send_func()
+            await read_task
+            break
+        if (time.time() - start_wait > 5):
+            print("Connection timed out. Exiting.")
+            if not add_peer_task.done():
+                add_peer_task.cancel()
+            break
+        await asyncio.sleep(0.1)
+
+
 def run_as_ping(config):
     def ping_iter():
         if config.ping_count:
@@ -81,13 +102,7 @@ def run_as_ping(config):
                 yield 0
 
     async def ping_entrypoint():
-        read_task = controller.loop.create_task(read_responses())
-        controller.add_peer(config.ping_peer)
-        start_wait = time.time()
-        while not controller.receptor.router.node_is_known(config.ping_recipient) and (time.time() - start_wait < 5):
-            await asyncio.sleep(0.1)
-        await send_pings()
-        await read_task
+        return await run_oneshot_command(controller, config.ping_peer, config.ping_recipient, send_pings, read_responses)
 
     async def read_responses():
         for _ in ping_iter():
@@ -109,11 +124,9 @@ def run_as_ping(config):
 
 def run_as_send(config):
     async def send_entrypoint():
-        read_task = controller.loop.create_task(read_responses())
-        controller.add_peer(config.send_peer)
-        start_wait = time.time()
-        while not controller.receptor.router.node_is_known(config.ping_recipient) and (time.time() - start_wait < 5):
-            await asyncio.sleep(0.1)
+        return await run_oneshot_command(controller, config.send_peer, config.send_recipient, send_message, read_responses)
+
+    async def send_message():
         msg = Message(config.send_recipient, config.send_directive)
         if config.send_payload == "-":
             msg.data(sys.stdin.buffer.read())
@@ -126,7 +139,6 @@ def run_as_send(config):
                 send_payload = config.send_payload
             msg.data(send_payload)
         await controller.send(msg)
-        await read_task
 
     async def read_responses():
         while True:
@@ -153,14 +165,13 @@ def run_as_send(config):
 def run_as_status(config):
 
     async def status_entrypoint():
-        controller.add_peer(config.status_peer)
-        start_wait = time.time()
-        r = controller.receptor
-        while not r.router.node_is_known(config.status_peer) and (time.time() - start_wait < 5):
-            await asyncio.sleep(0.1)
+        return await run_oneshot_command(controller, config.status_peer, None, print_status, noop)
+
+    async def print_status():
 
         # This output should be formatted so as to be parseable as YAML
 
+        r = controller.receptor
         print("Nodes:")
         print("  Myself:", r.router.node_id)
         print("  Others:")
@@ -176,6 +187,9 @@ def run_as_status(config):
             print("  ", node, ":", sep="")
             for cap, cap_value in node_caps.items():
                 print("    ", cap, ": ", str(cap_value), sep="")
+
+    async def noop():
+        return
 
     try:
         controller = Controller(config)

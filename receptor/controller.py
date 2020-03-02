@@ -18,7 +18,7 @@ class Controller:
         self.loop = loop
         self.connection_manager = Manager(
             lambda: Worker(self.receptor, loop),
-            self.receptor.config.get_server_ssl_context(),
+            self.receptor.config.get_ssl_context,
             loop
         )
         self.queue = queue
@@ -34,7 +34,7 @@ class Controller:
 
     def add_peer(self, peer):
         logger.info("Connecting to peer {}".format(peer))
-        self.connection_manager.get_peer(peer)
+        return self.connection_manager.get_peer(peer, reconnect=not self.receptor.config._is_ephemeral)
 
     async def recv(self):
         return await self.receptor.response_queue.get()

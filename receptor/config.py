@@ -109,27 +109,75 @@ class ReceptorConfig:
         # so all of these options use `subparse=False`.
         self.add_config_option(
             section='auth',
-            key='ssl_cert',
+            key='server_cert',
             default_value='',
             value_type='str',
             subparse=False,
-            hint='Path to the SSL/TLS certificate chain file.',
+            hint='Path to the SSL/TLS server certificate file.',
         )
         self.add_config_option(
             section='auth',
-            key='ssl_key',
+            key='server_key',
             default_value='',
             value_type='str',
             subparse=False,
-            hint='Path to the SSL/TLS certificate key file.',
+            hint='Path to the SSL/TLS server certificate key file.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='server_ca_bundle',
+            default_value=None,
+            value_type='str',
+            subparse=False,
+            hint='Path to the CA bundle used by clients to verify servers.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='client_cert',
+            default_value='',
+            value_type='str',
+            subparse=False,
+            hint='Path to the SSL/TLS client certificate file.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='client_key',
+            default_value='',
+            value_type='str',
+            subparse=False,
+            hint='Path to the SSL/TLS client certificate key file.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='client_verification_ca',
+            default_value=None,
+            value_type='str',
+            subparse=False,
+            hint='Path to the CA bundle used by servers to verify clients.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='server_cipher_list',
+            default_value=None,
+            value_type='str',
+            subparse=False,
+            hint='TLS cipher list for use by the server.',
+        )
+        self.add_config_option(
+            section='auth',
+            key='client_cipher_list',
+            default_value=None,
+            value_type='str',
+            subparse=False,
+            hint='TLS cipher list for use by the client.',
         )
         # Receptor node options
         self.add_config_option(
             section='node',
             key='listen',
-            default_value=['receptor://0.0.0.0:8888'],
+            default_value=['rnp://0.0.0.0:8888'],
             value_type='list',
-            hint='Set/override IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0:8888.',
+            hint='Set/override IP address and port to listen on. If not set here or in a config file, the default is rnp://0.0.0.0:8888.',
         )
         self.add_config_option(
             section='node',
@@ -191,10 +239,10 @@ class ReceptorConfig:
         self.add_config_option(
             section='controller',
             key='listen',
-            default_value=['receptor://0.0.0.0:8888'],
+            default_value=['rnp://0.0.0.0:8888'],
             value_type='list',
             hint=(
-                'Set IP address and port to listen on. If not set here or in a config file, the default is receptor://0.0.0.0/0:8888. This option can be '
+                'Set IP address and port to listen on. If not set here or in a config file, the default is rnp://0.0.0.0/0:8888. This option can be '
                 'passed multiple times.'
             ),
         )
@@ -476,21 +524,47 @@ class ReceptorConfig:
         self._is_ephemeral = self._parsed_args.ephemeral
         self._parsed_args.func(self)
 
-    def get_client_ssl_context(self):
-        if self.auth_ssl_cert:
-            logger.debug("Loading SSL Client Context")
-            return ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=self.auth_ssl_cert)
+    def get_ssl_context(self, context_type):
+        if context_type == 'server':
+            return self.get_server_ssl_context()
+        elif context_type == 'client':
+            return self.get_client_ssl_context()
         else:
-            return None
+            raise ReceptorRuntimeError(f"Unknown SSL context type {context_type}")
+
+    def get_client_ssl_context(self):
+        logger.debug("Loading TLS Client Context")
+        ca_bundle = self.auth_server_ca_bundle
+        ca_bundle = ca_bundle if ca_bundle else None   # Make false-like values like '' explicitly None
+        sc = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        sc.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2
+        if self.auth_client_cipher_list:
+            sc.set_ciphers(self.auth_client_cipher_list)
+        sc.verify_mode = ssl.CERT_REQUIRED
+        if self.auth_server_ca_bundle:
+            sc.load_verify_locations(self.auth_server_ca_bundle)
+        else:
+            sc.load_default_certs(ssl.Purpose.SERVER_AUTH)
+        if self.auth_client_cert and self.auth_client_key:
+            sc.load_cert_chain(self.auth_client_cert, self.auth_client_key)
+        return sc
 
     def get_server_ssl_context(self):
-        if self.auth_ssl_cert and self.auth_ssl_key:
-            logger.debug("Loading SSL Server Context")
-            sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            sc.load_cert_chain(self.auth_ssl_cert, self.auth_ssl_key)
-            return sc
+        logger.debug("Loading TLS Server Context")
+        ca_bundle = self.auth_client_verification_ca
+        ca_bundle = ca_bundle if ca_bundle else None   # Make false-like values like '' explicitly None
+        sc = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        sc.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_TLSv1_2
+        if self.auth_server_cipher_list:
+            sc.set_ciphers(self.auth_server_cipher_list)
+        if self.auth_client_verification_ca:
+            sc.load_verify_locations(self.auth_client_verification_ca)
+            sc.verify_mode = ssl.CERT_REQUIRED
+            sc.check_hostname = False
         else:
-            return None
+            sc.load_default_certs(ssl.Purpose.CLIENT_AUTH)
+        sc.load_cert_chain(self.auth_server_cert, self.auth_server_key)
+        return sc
 
     def __getattr__(self, key):
         value = self._config_options[key]
