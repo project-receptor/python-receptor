@@ -3,6 +3,8 @@ import datetime
 import logging
 import uuid
 
+from contextlib import suppress
+
 from .receptor import Receptor
 from .messages import envelope
 from .connection.base import Worker
@@ -26,11 +28,33 @@ class Controller:
             self.queue = asyncio.Queue(loop=loop)
         self.receptor.response_queue = self.queue
 
+    async def shutdown_loop(self):
+        tasks = [task for task in asyncio.Task.all_tasks()
+                 if task is not asyncio.Task.current_task()]
+        # Retrieve and throw away all exceptions that happen after
+        # the decision to shut down was made.
+        for task in tasks:
+            task.cancel()
+            with suppress(Exception):
+                await task
+        asyncio.gather(*tasks)
+        self.loop.stop()
+
+    async def exit_on_exceptions_in(self, tasks):
+        try:
+            for task in tasks:
+                await task
+        except Exception as e:
+            logger.exception(str(e))
+            self.loop.create_task(self.shutdown_loop())
+
     def enable_server(self, listen_urls):
+        tasks = list()
         for url in listen_urls:
             listener = self.connection_manager.get_listener(url)
             logger.info("Serving on %s", url)
-            self.loop.create_task(listener)
+            tasks.append(self.loop.create_task(listener))
+        return tasks
 
     def add_peer(self, peer):
         logger.info("Connecting to peer {}".format(peer))

@@ -46,7 +46,8 @@ def run_as_node(config):
             logger.info(f'Starting stats on port {config.node_stats_port}')
             start_http_server(config.node_stats_port)
         if not config.node_server_disable:
-            controller.enable_server(config.node_listen)
+            listen_tasks = controller.enable_server(config.node_listen)
+            controller.loop.create_task(controller.exit_on_exceptions_in(listen_tasks))
         for peer in config.node_peers:
             controller.add_peer(peer)
         if config.node_keepalive_interval > 1:
