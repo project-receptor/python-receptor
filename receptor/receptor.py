@@ -119,7 +119,7 @@ class Receptor:
         if id_ is None:
             id_ = protocol_obj.id
 
-        self.router.register_edge(id_, self.node_id, 1)
+        self.router.add_or_update_edges([(id_, self.node_id, 1)])
         if id_ in self.connections:
             self.connections[id_].append(protocol_obj)
         else:
@@ -141,7 +141,7 @@ class Receptor:
                     del self.node_capabilities[connection_node]
                 else:
                     self.connections[connection_node].remove(protocol_obj)
-                    self.router.update_node(self.node_id, connection_node, 100)
+                    self.router.add_or_update_edges([(self.node_id, connection_node, 100)])
                     self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
         if loop is None:
@@ -177,7 +177,7 @@ class Receptor:
 
     async def handle_route_advertisement(self, data):
         self.node_capabilities[data["id"]] = data["capabilities"]
-        self.router.add_edges(data["edges"])
+        self.router.add_or_update_edges(data["edges"])
         await self.send_route_advertisement(data["edges"], data["seen"])
 
     async def send_route_advertisement(self, edges=None, seen=[]):
