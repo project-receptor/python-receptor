@@ -76,7 +76,7 @@ class MeshRouter:
     def add_or_update_edges(self, edges):
         """
         Adds a list of edges supplied as (node1, node2, cost) tuples.
-        Already-existing edges have their cost set to the lesser of the existing or new cost.
+        Already-existing edges have their cost updated.
         Supplying a cost of None removes the edge.
         """
         for left, right, cost in edges:
@@ -90,7 +90,7 @@ class MeshRouter:
                 self._edges[edge_key] = cost
             elif cost is None:
                 del self._edges[edge_key]
-            elif cost < self._edges[edge_key]:
+            else:
                 self._edges[edge_key] = cost
         self.update_routing_table()
         route_info.info(dict(edges=str(self.get_edges())))
@@ -105,7 +105,9 @@ class MeshRouter:
                 if node in self._neighbors[neighbor]:
                     self._neighbors[neighbor].remove(node)
             del self._neighbors[node]
-        self._nodes.remove(node)
+        if node in self._nodes:
+            self._nodes.remove(node)
+        route_info.info(dict(edges=str(self.get_edges())))
 
     def get_edges(self):
         """Returns set of edges as a list of (node1, node2, cost) tuples."""
