@@ -93,7 +93,7 @@ class MeshRouter:
             else:
                 self._edges[edge_key] = cost
         self.update_routing_table()
-        route_info.info(dict(edges=str(self.get_edges())))
+        route_info.info(dict(edges=str(set(self.get_edges()))))
 
     def remove_node(self, node):
         """Removes a node and its associated edges."""
@@ -107,7 +107,7 @@ class MeshRouter:
             del self._neighbors[node]
         if node in self._nodes:
             self._nodes.remove(node)
-        route_info.info(dict(edges=str(self.get_edges())))
+        route_info.info(dict(edges=str(set(self.get_edges()))))
 
     def get_edges(self):
         """Returns set of edges as a list of (node1, node2, cost) tuples."""
