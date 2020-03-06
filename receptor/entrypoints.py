@@ -69,7 +69,7 @@ def run_as_controller(config):
         controller.loop.create_task(controller.receptor.watch_expire())
         controller.run()
     finally:
-        cleanup_tmpdir()
+        cleanup_tmpdir(controller)
 
 
 async def run_oneshot_command(controller, peer, recipient, send_func, read_func):
