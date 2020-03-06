@@ -4,10 +4,6 @@
       jobs:
         - ansible-tox-integration:
             voting: false
-    gate:
-      jobs:
-        - ansible-tox-integration:
-            voting: false
 
 - job:
     name: ansible-tox-integration
