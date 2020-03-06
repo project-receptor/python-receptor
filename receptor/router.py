@@ -166,7 +166,9 @@ class MeshRouter:
         given recipient. If the current node is the recipient or there is
         no path, then return None.
         """
-        if recipient in self.routing_table:
+        if recipient == self.node_id:
+            return self.node_id
+        elif recipient in self.routing_table:
             return self.routing_table[recipient][0]
         else:
             return None
@@ -222,4 +224,7 @@ class MeshRouter:
         logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
         if expected_response and inner_envelope.message_type == 'directive':
             self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
-        await self.forward(msg, next_node_id)
+        if next_node_id == self.node_id:
+            await self.receptor.handle_message(msg)
+        else:
+            await self.forward(msg, next_node_id)
