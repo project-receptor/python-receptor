@@ -58,20 +58,6 @@ def run_as_node(config):
         cleanup_tmpdir(controller)
 
 
-def run_as_controller(config):
-    try:
-        controller = Controller(config)
-        logger.info(f'Running as Receptor controller with ID: {controller.receptor.node_id}')
-        if config.controller_stats_enable:
-            logger.info(f'Starting stats on port {config.node_stats_port}')
-            start_http_server(config.controller_stats_port)
-        controller.enable_server(config.controller_listen)
-        controller.loop.create_task(controller.receptor.watch_expire())
-        controller.run()
-    finally:
-        cleanup_tmpdir(controller)
-
-
 async def run_oneshot_command(controller, peer, recipient, send_func, read_func):
     add_peer_task = controller.add_peer(peer)
     start_wait = time.time()

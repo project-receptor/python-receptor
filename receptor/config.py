@@ -5,7 +5,7 @@ import logging
 import os
 import ssl
 
-from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_controller, run_as_status
+from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_status
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
 
 logger = logging.getLogger(__name__)
@@ -17,13 +17,8 @@ SUBCOMMAND_EXTRAS = {
         'entrypoint': run_as_node,
         'is_ephemeral': False,
     },
-    'controller': {
-        'hint': 'Run a Receptor controller',
-        'entrypoint': run_as_controller,  # TODO: New entrypoint
-        'is_ephemeral': False,
-    },
     'ping': {
-        'hint': 'Tell the local controller to ping a node',
+        'hint': 'Ping a Receptor node',
         'entrypoint': run_as_ping,
         'is_ephemeral': True,
     },
@@ -187,7 +182,7 @@ class ReceptorConfig:
             default_value=[],
             value_type='list',
             listof='str',
-            hint='Set/override peer nodes/controllers to connect to. Use multiple times for multiple peers.',
+            hint='Set/override peer nodes to connect to. Use multiple times for multiple peers.',
         )
         self.add_config_option(
             section='node',
@@ -228,61 +223,7 @@ class ReceptorConfig:
             listof='str',
             hint='Define membership in one or more groups to aid in message routing',
         )
-        # Controller options
-        self.add_config_option(
-            section='controller',
-            key='socket_path',
-            default_value='/var/run/receptor_controller.sock',
-            value_type='path',
-            hint='Path to control socket for controller commands.',
-        )
-        self.add_config_option(
-            section='controller',
-            key='listen',
-            default_value=['rnp://0.0.0.0:8888'],
-            value_type='list',
-            hint=(
-                'Set IP address and port to listen on. If not set here or in a config file, the default is rnp://0.0.0.0/0:8888. This option can be '
-                'passed multiple times.'
-            ),
-        )
-        self.add_config_option(
-            section='controller',
-            key='id',
-            long_option='--node-id',
-            default_value='',
-            value_type='str',
-            hint='Set/override controller node identifier. If unspecified here or in a config file, one will be automatically generated.',
-        )
-        self.add_config_option(
-            section='ping',
-            key='peer',
-            default_value='localhost:8888',
-            value_type='str',
-            hint='The peer to relay the ping directive through. If unspecified here or in a config file, localhost:8888 will be used.'
-        )
-        self.add_config_option(
-            section='status',
-            key='peer',
-            default_value='localhost:8888',
-            value_type='str',
-            hint='The peer to access the mesh through. If unspecified here or in a config file, localhost:8888 will be used.'
-        )
-        self.add_config_option(
-            section='controller',
-            key='stats_enable',
-            default_value=None,
-            set_value=True,
-            value_type='bool',
-            hint="Enable Prometheus style stats port",
-        )
-        self.add_config_option(
-            section='controller',
-            key='stats_port',
-            default_value=8889,
-            value_type='int',
-            hint='Port to listen for requests to show stats',
-        )
+        # ping options
         self.add_config_option(
             section='ping',
             key='count',
@@ -304,7 +245,7 @@ class ReceptorConfig:
             long_option='ping_recipient',
             default_value='',
             value_type='str',
-            hint='Node ID of the Receptor node or controller to ping.',
+            hint='Node ID of the Receptor node to ping.',
         )
         # send options
         self.add_config_option(
@@ -327,7 +268,7 @@ class ReceptorConfig:
             long_option='send_recipient',
             default_value='',
             value_type='str',
-            hint='Node ID of the Receptor node or controller to ping.',
+            hint='Node ID of the Receptor node to ping.',
         )
         self.add_config_option(
             section='send',
@@ -361,7 +302,7 @@ class ReceptorConfig:
     def add_config_option(self, section, key, cli=True, short_option='', long_option='',
                           default_value=None, set_value=None, value_type=None, listof=None, subparse=True,
                           hint=None):
-
+        
         config_entry = '%s_%s' % (section, key)
         if cli:
             # for lists, we switch the action from 'store' to 'append'
