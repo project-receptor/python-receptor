@@ -70,7 +70,7 @@ class DurableBuffer:
 
     def _write_manifest(self):
         with open(self._manifest_path, "w") as fp:
-            json.dump(list(self.q._queue), fp, default=encode_date)
+            fp.write(json.dumps(list(self.q._queue), default=encode_date))
 
     def _read_manifest(self):
         try:
