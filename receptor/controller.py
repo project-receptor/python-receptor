@@ -56,9 +56,10 @@ class Controller:
             tasks.append(self.loop.create_task(listener))
         return tasks
 
-    def add_peer(self, peer):
+    def add_peer(self, peer, ws_extra_headers=None):
         logger.info("Connecting to peer {}".format(peer))
-        return self.connection_manager.get_peer(peer, reconnect=not self.receptor.config._is_ephemeral)
+        return self.connection_manager.get_peer(peer, reconnect=not self.receptor.config._is_ephemeral,
+                                                ws_extra_headers=ws_extra_headers)
 
     async def recv(self):
         return await self.receptor.response_queue.get()

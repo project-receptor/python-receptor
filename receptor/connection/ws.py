@@ -28,13 +28,17 @@ class WebSocket(Transport):
         await self.ws.send_bytes(bytes_)
 
 
-async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True):
+async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_extra_headers=None):
     if not loop:
         loop = asyncio.get_event_loop()
 
+    print("------------------------------ In connect --------------------------")
     worker = factory()
     try:
-        async with aiohttp.ClientSession().ws_connect(uri, ssl=ssl_context) as ws:
+        extra_headers = [(key.strip(), value.strip()) for key, sep, value in
+                         [s.partition(':') for s in ws_extra_headers]]
+        async with aiohttp.ClientSession().ws_connect(uri, ssl=ssl_context,
+                                                      headers=extra_headers) as ws:
             log_ssl_detail(ws)
             t = WebSocket(ws)
             await worker.client(t)

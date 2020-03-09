@@ -49,7 +49,7 @@ def run_as_node(config):
             listen_tasks = controller.enable_server(config.node_listen)
             controller.loop.create_task(controller.exit_on_exceptions_in(listen_tasks))
         for peer in config.node_peers:
-            controller.add_peer(peer)
+            controller.add_peer(peer, ws_extra_headers=config.node_ws_extra_headers)
         if config.node_keepalive_interval > 1:
             controller.loop.create_task(node_keepalive())
         controller.loop.create_task(controller.receptor.watch_expire())
@@ -58,8 +58,8 @@ def run_as_node(config):
         cleanup_tmpdir(controller)
 
 
-async def run_oneshot_command(controller, peer, recipient, send_func, read_func):
-    add_peer_task = controller.add_peer(peer)
+async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, send_func, read_func):
+    add_peer_task = controller.add_peer(peer, ws_extra_headers=ws_extra_headers)
     start_wait = time.time()
     while True:
         if add_peer_task and add_peer_task.done() and not add_peer_task.result():
@@ -89,7 +89,8 @@ def run_as_ping(config):
                 yield 0
 
     async def ping_entrypoint():
-        return await run_oneshot_command(controller, config.ping_peer, config.ping_recipient, send_pings, read_responses)
+        return await run_oneshot_command(controller, config.ping_peer, config.ping_recipient,
+                                         config.ping_ws_extra_headers, send_pings, read_responses)
 
     async def read_responses():
         for _ in ping_iter():
@@ -111,7 +112,8 @@ def run_as_ping(config):
 
 def run_as_send(config):
     async def send_entrypoint():
-        return await run_oneshot_command(controller, config.send_peer, config.send_recipient, send_message, read_responses)
+        return await run_oneshot_command(controller, config.send_peer, config.send_recipient,
+                                         config.ws_extra_headers, send_message, read_responses)
 
     async def send_message():
         msg = Message(config.send_recipient, config.send_directive)
@@ -152,7 +154,8 @@ def run_as_send(config):
 def run_as_status(config):
 
     async def status_entrypoint():
-        return await run_oneshot_command(controller, config.status_peer, None, print_status, noop)
+        return await run_oneshot_command(controller, config.status_peer, None,
+                                         config.status_ws_extra_headers, print_status, noop)
 
     async def print_status():
 
