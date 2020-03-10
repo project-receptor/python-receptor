@@ -226,6 +226,13 @@ class ReceptorConfig:
         # ping options
         self.add_config_option(
             section='ping',
+            key='peer',
+            default_value='localhost:8888',
+            value_type='str',
+            hint='The peer to relay the ping directive through. If unspecified here or in a config file, localhost:8888 will be used.'
+        )
+        self.add_config_option(
+            section='ping',
             key='count',
             default_value=4,
             value_type='int',
