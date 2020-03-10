@@ -43,22 +43,20 @@ async def test_chunks(event_loop, tempdir):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Waiting on more durable buffer work")
 async def test_unreadable_file(event_loop, tempdir):
     b = DurableBuffer(tempdir, "test_unreadable_file", event_loop)
     b.q._queue.appendleft("junk")
     await b.put(b"valid data")
-    data = await b.get()
+    ident, data = await b.get()
     assert data == b"valid data"
     assert b.q.empty()
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Waiting on more durable buffer work")
 async def test_deletes_messages(event_loop, tempdir):
     b = DurableBuffer(tempdir, "test_deletes_messages", event_loop)
     await b.put(b"some data")
-    ident = b.q._queue[0]["ident"]
-    assert await b.get() == b"some data"
-    filepath = os.path.join(b._message_path, ident)
+    ident, data = await b.get()
+    assert data == b"some data"
+    filepath = os.path.join(b._message_path, ident["ident"])
     assert not os.path.exists(filepath)
