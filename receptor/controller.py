@@ -37,7 +37,7 @@ class Controller:
             task.cancel()
             with suppress(Exception):
                 await task
-        asyncio.gather(*tasks)
+        await asyncio.gather(*tasks)
         self.loop.stop()
 
     async def exit_on_exceptions_in(self, tasks):

@@ -1,8 +1,9 @@
+import sys
 import datetime
 import heapq
 import logging
-import random
 import uuid
+import itertools
 from collections import defaultdict
 
 from .exceptions import ReceptorBufferError, UnrouteableError
@@ -12,66 +13,165 @@ from .stats import route_counter, route_info
 logger = logging.getLogger(__name__)
 
 
-class MeshRouter:
-    _nodes = set()
-    _edges = set()
-    response_registry = dict()
+class PriorityQueue:
 
-    def __init__(self, receptor):
+    REMOVED = '$$$%%%<removed-task>%%%$$$'
+
+    def __init__(self):
+        self.heap = list()
+        self.entry_finder = dict()
+        self.counter = itertools.count()
+
+    def add_with_priority(self, item, priority):
+        """Adds an item to the queue, or changes the priority of an existing item."""
+        if item in self.entry_finder:
+            self.remove_item(item)
+        count = next(self.counter)
+        entry = [priority, count, item]
+        self.entry_finder[item] = entry
+        heapq.heappush(self.heap, entry)
+
+    def remove_item(self, item):
+        """Removes an item from the queue."""
+        entry = self.entry_finder.pop(item)
+        entry[-1] = self.REMOVED
+
+    def pop_item(self):
+        """Returns the item from the queue with the lowest sort order."""
+        while self.heap:
+            priority, count, item = heapq.heappop(self.heap)
+            if item is not self.REMOVED:
+                del self.entry_finder[item]
+                return item
+        raise KeyError('Pop from empty PriorityQueue')
+
+    def is_empty(self):
+        """Returns True if the queue is empty."""
+        for entry in self.heap:
+            if entry[-1] is not self.REMOVED:
+                return False
+        return True
+
+
+class MeshRouter:
+
+    def __init__(self, receptor=None, node_id=None):
+        self._nodes = set()
+        self._edges = dict()
+        self._neighbors = defaultdict(set)
+        self.response_registry = dict()
         self.receptor = receptor
-        self.node_id = receptor.node_id
+        if node_id:
+            self.node_id = node_id
+        elif receptor:
+            self.node_id = receptor.node_id
+        else:
+            raise RuntimeError('Unknown node_id')
+        self.routing_table = dict()
         route_info.info(dict(edges="()"))
 
     def node_is_known(self, node_id):
         return node_id in self._nodes or node_id == self.node_id
 
-    def find_edge(self, left, right):
-        node_actual = sorted([left, right])
-        for edge in self._edges:
-            if node_actual[0] == edge[0] and node_actual[1] == edge[1]:
-                return edge
-        return None
-
-    def add_edges(self, edges):
-        for edge in edges:
-            existing_edge = self.find_edge(edge[0], edge[1])
-            if existing_edge and existing_edge[2] > edge[2]:
-                self.update_node(edge[0], edge[1], edge[2])
+    def add_or_update_edges(self, edges):
+        """
+        Adds a list of edges supplied as (node1, node2, cost) tuples.
+        Already-existing edges have their cost updated.
+        Supplying a cost of None removes the edge.
+        """
+        for left, right, cost in edges:
+            edge_key = tuple(sorted([left, right]))
+            if edge_key not in self._edges:
+                self._neighbors[left].add(right)
+                self._neighbors[right].add(left)
+                for node in edge_key:
+                    if node != self.node_id:
+                        self._nodes.add(node)
+                self._edges[edge_key] = cost
+            elif cost is None:
+                del self._edges[edge_key]
             else:
-                self.register_edge(*edge)
-
-    def register_edge(self, left, right, cost):
-        if left != self.node_id:
-            self._nodes.add(left)
-        if right != self.node_id:
-            self._nodes.add(right)
-        edge = self.update_node(left, right, cost)
-        if not edge:
-            self._edges.add((*sorted([left, right]), cost))
-        route_info.info(dict(edges=str(self._edges)))
-
-    def update_node(self, left, right, cost):
-        edge = self.find_edge(left, right)
-        if edge:
-            new_edge = (edge[0], edge[1], cost)
-            self._edges.remove(edge)
-            self._edges.add(new_edge)
-            return edge
-        return None
+                self._edges[edge_key] = cost
+        self.update_routing_table()
+        route_info.info(dict(edges=str(set(self.get_edges()))))
 
     def remove_node(self, node):
-        edge = self.find_edge(self.node_id, node)
-        if edge:
-            self._edges.remove(edge)
-            return edge
-        return None
+        """Removes a node and its associated edges."""
+        edge_keys = [ek for ek in self._edges.keys() if ek[0] == node or ek[1] == node]
+        for ek in edge_keys:
+            del self._edges[ek]
+        if node in self._neighbors:
+            for neighbor in self._neighbors[node]:
+                if node in self._neighbors[neighbor]:
+                    self._neighbors[neighbor].remove(node)
+            del self._neighbors[node]
+        if node in self._nodes:
+            self._nodes.remove(node)
+        route_info.info(dict(edges=str(set(self.get_edges()))))
 
     def get_edges(self):
-        """Returns set of edges"""
-        return list(self._edges)
+        """Returns set of edges as a list of (node1, node2, cost) tuples."""
+        return [(ek[0], ek[1], cost) for ek, cost in self._edges.items()]
 
     def get_nodes(self):
-        return self._nodes
+        """Returns the list of nodes known to the router."""
+        return [node for node in self._nodes]
+
+    def get_neighbors(self, node):
+        """Returns the set of nodes which are neighbors of the given node."""
+        return self._neighbors[node]
+
+    def get_edge_cost(self, node1, node2):
+        """Returns the cost of the edge between node1 and node2."""
+        if node1 == node2:
+            return 0
+        node_key = tuple(sorted([node1, node2]))
+        if node_key in self._edges:
+            return self._edges[node_key]
+        else:
+            return None
+
+    def update_routing_table(self):
+        """Dijkstra's algorithm"""
+        Q = PriorityQueue()
+        Q.add_with_priority(self.node_id, 0)
+        cost = {self.node_id: 0}
+        prev = dict()
+
+        for node in self._nodes:
+            cost[node] = sys.maxsize   # poor man's infinity
+            prev[node] = None
+            Q.add_with_priority(node, cost[node])
+
+        while not Q.is_empty():
+            node = Q.pop_item()
+            for neighbor in self.get_neighbors(node):
+                path_cost = cost[node] + self.get_edge_cost(node, neighbor)
+                if path_cost < cost[neighbor]:
+                    cost[neighbor] = path_cost
+                    prev[neighbor] = node
+                    Q.add_with_priority(neighbor, path_cost)
+
+        new_routing_table = dict()
+        for dest in self._nodes:
+            p = dest
+            while prev[p] != self.node_id:
+                p = prev[p]
+            new_routing_table[dest] = (p, cost[dest])
+        self.routing_table = new_routing_table
+
+    def next_hop(self, recipient):
+        """
+        Return the node ID of the next hop for routing a message to the
+        given recipient. If the current node is the recipient or there is
+        no path, then return None.
+        """
+        if recipient == self.node_id:
+            return self.node_id
+        elif recipient in self.routing_table:
+            return self.routing_table[recipient][0]
+        else:
+            return None
 
     async def ping_node(self, node_id, expected_response=True):
         logger.info(f'Sending ping to node {node_id}')
@@ -89,33 +189,6 @@ class MeshRouter:
         )
         return await self.send(ping_envelope, expected_response)
 
-    def find_shortest_path(self, to_node_id):
-        """Implementation of Dijkstra algorithm"""
-        cost_map = defaultdict(list)
-        for left, right, cost in self._edges:
-            cost_map[left].append((cost, right))
-            cost_map[right].append((cost, left))
-
-        heap, seen, mins = [(0, self.node_id, [])], set(), {self.node_id: 0}
-        while heap:
-            (cost, vertex, path) = heapq.heappop(heap)
-            if vertex not in seen:
-                seen.add(vertex)
-                path = [vertex] + path
-                if vertex == to_node_id:
-                    logger.debug(f'Shortest path to {to_node_id} with cost {cost} is {path}')
-                    return path
-                cost_map_for_vertex = cost_map.get(vertex, ())
-                random.shuffle(cost_map_for_vertex)
-                for next_cost, next_vertex in cost_map.get(vertex, ()):
-                    if next_vertex in seen:
-                        continue
-                    min_so_far = mins.get(next_vertex, None)
-                    next_total_cost = cost + next_cost
-                    if min_so_far is None or next_total_cost < min_so_far:
-                        mins[next_vertex] = next_total_cost
-                        heapq.heappush(heap, (next_total_cost, next_vertex, path))
-
     async def forward(self, msg, next_hop):
         """
         Forward a message on to the next hop closer to its destination
@@ -132,18 +205,6 @@ class MeshRouter:
             # TODO: Possible to find another route? This might be a hard failure
         except Exception as e:
             logger.exception("Error trying to forward message to {}: {}".format(next_hop, e))
-
-    def next_hop(self, recipient):
-        """
-        Return the node ID of the next hop for routing a message to the
-        given recipient. If the current node is the recipient or there is
-        no path, then return None.
-        """
-        if recipient == self.node_id:
-            return None
-        path = self.find_shortest_path(recipient)
-        if path:
-            return path[-2]
 
     async def send(self, inner_envelope, expected_response=False):
         """
@@ -163,4 +224,7 @@ class MeshRouter:
         logger.debug(f'Sending {inner_envelope.message_id} to {inner_envelope.recipient} via {next_node_id}')
         if expected_response and inner_envelope.message_type == 'directive':
             self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
-        await self.forward(msg, next_node_id)
+        if next_node_id == self.node_id:
+            await self.receptor.handle_message(msg)
+        else:
+            await self.forward(msg, next_node_id)

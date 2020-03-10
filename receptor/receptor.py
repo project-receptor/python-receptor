@@ -17,6 +17,26 @@ RECEPTOR_DIRECTIVE_NAMESPACE = 'receptor'
 logger = logging.getLogger(__name__)
 
 
+def is_peer_of(edge, node):
+    """If the edge includes the given node, return the other node. Otherwise, return None."""
+    if edge[0] == node:
+        return edge[1]
+    elif edge[1] == node:
+        return edge[0]
+    else:
+        return None
+
+
+def get_peers_of(edges, node):
+    """Gets the peers of a given node"""
+    peers = set()
+    for edge in edges:
+        peer = is_peer_of(edge, node)
+        if peer:
+            peers.add(peer)
+    return peers
+
+
 class Receptor:
     def __init__(self, config, node_id=None, router_cls=None,
                  work_manager_cls=None, response_queue=None):
@@ -119,7 +139,7 @@ class Receptor:
         if id_ is None:
             id_ = protocol_obj.id
 
-        self.router.register_edge(id_, self.node_id, 1)
+        self.router.add_or_update_edges([(id_, self.node_id, 1)])
         if id_ in self.connections:
             self.connections[id_].append(protocol_obj)
         else:
@@ -129,6 +149,14 @@ class Receptor:
     def add_connection(self, protocol_obj):
         self.update_connections(protocol_obj)
 
+    def remove_ephemeral(self, node):
+        logger.debug(f"Removing ephemeral node {node}")
+        if node in self.connections:
+            self.remove_connection_manifest(node)
+        if node in self.node_capabilities:
+            del self.node_capabilities[node]
+        self.router.remove_node(node)
+
     def remove_connection(self, protocol_obj, id_=None, loop=None):
         notify_connections = []
         for connection_node in self.connections:
@@ -136,12 +164,10 @@ class Receptor:
                 logger.info("Removing connection {} for node {}".format(protocol_obj, connection_node))
                 if self.is_ephemeral(connection_node):
                     self.connections[connection_node].remove(protocol_obj)
-                    self.router.remove_node(connection_node)
-                    self.remove_connection_manifest(connection_node)
-                    del self.node_capabilities[connection_node]
+                    self.remove_ephemeral(connection_node)
                 else:
                     self.connections[connection_node].remove(protocol_obj)
-                    self.router.update_node(self.node_id, connection_node, 100)
+                    self.router.add_or_update_edges([(self.node_id, connection_node, 100)])
                     self.update_connection_manifest(connection_node)
             notify_connections += self.connections[connection_node]
         if loop is None:
@@ -177,12 +203,31 @@ class Receptor:
 
     async def handle_route_advertisement(self, data):
         self.node_capabilities[data["id"]] = data["capabilities"]
-        self.router.add_edges(data["edges"])
-        await self.send_route_advertisement(data["edges"], data["seen"])
+        if "node_capabilities" in data:
+            for node, caps in data["node_capabilities"].items():
+                self.node_capabilities[node] = caps
+        old_node_peers = get_peers_of(self.router.get_edges(), data["id"])
+        new_node_peers = get_peers_of(data["edges"], data["id"])
+        removed_peers = old_node_peers - new_node_peers
+        for removed_peer in removed_peers:
+            if self.is_ephemeral(removed_peer):
+                self.remove_ephemeral(removed_peer)
+        accepted_edges = list()
+        for edge in data["edges"]:
+            peer = is_peer_of(edge, self.node_id)
+            if peer:
+                if peer == data["id"]:
+                    accepted_edges.append(edge)
+                else:
+                    logger.debug(f"Excluding edge {edge}")
+            else:
+                accepted_edges.append(edge)
+        self.router.add_or_update_edges(accepted_edges)
+        await self.send_route_advertisement(self.router.get_edges(), data["seen"])
 
-    async def send_route_advertisement(self, edges=None, seen=[]):
+    async def send_route_advertisement(self, edges=None, seen=None):
         edges = edges or self.router.get_edges()
-        seen = set(seen)
+        seen = set(seen) if seen else set()
         logger.debug("Emitting Route Advertisements, excluding {}".format(seen))
         destinations = set(self.connections) - seen
         seens = list(seen | destinations | {self.node_id})
@@ -195,6 +240,7 @@ class Receptor:
                     "cmd": "ROUTE",
                     "id": self.node_id,
                     "capabilities": self.work_manager.get_capabilities(),
+                    "node_capabilities": self.node_capabilities,
                     "groups": self.config.node_groups,
                     "edges": edges,
                     "seen": seens
@@ -251,8 +297,9 @@ class Receptor:
             eof=self.handle_response,
         )
         messages_received_counter.inc()
-        next_hop = self.router.next_hop(msg.header["recipient"])
-        if next_hop:
+
+        if msg.header["recipient"] != self.node_id:
+            next_hop = self.router.next_hop(msg.header["recipient"])
             return await self.router.forward(msg, next_hop)
 
         inner = await envelope.Inner.deserialize(self, msg.payload)
