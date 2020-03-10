@@ -17,12 +17,14 @@ test_networks = [
     ),
 ]
 
+
 @pytest.mark.parametrize("edges, expected_next_hops, expected_neighbors", test_networks)
 def test_next_hop(edges, expected_next_hops, expected_neighbors):
     for node_id, remote, enh in expected_next_hops:
         r = MeshRouter(node_id=node_id)
         r.add_or_update_edges(edges)
         assert r.next_hop(remote) == enh
+
 
 @pytest.mark.parametrize("edges, expected_next_hops, expected_neighbors", test_networks)
 def test_neighbors(edges, expected_next_hops, expected_neighbors):
