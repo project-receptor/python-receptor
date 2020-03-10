@@ -112,7 +112,9 @@ class WorkManager:
                 code=1,
                 message_type="eof",
             )
-            self.remove_work(inner_env)
+
+        self.remove_work(inner_env)
+
         if eof_response is None:
             eof_response = envelope.Inner.make_response(
                 receptor=self.receptor,
