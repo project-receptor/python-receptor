@@ -133,7 +133,7 @@ class Receptor:
                 if "cmd" in data.header and data.header["cmd"] == "ROUTE":
                     await self.handle_route_advertisement(data.header)
                 else:
-                    await self.handle_message(data)
+                    asyncio.ensure_future(self.handle_message(data))
 
     def update_connections(self, protocol_obj, id_=None):
         if id_ is None:
