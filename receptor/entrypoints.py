@@ -110,22 +110,26 @@ def run_as_ping(config):
 
 
 def run_as_send(config):
+    msg_ids = set()
+
     async def send_entrypoint():
         return await run_oneshot_command(controller, config.send_peer, config.send_recipient, send_message, read_responses)
 
     async def send_message():
-        msg = Message(config.send_recipient, config.send_directive)
-        if config.send_payload == "-":
-            msg.data(sys.stdin.buffer.read())
-        elif os.path.exists(config.send_payload):
-            msg.file(config.send_payload)
-        else:
-            if isinstance(config.send_payload, str):
-                send_payload = config.send_payload.encode()
+        for i in range(config.send_repeats):
+            msg = Message(config.send_recipient, config.send_directive)
+            if config.send_payload == "-":
+                msg.data(sys.stdin.buffer.read())
+            elif os.path.exists(config.send_payload):
+                msg.file(config.send_payload)
             else:
-                send_payload = config.send_payload
-            msg.data(send_payload)
-        await controller.send(msg)
+                if isinstance(config.send_payload, str):
+                    send_payload = config.send_payload.encode()
+                else:
+                    send_payload = config.send_payload
+                msg.data(send_payload)
+            msg_id = await controller.send(msg)
+            msg_ids.add(str(msg_id))
 
     async def read_responses():
         while True:
@@ -138,7 +142,10 @@ def run_as_send(config):
                 if message.code != 0:
                     logger.error(f'EOF was an error result: {message.raw_payload}')
                     print(f'ERROR: {message.raw_payload}')
-                break
+                if message.in_response_to in msg_ids:
+                    msg_ids.remove(message.in_response_to)
+                if not msg_ids:
+                    break
             else:
                 logger.warning(f'Received unknown message type {message.message_type}')
     try:

@@ -264,6 +264,13 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section='send',
+            key='repeats',
+            default_value='1',
+            value_type='int',
+            hint='Number of times to repeatedly send the same message. Defaults to 1.',
+        )
+        self.add_config_option(
+            section='send',
             key='recipient',
             long_option='send_recipient',
             default_value='',
