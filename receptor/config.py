@@ -278,6 +278,14 @@ class ReceptorConfig:
             value_type='str',
             hint='Payload of the directive to send. Use - for stdin or give the path to a file to transmit the file contents.',
         )
+        # status options
+        self.add_config_option(
+            section='status',
+            key='peer',
+            default_value='localhost:8888',
+            value_type='str',
+            hint='The peer to access the mesh through. If unspecified here or in a config file, localhost:8888 will be used.'
+        )
         # Component options. These are also only used in a config section
         # like auth, so they also set `subparse=False`.
         self.add_config_option(
