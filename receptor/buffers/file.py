@@ -1,32 +1,15 @@
 import asyncio
 import datetime
-import json
 import logging
 import os
 import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-
-import dateutil.parser
+from json.decoder import JSONDecodeError
+from .. import serde as json
 
 logger = logging.getLogger(__name__)
 pool = ThreadPoolExecutor()
-
-
-def encode_date(obj):
-    if isinstance(obj, datetime.datetime):
-        return {
-            "_type": "datetime.datetime",
-            "value": obj.isoformat(),
-        }
-    raise TypeError
-
-
-def decode_date(o):
-    type_ = o.get("_type")
-    if type_ != "datetime.datetime":
-        return o
-    return dateutil.parser.parse(o["value"])
 
 
 class DurableBuffer:
@@ -68,15 +51,15 @@ class DurableBuffer:
 
     def _write_manifest(self):
         with open(self._manifest_path, "w") as fp:
-            fp.write(json.dumps(list(self.q._queue), default=encode_date))
+            fp.write(json.dumps(list(self.q._queue)))
 
     def _read_manifest(self):
         try:
             with open(self._manifest_path, "r") as fp:
-                return json.load(fp, object_hook=decode_date)
+                return json.load(fp)
         except FileNotFoundError:
             return []
-        except json.decoder.JSONDecodeError:
+        except JSONDecodeError:
             with open(self._manifest_path, "r") as fp:
                 logger.error("failed to decode manifest: %s", fp.read())
             raise

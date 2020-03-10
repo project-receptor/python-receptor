@@ -7,6 +7,7 @@ import time
 from prometheus_client import start_http_server
 
 from .controller import Controller
+from . import serde as json
 
 logger = logging.getLogger(__name__)
 

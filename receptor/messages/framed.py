@@ -19,7 +19,6 @@ FramedMessage--------------------------------
 import asyncio
 import functools
 import io
-import json
 import logging
 import os
 import struct
@@ -28,6 +27,7 @@ import uuid
 from enum import IntEnum
 
 from ..exceptions import ReceptorRuntimeError
+from .. import serde as json
 
 logger = logging.getLogger(__name__)
 

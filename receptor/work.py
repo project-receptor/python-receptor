@@ -90,7 +90,7 @@ class WorkManager:
                                 recipient=message.header["sender"],
                                 in_response_to=message.msg_id,
                                 serial=serial,
-                                timestamp=datetime.datetime.now().isoformat()
+                                timestamp=datetime.datetime.utcnow()
                             ),
                             payload=FileBackedBuffer.from_data(response)
                         )
@@ -111,7 +111,7 @@ class WorkManager:
                     in_response_to=message.msg_id,
                     serial=serial+1,
                     code=1,
-                    timestamp=datetime.datetime.now().isoformat(),
+                    timestamp=datetime.datetime.utcnow(),
                     eof=True
                 ),
                 payload=FileBackedBuffer.from_data(str(e))
@@ -125,7 +125,7 @@ class WorkManager:
                     in_response_to=message.msg_id,
                     serial=serial+1,
                     code=0,
-                    timestamp=datetime.datetime.now().isoformat(),
+                    timestamp=datetime.datetime.utcnow(),
                     eof=True
                 )
             )

@@ -35,7 +35,7 @@ class Control:
         logger.info(f'Received ping from {msg.header["sender"]}')
         yield dict(
             initial_time=msg.header["timestamp"],
-            response_time=str(datetime.datetime.utcnow()),
+            response_time=datetime.datetime.utcnow(),
             active_work=receptor.work_manager.get_work())
 
 

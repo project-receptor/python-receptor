@@ -174,8 +174,8 @@ class MeshRouter:
             return None
 
     async def ping_node(self, node_id, expected_response=True):
-        logger.info(f'Sending ping to node {node_id}')
-        now = datetime.datetime.utcnow().isoformat()
+        now = datetime.datetime.utcnow()
+        logger.info(f'Sending ping to node {node_id}, timestamp={now}')
         message = FramedMessage(header=dict(
             sender=self.node_id,
             recipient=node_id,

@@ -450,6 +450,7 @@ wait-for = "^1.1.1"
 reference = "a52f0b2ff37f6e68f9e533487f3a5933bc9901ef"
 type = "git"
 url = "https://github.com/project-receptor/affinity.git"
+
 [[package]]
 category = "main"
 description = "Python HTTP for Humans."
@@ -640,7 +641,7 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-content-hash = "e8ca9c06060e50b1f5b5e4018f15d8ee64b4f61c1eb324d1491a92da11853195"
+content-hash = "1ac23496747a7f52e6dbf097f022bf79e39fee679ddb487de00f74ef0baa2e0e"
 python-versions = "^3.6"
 
 [metadata.files]
