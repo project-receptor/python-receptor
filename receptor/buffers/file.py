@@ -6,6 +6,7 @@ import uuid
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from json.decoder import JSONDecodeError
+
 from .. import serde as json
 
 logger = logging.getLogger(__name__)
@@ -39,9 +40,13 @@ class DurableBuffer:
         await self.q.put(item)
         self._manifest_dirty = True
 
+    async def put_ident(self, ident):
+        await self.q.put(ident)
+        self._manifest_dirty = True
+
     async def get(self, handle_only=False, delete=True):
         while True:
-            msg = await self.q.get()
+            ident = await self.q.get()
             self._manifest_dirty = True
             try:
                 f = await self._get_file(ident["ident"], handle_only=handle_only, delete=delete)

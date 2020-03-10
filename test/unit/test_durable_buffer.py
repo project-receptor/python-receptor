@@ -19,7 +19,8 @@ def tempdir():
 async def test_create(event_loop, tempdir):
     b = DurableBuffer(tempdir, "test_create", event_loop)
     await b.put(b"some data")
-    assert await b.get() == b"some data"
+    ident, data = await b.get()
+    assert data == b"some data"
 
 
 # this test is flaky because the manifest is written on a timer
@@ -35,21 +36,24 @@ async def test_manifest(event_loop, tempdir):
     await b.put(b"three")
     assert b.q.qsize() == 3
 
-    await asyncio.sleep(0.2)
+    await asyncio.sleep(0.3)
 
     assert len(b._read_manifest()) == 3
 
 
 @pytest.mark.asyncio
 async def test_chunks(event_loop, tempdir):
-    b = DurableBuffer(tempdir, "test_chunks", event_loop)
+    b = DurableBuffer(tempdir, "test_chunks", event_loop, write_time=0.0)
     await b.put((b"one", b"two", b"three"))
     assert b.q.qsize() == 1
 
+    await asyncio.sleep(0.3)
+
     assert len(b._read_manifest()) == 1
 
-    data = await b.get()
+    ident, data = await b.get()
     assert data == b"onetwothree"
+
 
 @pytest.mark.asyncio
 @pytest.mark.skip(reason="Waiting on more durable buffer work")

@@ -49,19 +49,22 @@ class BridgeQueue(queue.Queue):
 
     sentinel = object()
 
-    async def __aiter__(self):
+    def __aiter__(self):
         return self
 
     async def __anext__(self):
+        sleep_time = 0.0
         while True:
             try:
                 item = self.get_nowait()
+                sleep_time = 0.0
                 if item is self.sentinel:
                     raise StopAsyncIteration
                 else:
                     return item
             except queue.Empty:
-                await asyncio.sleep(0.0)
+                await asyncio.sleep(sleep_time)
+                sleep_time = min(1.0, sleep_time + 0.1)
 
     @classmethod
     def one(cls, item):
