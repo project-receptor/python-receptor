@@ -302,7 +302,6 @@ class ReceptorConfig:
     def add_config_option(self, section, key, cli=True, short_option='', long_option='',
                           default_value=None, set_value=None, value_type=None, listof=None, subparse=True,
                           hint=None):
-        
         config_entry = '%s_%s' % (section, key)
         if cli:
             # for lists, we switch the action from 'store' to 'append'
