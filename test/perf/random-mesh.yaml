@@ -2,7 +2,6 @@
 nodes:
   controller:
     connections: []
-    controller: true
     listen: receptor://127.0.0.1:8889
     name: controller
     stats_enable: true
@@ -10,7 +9,6 @@ nodes:
   node1:
     connections:
       - controller
-    controller: false
     listen: receptor://127.0.0.1:11111
     name: node1
     stats_enable: true
@@ -19,7 +17,6 @@ nodes:
     connections:
       - node12
       - node4
-    controller: false
     listen: null
     name: node10
     stats_enable: true
@@ -27,7 +24,6 @@ nodes:
   node11:
     connections:
       - node1
-    controller: false
     listen: null
     name: node11
     stats_enable: true
@@ -36,7 +32,6 @@ nodes:
     connections:
       - node11
       - controller
-    controller: false
     listen: null
     name: node12
     stats_enable: true
@@ -44,7 +39,6 @@ nodes:
   node2:
     connections:
       - node1
-    controller: false
     listen: null
     name: node2
     stats_enable: true
@@ -53,7 +47,6 @@ nodes:
     connections:
       - node6
       - node4
-    controller: false
     listen: null
     name: node3
     stats_enable: true
@@ -62,7 +55,6 @@ nodes:
     connections:
       - node7
       - node2
-    controller: false
     listen: null
     name: node4
     stats_enable: true
@@ -71,7 +63,6 @@ nodes:
     connections:
       - node8
       - node12
-    controller: false
     listen: null
     name: node5
     stats_enable: true
@@ -80,7 +71,6 @@ nodes:
     connections:
       - node10
       - node3
-    controller: false
     listen: null
     name: node6
     stats_enable: true
@@ -89,7 +79,6 @@ nodes:
     connections:
       - node3
       - node1
-    controller: false
     listen: null
     name: node7
     stats_enable: true
@@ -97,7 +86,6 @@ nodes:
   node8:
     connections:
       - node1
-    controller: false
     listen: null
     name: node8
     stats_enable: true
@@ -106,7 +94,6 @@ nodes:
     connections:
       - node10
       - node5
-    controller: false
     listen: null
     name: node9
     stats_enable: true
