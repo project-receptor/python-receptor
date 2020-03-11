@@ -472,8 +472,7 @@ class ReceptorConfig:
                 if not isinstance(entry.value, list):
                     entry.value = entry.value.split(',')
                 if entry.value_type == 'key-value-list':
-                    entry.value = [(key.strip(), value.strip()) for key, sep, value in
-                         [s.partition(':') for s in entry.value]]
+                    entry.value = [(key.strip(), value.strip()) for key, sep, value in [s.partition(':') for s in entry.value]]
                 else:
                     for idx, value in enumerate(entry.value):
                         entry.value[idx] = self._enforce_value_type(value, entry.listof)
