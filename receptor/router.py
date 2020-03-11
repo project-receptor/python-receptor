@@ -1,4 +1,5 @@
 import sys
+import asyncio
 import datetime
 import heapq
 import logging
@@ -225,6 +226,6 @@ class MeshRouter:
         if expected_response and inner_envelope.message_type == 'directive':
             self.response_registry[inner_envelope.message_id] = dict(message_sent_time=inner_envelope.timestamp)
         if next_node_id == self.node_id:
-            await self.receptor.handle_message(msg)
+            asyncio.ensure_future(self.receptor.handle_message(msg))
         else:
             await self.forward(msg, next_node_id)

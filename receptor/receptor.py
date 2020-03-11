@@ -133,7 +133,7 @@ class Receptor:
                 if "cmd" in data.header and data.header["cmd"] == "ROUTE":
                     await self.handle_route_advertisement(data.header)
                 else:
-                    await self.handle_message(data)
+                    asyncio.ensure_future(self.handle_message(data))
 
     def update_connections(self, protocol_obj, id_=None):
         if id_ is None:
@@ -291,21 +291,24 @@ class Receptor:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
 
     async def handle_message(self, msg):
-        handlers = dict(
-            directive=self.handle_directive,
-            response=self.handle_response,
-            eof=self.handle_response,
-        )
-        messages_received_counter.inc()
+        try:
+            handlers = dict(
+                directive=self.handle_directive,
+                response=self.handle_response,
+                eof=self.handle_response,
+            )
+            messages_received_counter.inc()
 
-        if msg.header["recipient"] != self.node_id:
-            next_hop = self.router.next_hop(msg.header["recipient"])
-            return await self.router.forward(msg, next_hop)
+            if msg.header["recipient"] != self.node_id:
+                next_hop = self.router.next_hop(msg.header["recipient"])
+                return await self.router.forward(msg, next_hop)
 
-        inner = await envelope.Inner.deserialize(self, msg.payload)
+            inner = await envelope.Inner.deserialize(self, msg.payload)
 
-        if inner.message_type not in handlers:
-            raise exceptions.UnknownMessageType(
-                f'Unknown message type: {inner.message_type}')
+            if inner.message_type not in handlers:
+                raise exceptions.UnknownMessageType(
+                    f'Unknown message type: {inner.message_type}')
 
-        await handlers[inner.message_type](inner)
+            await handlers[inner.message_type](inner)
+        except Exception:
+            logger.exception("handle_message")

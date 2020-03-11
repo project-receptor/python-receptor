@@ -99,7 +99,7 @@ class WorkManager:
                     # Calling result() will raise any exceptions from the worker thread, on this thread
                     work_exec.result()
                     break
-                await asyncio.sleep(0)
+                await asyncio.sleep(0.05)
         except Exception as e:
             logger.error(f'Error encountered while handling the response, replying with an error message ({e})')
             logger.error(traceback.format_tb(e.__traceback__))
