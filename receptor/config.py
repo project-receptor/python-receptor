@@ -186,15 +186,6 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section='node',
-            key='ws_extra_headers',
-            long_option='--ws_extra_header',
-            default_value=[],
-            value_type='key-value-list',
-            listof='str',
-            hint='Set additional headers to provide when connecting to websocket peers.',
-        )
-        self.add_config_option(
-            section='node',
             key='server_disable',
             default_value=False,
             value_type='bool',
@@ -238,7 +229,6 @@ class ReceptorConfig:
             long_option='--ws_extra_header',
             default_value=[],
             value_type='key-value-list',
-            listof='str',
             hint='Set additional headers to provide when connecting to websocket peers.',
         )
         # ping options
@@ -271,7 +261,6 @@ class ReceptorConfig:
             long_option='--ws_extra_header',
             default_value=[],
             value_type='key-value-list',
-            listof='str',
             hint='Set additional headers to provide when connecting to websocket peers.',
         )
         # send options
@@ -311,7 +300,6 @@ class ReceptorConfig:
             long_option='--ws_extra_header',
             default_value=[],
             value_type='list',
-            listof='str',
             hint='Set additional headers to provide when connecting to websocket peers.',
         )
         # status options
