@@ -47,7 +47,7 @@ class Manager:
         else:
             raise RuntimeError(f"Unknown URL scheme {service.scheme}")
 
-    def get_peer(self, peer, reconnect=True):
+    def get_peer(self, peer, reconnect=True, ws_extra_headers=None):
         service = parse_peer(peer)
         ssl_context = self.ssl_context_factory("client") if service.scheme in ("rnps", "wss") else None
         if service.scheme in ("rnp", "rnps"):
@@ -55,6 +55,6 @@ class Manager:
                                          self.loop, ssl_context, reconnect))
         elif service.scheme in ("ws", "wss"):
             return self.loop.create_task(ws.connect(peer, self.factory, self.loop,
-                                         ssl_context, reconnect))
+                                         ssl_context, reconnect, ws_extra_headers))
         else:
             raise RuntimeError(f"Unknown URL scheme {service.scheme}")

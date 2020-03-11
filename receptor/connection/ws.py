@@ -28,13 +28,14 @@ class WebSocket(Transport):
         await self.ws.send_bytes(bytes_)
 
 
-async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True):
+async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_extra_headers=None):
     if not loop:
         loop = asyncio.get_event_loop()
 
     worker = factory()
     try:
-        async with aiohttp.ClientSession().ws_connect(uri, ssl=ssl_context) as ws:
+        async with aiohttp.ClientSession().ws_connect(uri, ssl=ssl_context,
+                                                      headers=ws_extra_headers) as ws:
             log_ssl_detail(ws)
             t = WebSocket(ws)
             await worker.client(t)

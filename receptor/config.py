@@ -223,6 +223,14 @@ class ReceptorConfig:
             listof='str',
             hint='Define membership in one or more groups to aid in message routing',
         )
+        self.add_config_option(
+            section='node',
+            key='ws_extra_headers',
+            long_option='--ws_extra_header',
+            default_value=[],
+            value_type='key-value-list',
+            hint='Set additional headers to provide when connecting to websocket peers.',
+        )
         # ping options
         self.add_config_option(
             section='ping',
@@ -246,6 +254,14 @@ class ReceptorConfig:
             default_value='',
             value_type='str',
             hint='Node ID of the Receptor node to ping.',
+        )
+        self.add_config_option(
+            section='ping',
+            key='ws_extra_headers',
+            long_option='--ws_extra_header',
+            default_value=[],
+            value_type='key-value-list',
+            hint='Set additional headers to provide when connecting to websocket peers.',
         )
         # send options
         self.add_config_option(
@@ -278,6 +294,14 @@ class ReceptorConfig:
             value_type='str',
             hint='Payload of the directive to send. Use - for stdin or give the path to a file to transmit the file contents.',
         )
+        self.add_config_option(
+            section='send',
+            key='ws_extra_headers',
+            long_option='--ws_extra_header',
+            default_value=[],
+            value_type='list',
+            hint='Set additional headers to provide when connecting to websocket peers.',
+        )
         # status options
         self.add_config_option(
             section='status',
@@ -285,6 +309,15 @@ class ReceptorConfig:
             default_value='localhost:8888',
             value_type='str',
             hint='The peer to access the mesh through. If unspecified here or in a config file, localhost:8888 will be used.'
+        )
+        self.add_config_option(
+            section='status',
+            key='ws_extra_headers',
+            long_option='--ws_extra_header',
+            default_value=[],
+            value_type='key-value-list',
+            listof='str',
+            hint='Set additional headers to provide when connecting to websocket peers.',
         )
         # Component options. These are also only used in a config section
         # like auth, so they also set `subparse=False`.
@@ -314,7 +347,7 @@ class ReceptorConfig:
         if cli:
             # for lists, we switch the action from 'store' to 'append'
             action = 'store'
-            if value_type == 'list':
+            if value_type == 'list' or value_type == 'key-value-list':
                 action = 'append'
             if value_type == 'bool':
                 action = 'store_const'
@@ -423,11 +456,14 @@ class ReceptorConfig:
 
     def _enforce_entry_type(self, entry):
         if entry.value is not None:
-            if entry.value_type == 'list':
+            if entry.value_type == 'list' or entry.value_type == 'key-value-list':
                 if not isinstance(entry.value, list):
                     entry.value = entry.value.split(',')
-                for idx, value in enumerate(entry.value):
-                    entry.value[idx] = self._enforce_value_type(value, entry.listof)
+                if entry.value_type == 'key-value-list':
+                    entry.value = [(key.strip(), value.strip()) for key, sep, value in [s.partition(':') for s in entry.value]]
+                else:
+                    for idx, value in enumerate(entry.value):
+                        entry.value[idx] = self._enforce_value_type(value, entry.listof)
             else:
                 entry.value = self._enforce_value_type(entry.value, entry.value_type)
 
