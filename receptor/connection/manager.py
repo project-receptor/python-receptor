@@ -19,7 +19,7 @@ def parse_peer(peer, role):
         peer = peer.replace("receptor", "rnp", 1)
     parsed_peer = urlparse(peer)
     if (parsed_peer.scheme not in default_scheme_ports) or \
-            (role=='server' and (parsed_peer.path or parsed_peer.params or parsed_peer.query or parsed_peer.fragment)):
+            (role == 'server' and (parsed_peer.path or parsed_peer.params or parsed_peer.query or parsed_peer.fragment)):
         raise RuntimeError(f"Invalid Receptor peer specified: {peer}")
 
     return parsed_peer
