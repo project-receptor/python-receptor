@@ -32,7 +32,6 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_
     if not loop:
         loop = asyncio.get_event_loop()
 
-    print("------------------------------ In connect --------------------------")
     worker = factory()
     try:
         extra_headers = [(key.strip(), value.strip()) for key, sep, value in
