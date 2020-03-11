@@ -34,10 +34,8 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_
 
     worker = factory()
     try:
-        extra_headers = [(key.strip(), value.strip()) for key, sep, value in
-                         [s.partition(':') for s in ws_extra_headers]]
         async with aiohttp.ClientSession().ws_connect(uri, ssl=ssl_context,
-                                                      headers=extra_headers) as ws:
+                                                      headers=ws_extra_headers) as ws:
             log_ssl_detail(ws)
             t = WebSocket(ws)
             await worker.client(t)

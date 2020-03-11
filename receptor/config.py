@@ -186,6 +186,15 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section='node',
+            key='ws_extra_headers',
+            long_option='--ws_extra_header',
+            default_value=[],
+            value_type='key-value-list',
+            listof='str',
+            hint='Set additional headers to provide when connecting to websocket peers.',
+        )
+        self.add_config_option(
+            section='node',
             key='server_disable',
             default_value=False,
             value_type='bool',
@@ -228,7 +237,7 @@ class ReceptorConfig:
             key='ws_extra_headers',
             long_option='--ws_extra_header',
             default_value=[],
-            value_type='list',
+            value_type='key-value-list',
             listof='str',
             hint='Set additional headers to provide when connecting to websocket peers.',
         )
@@ -261,7 +270,7 @@ class ReceptorConfig:
             key='ws_extra_headers',
             long_option='--ws_extra_header',
             default_value=[],
-            value_type='list',
+            value_type='key-value-list',
             listof='str',
             hint='Set additional headers to provide when connecting to websocket peers.',
         )
@@ -318,7 +327,7 @@ class ReceptorConfig:
             key='ws_extra_headers',
             long_option='--ws_extra_header',
             default_value=[],
-            value_type='list',
+            value_type='key-value-list',
             listof='str',
             hint='Set additional headers to provide when connecting to websocket peers.',
         )
@@ -350,7 +359,7 @@ class ReceptorConfig:
         if cli:
             # for lists, we switch the action from 'store' to 'append'
             action = 'store'
-            if value_type == 'list':
+            if value_type == 'list' or value_type == 'key-value-list':
                 action = 'append'
             if value_type == 'bool':
                 action = 'store_const'
@@ -459,11 +468,15 @@ class ReceptorConfig:
 
     def _enforce_entry_type(self, entry):
         if entry.value is not None:
-            if entry.value_type == 'list':
+            if entry.value_type == 'list' or entry.value_type == 'key-value-list':
                 if not isinstance(entry.value, list):
                     entry.value = entry.value.split(',')
-                for idx, value in enumerate(entry.value):
-                    entry.value[idx] = self._enforce_value_type(value, entry.listof)
+                if entry.value_type == 'key-value-list':
+                    entry.value = [(key.strip(), value.strip()) for key, sep, value in
+                         [s.partition(':') for s in entry.value]]
+                else:
+                    for idx, value in enumerate(entry.value):
+                        entry.value[idx] = self._enforce_value_type(value, entry.listof)
             else:
                 entry.value = self._enforce_value_type(entry.value, entry.value_type)
 
