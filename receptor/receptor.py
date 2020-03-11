@@ -291,21 +291,24 @@ class Receptor:
             logger.warning(f'Received response to {in_response_to} but no record of sent message.')
 
     async def handle_message(self, msg):
-        handlers = dict(
-            directive=self.handle_directive,
-            response=self.handle_response,
-            eof=self.handle_response,
-        )
-        messages_received_counter.inc()
-
-        if msg.header["recipient"] != self.node_id:
-            next_hop = self.router.next_hop(msg.header["recipient"])
-            return await self.router.forward(msg, next_hop)
-
-        inner = await envelope.Inner.deserialize(self, msg.payload)
-
-        if inner.message_type not in handlers:
-            raise exceptions.UnknownMessageType(
-                f'Unknown message type: {inner.message_type}')
-
-        await handlers[inner.message_type](inner)
+        try:
+            handlers = dict(
+                directive=self.handle_directive,
+                response=self.handle_response,
+                eof=self.handle_response,
+            )
+            messages_received_counter.inc()
+    
+            if msg.header["recipient"] != self.node_id:
+                next_hop = self.router.next_hop(msg.header["recipient"])
+                return await self.router.forward(msg, next_hop)
+    
+            inner = await envelope.Inner.deserialize(self, msg.payload)
+    
+            if inner.message_type not in handlers:
+                raise exceptions.UnknownMessageType(
+                    f'Unknown message type: {inner.message_type}')
+    
+            await handlers[inner.message_type](inner)
+        except Exception:
+            logger.exception("handle_message")
