@@ -12,14 +12,14 @@ default_scheme_ports = {
 }
 
 
-def parse_peer(peer):
+def parse_peer(peer, role):
     if "://" not in peer:
         peer = f"rnp://{peer}"
     if peer.startswith("receptor://"):
         peer = peer.replace("receptor", "rnp", 1)
     parsed_peer = urlparse(peer)
-    if parsed_peer.path or parsed_peer.params or parsed_peer.query or \
-            parsed_peer.fragment or (parsed_peer.scheme not in default_scheme_ports):
+    if (parsed_peer.scheme not in default_scheme_ports) or \
+            (role=='server' and (parsed_peer.path or parsed_peer.params or parsed_peer.query or parsed_peer.fragment)):
         raise RuntimeError(f"Invalid Receptor peer specified: {peer}")
 
     return parsed_peer
@@ -32,7 +32,7 @@ class Manager:
         self.loop = loop or asyncio.get_event_loop()
 
     def get_listener(self, listen_url):
-        service = parse_peer(listen_url)
+        service = parse_peer(listen_url, 'server')
         ssl_context = self.ssl_context_factory("server") if service.scheme in ("rnps", "wss") else None
         if service.scheme in ("rnp", "rnps"):
             return asyncio.start_server(
@@ -52,7 +52,7 @@ class Manager:
             raise RuntimeError(f"Unknown URL scheme {service.scheme}")
 
     def get_peer(self, peer, reconnect=True, ws_extra_headers=None):
-        service = parse_peer(peer)
+        service = parse_peer(peer, 'client')
         ssl_context = self.ssl_context_factory("client") if service.scheme in ("rnps", "wss") else None
         if service.scheme in ("rnp", "rnps"):
             return self.loop.create_task(sock.connect(service.hostname, service.port, self.factory,
