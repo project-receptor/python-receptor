@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class PriorityQueue:
 
-    REMOVED = '$$$%%%<removed-task>%%%$$$'
+    REMOVED = "$$$%%%<removed-task>%%%$$$"
 
     def __init__(self):
         self.heap = list()
@@ -43,7 +43,7 @@ class PriorityQueue:
             if item is not self.REMOVED:
                 del self.entry_finder[item]
                 return item
-        raise KeyError('Pop from empty PriorityQueue')
+        raise KeyError("Pop from empty PriorityQueue")
 
     def is_empty(self):
         """Returns True if the queue is empty."""
@@ -54,7 +54,6 @@ class PriorityQueue:
 
 
 class MeshRouter:
-
     def __init__(self, receptor=None, node_id=None):
         self._nodes = set()
         self._edges = dict()
@@ -66,7 +65,7 @@ class MeshRouter:
         elif receptor:
             self.node_id = receptor.node_id
         else:
-            raise RuntimeError('Unknown node_id')
+            raise RuntimeError("Unknown node_id")
         self.routing_table = dict()
         route_info.info(dict(edges="()"))
 
@@ -139,7 +138,7 @@ class MeshRouter:
         prev = dict()
 
         for node in self._nodes:
-            cost[node] = sys.maxsize   # poor man's infinity
+            cost[node] = sys.maxsize  # poor man's infinity
             prev[node] = None
             Q.add_with_priority(node, cost[node])
 
@@ -175,14 +174,16 @@ class MeshRouter:
 
     async def ping_node(self, node_id, expected_response=True):
         now = datetime.datetime.utcnow()
-        logger.info(f'Sending ping to node {node_id}, timestamp={now}')
-        message = FramedMessage(header=dict(
-            sender=self.node_id,
-            recipient=node_id,
-            timestamp=now,
-            directive='receptor:ping',
-            ttl=15
-        ))
+        logger.info(f"Sending ping to node {node_id}, timestamp={now}")
+        message = FramedMessage(
+            header=dict(
+                sender=self.node_id,
+                recipient=node_id,
+                timestamp=now,
+                directive="receptor:ping",
+                ttl=15,
+            )
+        )
         return await self.send(message, expected_response)
 
     async def forward(self, msg, next_hop):
@@ -191,12 +192,14 @@ class MeshRouter:
         """
         buffer_obj = self.receptor.buffer_mgr[next_hop]
         msg.header["route_list"].append(self.node_id)
-        logger.debug(f'Forwarding frame {msg.msg_id} to {next_hop}')
+        logger.debug(f"Forwarding frame {msg.msg_id} to {next_hop}")
         try:
             route_counter.inc()
             await buffer_obj.put(msg)
         except ReceptorBufferError as e:
-            logger.exception("Receptor Buffer Write Error forwarding message to {}: {}".format(next_hop, e))
+            logger.exception(
+                "Receptor Buffer Write Error forwarding message to {}: {}".format(next_hop, e)
+            )
             # TODO: Possible to find another route? This might be a hard failure
         except Exception as e:
             logger.exception("Error trying to forward message to {}: {}".format(next_hop, e))
@@ -209,17 +212,16 @@ class MeshRouter:
         next_node_id = self.next_hop(recipient)
         if not next_node_id:
             # TODO: This probably needs to emit an error response
-            raise UnrouteableError(f'No route found to {recipient}')
+            raise UnrouteableError(f"No route found to {recipient}")
 
         # TODO: Not signing/serializing in order to finish buffered output work
 
-        message.header.update({
-            "sender": self.node_id,
-            "route_list": [self.node_id]
-        })
-        logger.debug(f'Sending {message.msg_id} to {recipient} via {next_node_id}')
+        message.header.update({"sender": self.node_id, "route_list": [self.node_id]})
+        logger.debug(f"Sending {message.msg_id} to {recipient} via {next_node_id}")
         if expected_response and "directive" in message.header:
-            self.response_registry[message.msg_id] = dict(message_sent_time=message.header["timestamp"])
+            self.response_registry[message.msg_id] = dict(
+                message_sent_time=message.header["timestamp"]
+            )
         if next_node_id == self.node_id:
             asyncio.ensure_future(self.receptor.handle_message(message))
         else:

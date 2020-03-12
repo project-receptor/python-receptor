@@ -78,7 +78,7 @@ class Frame:
 
     @classmethod
     def from_data(cls, data):
-        return cls.deserialize(data[:Frame.fmt.size]), data[Frame.fmt.size:]
+        return cls.deserialize(data[: Frame.fmt.size]), data[Frame.fmt.size :]
 
     @classmethod
     def wrap(cls, data, type_=Types.PAYLOAD, msg_id=None):
@@ -102,7 +102,6 @@ def join_uuid(hi, lo):
 
 
 class FileBackedBuffer:
-
     def __init__(self, fp, length=0):
         self.length = length
         self.fp = fp
@@ -138,7 +137,7 @@ class FileBackedBuffer:
 
     @classmethod
     def from_path(cls, path):
-        return cls(open(path, 'r+b'), os.path.getsize(path))
+        return cls(open(path, "r+b"), os.path.getsize(path))
 
     @property
     def name(self):
@@ -195,19 +194,18 @@ class FramedMessage:
         yield Frame.wrap(
             header_bytes,
             type_=Frame.Types.HEADER if self.payload else Frame.Types.COMMAND,
-            msg_id=self.msg_id).serialize()
+            msg_id=self.msg_id,
+        ).serialize()
         yield header_bytes
         if self.payload:
-            yield Frame.wrap(
-                self.payload,
-                msg_id=self.msg_id).serialize()
+            yield Frame.wrap(self.payload, msg_id=self.msg_id).serialize()
             self.payload.seek(0)
             reader = functools.partial(self.payload.read, size=2 ** 12)
-            for chunk in iter(reader, b''):
+            for chunk in iter(reader, b""):
                 yield chunk
 
     def serialize(self):
-        return b''.join(self)
+        return b"".join(self)
 
 
 class FramedBuffer:
@@ -249,7 +247,7 @@ class FramedBuffer:
         await self.consume(rest)
 
     async def consume(self, data):
-        data, rest = data[:self.to_read], data[self.to_read:]
+        data, rest = data[: self.to_read], data[self.to_read :]
         self.to_read -= self.bb.write(data)
         if self.to_read == 0:
             await self.finish()
@@ -262,9 +260,7 @@ class FramedBuffer:
             self.header = json.load(self.bb)
         elif self.current_frame.type == Frame.Types.PAYLOAD:
             await self.q.put(
-                FramedMessage(
-                    self.current_frame.msg_id, header=self.header, payload=self.bb
-                )
+                FramedMessage(self.current_frame.msg_id, header=self.header, payload=self.bb)
             )
             self.header = None
         elif self.current_frame.type == Frame.Types.COMMAND:

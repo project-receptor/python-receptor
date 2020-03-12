@@ -6,11 +6,7 @@ import pytest
 
 @pytest.fixture(
     scope="function",
-    params=[
-        "test/perf/flat-mesh.yaml",
-        "test/perf/tree-mesh.yaml",
-        "test/perf/random-mesh.yaml",
-    ],
+    params=["test/perf/flat-mesh.yaml", "test/perf/tree-mesh.yaml", "test/perf/random-mesh.yaml"],
     ids=["flat", "tree", "random"],
 )
 def mesh(request):
@@ -22,7 +18,7 @@ def mesh(request):
         raise
     finally:
         print(f"{time.time()} - Stopping current mesh")
-        print(mesh.nodes['controller'])
+        print(mesh.nodes["controller"])
         mesh.stop()
 
 

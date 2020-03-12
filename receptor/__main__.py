@@ -5,7 +5,6 @@ import signal
 import sys
 
 from .config import ReceptorConfig
-from .logstash_formatter.logstash import LogstashFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -20,28 +19,20 @@ def main(args=None):
 
     logging.config.dictConfig(
         {
-            'version': 1,
-            'disable_existing_loggers': False,
-            'formatters': {
-                'simple': {
-                    'format': '{levelname} {asctime} {node_id} {module} {message}',
-                    'style': '{',
-                },
-                'structured': {
-                    '()': LogstashFormatter,
-                },
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "verbose": {
+                    "format": "{levelname} {asctime} {node_id} {module} {message}",
+                    "style": "{",
+                }
             },
-            'handlers': {
-                'console': {
-                    'class': 'logging.StreamHandler',
-                    'formatter': 'structured' if config.default_logging_format == 'structured' else 'simple'
-                },
-            },
-            'loggers': {
-                'receptor': {
-                    'handlers': ['console'],
-                    'level': 'DEBUG' if config.default_debug else 'WARN',
-                },
+            "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "verbose"}},
+            "loggers": {
+                "receptor": {
+                    "handlers": ["console"],
+                    "level": "DEBUG" if config.default_debug else "WARN",
+                }
             },
         }
     )
@@ -50,7 +41,7 @@ def main(args=None):
         record.node_id = config.default_node_id
         return True
 
-    for h in logging.getLogger('receptor').handlers:
+    for h in logging.getLogger("receptor").handlers:
         h.addFilter(_f)
 
     def dump_stacks(signum, frame):
@@ -68,6 +59,6 @@ def main(args=None):
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # We were run with python -m
     main()

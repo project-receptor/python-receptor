@@ -14,7 +14,6 @@ pool = ThreadPoolExecutor()
 
 
 class DurableBuffer:
-
     def __init__(self, dir_, key, loop, write_time=1.0):
         self.q = asyncio.Queue()
         self._base_path = os.path.join(os.path.expanduser(dir_))
@@ -114,7 +113,9 @@ class DurableBuffer:
                 if expire_time < datetime.datetime.utcnow():
                     logger.info("Expiring message %s", ident)
                     # TODO: Do something with expired message
-                    await self._loop.run_in_executor(pool, self._remove_path, self._path_for_ident(ident))
+                    await self._loop.run_in_executor(
+                        pool, self._remove_path, self._path_for_ident(ident)
+                    )
                 else:
                     await new_queue.put(item)
             self.q = new_queue
@@ -130,7 +131,6 @@ class DurableBuffer:
 
 
 class FileBufferManager(defaultdict):
-
     def __init__(self, path, loop=asyncio.get_event_loop()):
         self.path = path
         self.loop = loop

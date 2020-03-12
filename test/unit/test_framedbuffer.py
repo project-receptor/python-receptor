@@ -89,7 +89,7 @@ async def test_overfull(framed_buffer, msg_id):
     fbb = FileBackedBuffer.from_data(payload)
     msg = FramedMessage(header=header, payload=fbb)
 
-    await framed_buffer.put(b''.join(msg))
+    await framed_buffer.put(b"".join(msg))
 
     m = await framed_buffer.get()
 
@@ -103,7 +103,7 @@ async def test_underfull(framed_buffer, msg_id):
     payload = b"this is a test"
     fbb = FileBackedBuffer.from_data(payload)
     msg = FramedMessage(header=header, payload=fbb)
-    b = b''.join(msg)
+    b = b"".join(msg)
 
     await framed_buffer.put(b[:10])
     await framed_buffer.put(b[10:])
@@ -117,9 +117,7 @@ async def test_underfull(framed_buffer, msg_id):
 @pytest.mark.asyncio
 async def test_malformed_frame(framed_buffer, msg_id):
     with pytest.raises(ValueError):
-        await framed_buffer.put(
-            b"this is total garbage and should break things very nicely"
-        )
+        await framed_buffer.put(b"this is total garbage and should break things very nicely")
 
 
 @pytest.mark.asyncio
