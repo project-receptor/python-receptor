@@ -36,8 +36,9 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_
 
     worker = factory()
     try:
-        async with aiohttp.ClientSession().ws_connect(uri, ssl=ssl_context,
-                                                      headers=ws_extra_headers) as ws:
+        async with aiohttp.ClientSession().ws_connect(
+            uri, ssl=ssl_context, headers=ws_extra_headers
+        ) as ws:
             log_ssl_detail(ws)
             t = WebSocket(ws)
             await worker.client(t)
@@ -48,7 +49,15 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_
         if reconnect:
             await asyncio.sleep(5)
             logger.debug("ws.connect: reconnecting")
-            loop.create_task(connect(uri, factory=factory, loop=loop, ssl_context=ssl_context, ws_extra_headers=ws_extra_headers))
+            loop.create_task(
+                connect(
+                    uri,
+                    factory=factory,
+                    loop=loop,
+                    ssl_context=ssl_context,
+                    ws_extra_headers=ws_extra_headers,
+                )
+            )
         return True
 
 

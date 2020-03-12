@@ -32,16 +32,16 @@ def run_as_node(config):
         # rely on the connection logic
         for node_id in controller.receptor.router.get_nodes():
             await controller.ping(node_id, expected_response=False)
-        absolute_call_time = (((int(controller.loop.time()) + 1) // config.node_keepalive_interval) + 1) * config.node_keepalive_interval
-        controller.loop.call_at(absolute_call_time,
-                                controller.loop.create_task,
-                                node_keepalive())
+        absolute_call_time = (
+            ((int(controller.loop.time()) + 1) // config.node_keepalive_interval) + 1
+        ) * config.node_keepalive_interval
+        controller.loop.call_at(absolute_call_time, controller.loop.create_task, node_keepalive())
 
     try:
         controller = Controller(config)
-        logger.info(f'Running as Receptor node with ID: {controller.receptor.node_id}')
+        logger.info(f"Running as Receptor node with ID: {controller.receptor.node_id}")
         if config.node_stats_enable:
-            logger.info(f'Starting stats on port {config.node_stats_port}')
+            logger.info(f"Starting stats on port {config.node_stats_port}")
             start_http_server(config.node_stats_port)
         if not config.node_server_disable:
             listen_tasks = controller.enable_server(config.node_listen)
@@ -63,13 +63,14 @@ async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, sen
         if add_peer_task and add_peer_task.done() and not add_peer_task.result():
             print("Connection failed. Exiting.")
             break
-        if ((recipient and controller.receptor.router.node_is_known(recipient)) or
-                (not recipient and len(controller.receptor.router.get_nodes()) > 0)):
+        if (recipient and controller.receptor.router.node_is_known(recipient)) or (
+            not recipient and len(controller.receptor.router.get_nodes()) > 0
+        ):
             read_task = controller.loop.create_task(read_func())
             await send_func()
             await read_task
             break
-        if (time.time() - start_wait > 5):
+        if time.time() - start_wait > 5:
             print("Connection timed out. Exiting.")
             if not add_peer_task.done():
                 add_peer_task.cancel()
@@ -87,8 +88,14 @@ def run_as_ping(config):
                 yield 0
 
     async def ping_entrypoint():
-        return await run_oneshot_command(controller, config.ping_peer, config.ping_recipient,
-                                         config.ping_ws_extra_headers, send_pings, read_responses)
+        return await run_oneshot_command(
+            controller,
+            config.ping_peer,
+            config.ping_recipient,
+            config.ping_ws_extra_headers,
+            send_pings,
+            read_responses,
+        )
 
     async def read_responses():
         for _ in ping_iter():
@@ -98,11 +105,11 @@ def run_as_ping(config):
     async def send_pings():
         for x in ping_iter():
             await controller.ping(config.ping_recipient)
-            if x+1 < config.ping_count:
+            if x + 1 < config.ping_count:
                 await asyncio.sleep(config.ping_delay)
 
     try:
-        logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')
+        logger.info(f"Sending ping to {config.ping_recipient} via {config.ping_peer}.")
         controller = Controller(config)
         controller.run(ping_entrypoint)
     finally:
@@ -111,8 +118,14 @@ def run_as_ping(config):
 
 def run_as_send(config):
     async def send_entrypoint():
-        return await run_oneshot_command(controller, config.send_peer, config.send_recipient,
-                                         config.ws_extra_headers, send_message, read_responses)
+        return await run_oneshot_command(
+            controller,
+            config.send_peer,
+            config.send_recipient,
+            config.ws_extra_headers,
+            send_message,
+            read_responses,
+        )
 
     async def send_message():
         if config.send_payload == "-":
@@ -120,9 +133,7 @@ def run_as_send(config):
         else:
             data = config.send_payload
         await controller.send(
-            payload=data,
-            recipient=config.send_recipient,
-            directive=config.send_directive
+            payload=data, recipient=config.send_recipient, directive=config.send_directive
         )
 
     async def read_responses():
@@ -130,24 +141,28 @@ def run_as_send(config):
             message = await controller.recv()
             logger.debug(f"{message}")
             if message.header.get("in_response_to", None):
-                logger.debug('Received response message')
+                logger.debug("Received response message")
                 if message.payload:
                     print(message.payload.readall().decode())
                 else:
                     print("---")
                 if message.header.get("eof", False):
-                    logger.info('Received EOF')
+                    logger.info("Received EOF")
                     if message.header.get("code", 0) != 0:
-                        logger.error(f'EOF was an error result')
+                        logger.error(f"EOF was an error result")
                         if message.payload:
-                            print(f'ERROR: {message.payload.readall().decode()}')
+                            print(f"ERROR: {message.payload.readall().decode()}")
                         else:
                             print(f"No EOF Error Payload")
                     break
             else:
-                logger.warning(f'Received unknown message {message}')
+                logger.warning(f"Received unknown message {message}")
+
     try:
-        logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
+        logger.info(
+            f"""Sending directive {config.send_directive} to {config.send_recipient}
+                via {config.send_peer}"""
+        )
         controller = Controller(config)
         controller.run(send_entrypoint)
     finally:
@@ -155,10 +170,10 @@ def run_as_send(config):
 
 
 def run_as_status(config):
-
     async def status_entrypoint():
-        return await run_oneshot_command(controller, config.status_peer, None,
-                                         config.status_ws_extra_headers, print_status, noop)
+        return await run_oneshot_command(
+            controller, config.status_peer, None, config.status_ws_extra_headers, print_status, noop
+        )
 
     async def print_status():
 

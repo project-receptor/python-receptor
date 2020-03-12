@@ -17,10 +17,20 @@ def random_mesh():
 
 
 def test_websocket_reconnect(random_mesh):
-    nodeX = Node("nodeX", connections=["node1"], stats_enable=True, stats_port=random_port(),
-                 listen=f"ws://127.0.0.1:{random_port()}")
-    nodeY = Node("nodeY", connections=["nodeX"], stats_enable=True, stats_port=random_port(),
-                 listen=f"ws://127.0.0.1:{random_port()}")
+    nodeX = Node(
+        "nodeX",
+        connections=["node1"],
+        stats_enable=True,
+        stats_port=random_port(),
+        listen=f"ws://127.0.0.1:{random_port()}",
+    )
+    nodeY = Node(
+        "nodeY",
+        connections=["nodeX"],
+        stats_enable=True,
+        stats_port=random_port(),
+        listen=f"ws://127.0.0.1:{random_port()}",
+    )
     random_mesh.add_node(nodeX)
     random_mesh.add_node(nodeY)
     nodeX.start()

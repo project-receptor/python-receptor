@@ -20,25 +20,30 @@ class WorkManager:
         work_info.info(dict(plugins=str(self.get_capabilities())))
         self.active_work = []
         self.thread_pool = concurrent.futures.ThreadPoolExecutor(
-                max_workers=self.receptor.config.default_max_workers)
+            max_workers=self.receptor.config.default_max_workers
+        )
 
     def load_receptor_worker(self, name):
-        entry_points = [x for x in filter(lambda x: x.name == name,
-                                          pkg_resources.iter_entry_points("receptor.worker"))]
+        entry_points = [
+            x
+            for x in filter(
+                lambda x: x.name == name, pkg_resources.iter_entry_points("receptor.worker")
+            )
+        ]
         if not entry_points:
             raise exceptions.UnknownDirective(f"Error loading directive handlers for {name}")
         return entry_points[0].load()
 
     def get_capabilities(self):
         caps = {
-            'worker_versions': {
+            "worker_versions": {
                 x.name: pkg_resources.get_distribution(x.resolve().__package__).version
-                for x in pkg_resources.iter_entry_points('receptor.worker')
-                },
-            'max_work_threads': self.receptor.config.default_max_workers,
+                for x in pkg_resources.iter_entry_points("receptor.worker")
+            },
+            "max_work_threads": self.receptor.config.default_max_workers,
         }
         if self.receptor.config._is_ephemeral:
-            caps['ephemeral'] = True
+            caps["ephemeral"] = True
         return caps
 
     def get_work(self):
@@ -47,9 +52,13 @@ class WorkManager:
     def add_work(self, message):
         work_counter.inc()
         active_work_gauge.inc()
-        self.active_work.append(dict(id=message.msg_id,
-                                     directive=message.header["directive"],
-                                     sender=message.header["sender"]))
+        self.active_work.append(
+            dict(
+                id=message.msg_id,
+                directive=message.header["directive"],
+                sender=message.header["sender"],
+            )
+        )
 
     def remove_work(self, message):
         for work in self.active_work:
@@ -59,23 +68,33 @@ class WorkManager:
 
     async def handle(self, message):
         logger.info(f'Handling work for {message.msg_id} as {message.header["directive"]}')
-        namespace, action = message.header["directive"].split(':', 1)
+        namespace, action = message.header["directive"].split(":", 1)
         serial = 0
         eof_response = None
         try:
             worker_module = self.load_receptor_worker(namespace)
             try:
-                action_method = getattr(worker_module, f'{action}')
+                action_method = getattr(worker_module, f"{action}")
             except AttributeError:
-                logger.exception(f'Could not load action {action} from {namespace}')
-                raise exceptions.InvalidDirectiveAction(f'Invalid action {action} for {namespace}')
+                logger.exception(f"Could not load action {action} from {namespace}")
+                raise exceptions.InvalidDirectiveAction(f"Invalid action {action} for {namespace}")
             if not getattr(action_method, "receptor_export", False):
-                logger.exception(f'Not allowed to call {action} from {namespace} because it is not marked for export')
-                raise exceptions.InvalidDirectiveAction(f'Access denied calling {action} for {namespace}')
+                logger.exception(
+                    f"""Not allowed to call {action} from {namespace} because
+                    it is not marked for export"""
+                )
+                raise exceptions.InvalidDirectiveAction(
+                    f"Access denied calling {action} for {namespace}"
+                )
 
             self.add_work(message)
             response_queue = queue.Queue()
-            work_exec = self.thread_pool.submit(action_method, message.payload.readall(), self.receptor.config.plugins.get(namespace, {}), response_queue)
+            work_exec = self.thread_pool.submit(
+                action_method,
+                message.payload.readall(),
+                self.receptor.config.plugins.get(namespace, {}),
+                response_queue,
+            )
             while True:
                 # Collect 'done' status here so we drain the response queue
                 # after the work is complete
@@ -84,37 +103,41 @@ class WorkManager:
                     try:
                         response = response_queue.get(False)
                         serial += 1
-                        logger.debug(f'Response emitted for {message.msg_id}, serial {serial}')
+                        logger.debug(f"Response emitted for {message.msg_id}, serial {serial}")
                         response_message = FramedMessage(
                             header=dict(
                                 recipient=message.header["sender"],
                                 in_response_to=message.msg_id,
                                 serial=serial,
-                                timestamp=datetime.datetime.utcnow()
+                                timestamp=datetime.datetime.utcnow(),
                             ),
-                            payload=FileBackedBuffer.from_data(response)
+                            payload=FileBackedBuffer.from_data(response),
                         )
                         await self.receptor.router.send(response_message)
                     except queue.Empty:
                         break
                 if is_done:
-                    # Calling result() will raise any exceptions from the worker thread, on this thread
+                    # Calling result() will raise any exceptions from the worker thread,
+                    # on this thread
                     work_exec.result()
                     break
                 await asyncio.sleep(0.05)
         except Exception as e:
-            logger.error(f'Error encountered while handling the response, replying with an error message ({e})')
+            logger.error(
+                f"""Error encountered while handling the response, replying with
+                    an error message ({e})"""
+            )
             logger.error(traceback.format_tb(e.__traceback__))
             eof_response = FramedMessage(
                 header=dict(
                     recipient=message.header["sender"],
                     in_response_to=message.msg_id,
-                    serial=serial+1,
+                    serial=serial + 1,
                     code=1,
                     timestamp=datetime.datetime.utcnow(),
-                    eof=True
+                    eof=True,
                 ),
-                payload=FileBackedBuffer.from_data(str(e))
+                payload=FileBackedBuffer.from_data(str(e)),
             )
         self.remove_work(message)
 
@@ -123,10 +146,10 @@ class WorkManager:
                 header=dict(
                     recipient=message.header["sender"],
                     in_response_to=message.msg_id,
-                    serial=serial+1,
+                    serial=serial + 1,
                     code=0,
                     timestamp=datetime.datetime.utcnow(),
-                    eof=True
+                    eof=True,
                 )
             )
         await self.receptor.router.send(eof_response)

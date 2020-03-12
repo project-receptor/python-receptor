@@ -14,14 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 class Controller:
-
     def __init__(self, config, loop=asyncio.get_event_loop(), queue=None):
         self.receptor = Receptor(config)
         self.loop = loop
         self.connection_manager = Manager(
-            lambda: Worker(self.receptor, loop),
-            self.receptor.config.get_ssl_context,
-            loop
+            lambda: Worker(self.receptor, loop), self.receptor.config.get_ssl_context, loop
         )
         self.queue = queue
         if self.queue is None:
@@ -29,8 +26,9 @@ class Controller:
         self.receptor.response_queue = self.queue
 
     async def shutdown_loop(self):
-        tasks = [task for task in asyncio.Task.all_tasks()
-                 if task is not asyncio.Task.current_task()]
+        tasks = [
+            task for task in asyncio.Task.all_tasks() if task is not asyncio.Task.current_task()
+        ]
         # Retrieve and throw away all exceptions that happen after
         # the decision to shut down was made.
         for task in tasks:
@@ -58,8 +56,11 @@ class Controller:
 
     def add_peer(self, peer, ws_extra_headers=None):
         logger.info("Connecting to peer {}".format(peer))
-        return self.connection_manager.get_peer(peer, reconnect=not self.receptor.config._is_ephemeral,
-                                                ws_extra_headers=ws_extra_headers)
+        return self.connection_manager.get_peer(
+            peer,
+            reconnect=not self.receptor.config._is_ephemeral,
+            ws_extra_headers=ws_extra_headers,
+        )
 
     async def recv(self):
         return await self.receptor.response_queue.get()
@@ -79,7 +80,7 @@ class Controller:
                 recipient=recipient,
                 timestamp=datetime.datetime.utcnow(),
                 directive=directive,
-                ttl=15
+                ttl=15,
             ),
             payload=buffer,
         )

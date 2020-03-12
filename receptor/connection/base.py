@@ -11,11 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 def log_ssl_detail(transport):
-    peername = transport.get_extra_info('peername')
-    if transport.get_extra_info('ssl_object', None):
-        cipher = transport.get_extra_info('cipher')
-        peercert = transport.get_extra_info('peercert')
-        logger.debug(f"{cipher[1]} connection with {str(peername)} using cipher {cipher[0]} and certificate {str(peercert)}.")
+    peername = transport.get_extra_info("peername")
+    if transport.get_extra_info("ssl_object", None):
+        cipher = transport.get_extra_info("cipher")
+        peercert = transport.get_extra_info("peercert")
+        logger.debug(
+            f"""{cipher[1]} connection with {str(peername)} using cipher {cipher[0]}
+                and certificate {str(peercert)}."""
+        )
     else:
         logger.debug(f"Unencrypted connection with {str(peername)}.")
 
@@ -139,9 +142,7 @@ class Worker:
     async def start_processing(self):
         await self.receptor.send_route_advertisement()
         logger.debug("starting normal loop")
-        self.handle_task = self.loop.create_task(
-            self.receptor.message_handler(self.buf)
-        )
+        self.handle_task = self.loop.create_task(self.receptor.message_handler(self.buf))
         self.outbound = self.receptor.buffer_mgr[self.remote_id]
         self.write_task = self.loop.create_task(self.watch_queue())
         return await self.write_task
@@ -152,7 +153,7 @@ class Worker:
 
     async def watch_queue(self):
         try:
-            logger.debug(f'Watching queue {str(self.conn)}')
+            logger.debug(f"Watching queue {str(self.conn)}")
             while not self.conn.closed:
                 try:
                     ident, fp = await asyncio.wait_for(self.outbound.get(handle_only=True), 5.0)
@@ -173,10 +174,12 @@ class Worker:
     async def drain_buf(self, ident, fp):
         try:
             if self.conn.closed:
-                logger.debug('Message not sent: connection already closed')
+                logger.debug("Message not sent: connection already closed")
             else:
                 q = BridgeQueue(maxsize=1)
-                await asyncio.gather(self.loop.run_in_executor(None, q.read_from, fp), self.conn.send(q))
+                await asyncio.gather(
+                    self.loop.run_in_executor(None, q.read_from, fp), self.conn.send(q)
+                )
         except Exception:
             logger.exception("watch_queue: error received trying to write")
             await self.outbound.put_ident(ident)
