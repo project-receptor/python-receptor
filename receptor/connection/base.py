@@ -108,29 +108,34 @@ async def watch_queue(loop, conn, buf):
                 logger.exception("watch_queue: error getting data from buffer")
                 continue
 
-            try:
-                if conn.closed:
-                    logger.debug('Message not sent: connection already closed')
-                else:
-                    q = BridgeQueue(maxsize=1)
-                    await asyncio.gather(loop.run_in_executor(None, q.read_from, fp), conn.send(q))
-            except Exception:
-                logger.exception("watch_queue: error received trying to write")
-                await buf.put_ident(ident)
-                if conn is not None and not conn.closed:
-                    return await conn.close()
-                else:
-                    return
-            else:
-                fp.close()
-                try:
-                    await loop.run_in_executor(None, os.remove, fp)
-                except TypeError:
-                    pass  # some messages aren't actually files
+            asyncio.ensure_future(send(loop, conn, buf, ident, fp))
+
     except asyncio.CancelledError:
         logger.debug("watch_queue: cancel request received")
         if conn is not None and not conn.closed:
             await conn.close()
+
+
+async def send(loop, conn, buf, ident, fp):
+    try:
+        if conn.closed:
+            logger.debug('Message not sent: connection already closed')
+        else:
+            q = BridgeQueue(maxsize=1)
+            await asyncio.gather(loop.run_in_executor(None, q.read_from, fp), conn.send(q))
+    except Exception:
+        logger.exception("watch_queue: error received trying to write")
+        await buf.put_ident(ident)
+        if conn is not None and not conn.closed:
+            return await conn.close()
+        else:
+            return
+    else:
+        fp.close()
+        try:
+            await loop.run_in_executor(None, os.remove, fp)
+        except TypeError:
+            pass  # some messages aren't actually files
 
 
 class Worker:
