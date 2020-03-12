@@ -6,15 +6,18 @@ If you have questions about this document or anything not covered here? Come cha
 
 ## Things to know prior to submitting code
 
-- All code and doc submissions are done through pull requests against the `master` branch.
+- All code and doc submissions are done through pull requests against the `devel` branch.
+- Bugfixes for a release should be submitted as a pull request against the
+  release branch.  Bugfixes in releases will selectively be merged back into
+  devel. 
 - Take care to make sure no merge commits are in the submission, and use `git rebase` vs `git merge` for this reason.
 
 ## Setting up your development environment
 
-It's entirely possible to develop on **Receptor** simply with
+We use [poetry](https://python-poetry.org) to develop **Receptor**.
 
 ```bash
-(host)$ python setup.py develop
+(host)$ poetry install
 ```
 
 ## Linting and Unit Tests
