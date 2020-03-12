@@ -1,84 +1,70 @@
 import asyncio
 import datetime
-import json
 import logging
 import os
 import uuid
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+from json.decoder import JSONDecodeError
 
-import dateutil.parser
-
-from .base import BaseBufferManager
+from .. import serde as json
 
 logger = logging.getLogger(__name__)
 pool = ThreadPoolExecutor()
 
 
-def encode_date(obj):
-    if isinstance(obj, datetime.datetime):
-        return {
-            "_type": "datetime.datetime",
-            "value": obj.isoformat(),
-        }
-    raise TypeError
-
-
-def decode_date(o):
-    type_ = o.get("_type")
-    if type_ != "datetime.datetime":
-        return o
-    return dateutil.parser.parse(o["value"])
-
-
 class DurableBuffer:
 
-    def __init__(self, dir_, key, loop):
+    def __init__(self, dir_, key, loop, write_time=1.0):
         self.q = asyncio.Queue()
         self._base_path = os.path.join(os.path.expanduser(dir_))
         self._message_path = os.path.join(self._base_path, "messages")
         self._manifest_path = os.path.join(self._base_path, f"manifest-{key}")
         self._loop = loop
         self._manifest_lock = asyncio.Lock(loop=self._loop)
+        self._manifest_dirty = False
         try:
             os.makedirs(self._message_path, mode=0o700)
         except Exception:
             pass
         for item in self._read_manifest():
             self.q.put_nowait(item)
+        self._loop.create_task(self.manifest_writer(write_time))
 
-    async def put(self, data):
+    async def put(self, framed_message):
         item = {
             "ident": str(uuid.uuid4()),
             "expire_time": datetime.datetime.utcnow() + datetime.timedelta(minutes=5),
         }
-        await self._loop.run_in_executor(pool, self._write_file, data, item)
+        await self._loop.run_in_executor(pool, self._write_file, framed_message, item)
         await self.q.put(item)
-        await self._save_manifest()
+        self._manifest_dirty = True
+
+    async def put_ident(self, ident):
+        await self.q.put(ident)
+        self._manifest_dirty = True
 
     async def get(self, handle_only=False, delete=True):
         while True:
-            msg = await self.q.get()
-            await self._save_manifest()
+            ident = await self.q.get()
+            self._manifest_dirty = True
             try:
-                return await self._get_file(msg["ident"], handle_only=handle_only, delete=delete)
-            except FileNotFoundError:
+                f = await self._get_file(ident["ident"], handle_only=handle_only, delete=delete)
+                return (ident, f)
+            except (FileNotFoundError, TypeError):
                 pass
-
-    async def _save_manifest(self):
-        async with self._manifest_lock:
-            await self._loop.run_in_executor(pool, self._write_manifest)
 
     def _write_manifest(self):
         with open(self._manifest_path, "w") as fp:
-            fp.write(json.dumps(list(self.q._queue), default=encode_date))
+            fp.write(json.dumps(list(self.q._queue)))
 
     def _read_manifest(self):
         try:
             with open(self._manifest_path, "r") as fp:
-                return json.load(fp, object_hook=decode_date)
+                return json.load(fp)
         except FileNotFoundError:
             return []
-        except json.decoder.JSONDecodeError:
+        except JSONDecodeError:
             with open(self._manifest_path, "r") as fp:
                 logger.error("failed to decode manifest: %s", fp.read())
             raise
@@ -112,7 +98,11 @@ class DurableBuffer:
 
     def _write_file(self, data, item):
         with open(os.path.join(self._message_path, item["ident"]), "wb") as fp:
-            fp.write(data)
+            if isinstance(data, bytes):
+                fp.write(data)
+            else:
+                for chunk in data:
+                    fp.write(chunk)
 
     async def expire(self):
         async with self._manifest_lock:
@@ -130,16 +120,21 @@ class DurableBuffer:
             self.q = new_queue
             self._write_manifest()
 
+    async def manifest_writer(self, write_time):
+        while True:
+            if self._manifest_dirty:
+                async with self._manifest_lock:
+                    await self._loop.run_in_executor(pool, self._write_manifest)
+                    self._manifest_dirty = False
+            await asyncio.sleep(write_time)
 
-class FileBufferManager(BaseBufferManager):
-    _buffers = {}
 
-    def get_buffer_for_node(self, node_id, receptor):
-        # due to the way that the manager is constructed, we won't have enough
-        # information to build a proper defaultdict at the time, and we want to
-        # make sure we only construct a single instance of DurableBuffer
-        # per-node so.. doing this the hard way.
-        if node_id not in self._buffers:
-            path = os.path.join(os.path.expanduser(receptor.base_path))
-            self._buffers[node_id] = DurableBuffer(path, node_id, asyncio.get_event_loop())
-        return self._buffers[node_id]
+class FileBufferManager(defaultdict):
+
+    def __init__(self, path, loop=asyncio.get_event_loop()):
+        self.path = path
+        self.loop = loop
+
+    def __missing__(self, key):
+        self[key] = DurableBuffer(self.path, key, self.loop)
+        return self[key]

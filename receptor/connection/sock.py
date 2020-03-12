@@ -26,9 +26,10 @@ class RawSocket(Transport):
         self._closed = True
         self.writer.close()
 
-    async def send(self, bytes_):
-        self.writer.write(bytes_)
-        await self.writer.drain()
+    async def send(self, q):
+        async for chunk in q:
+            self.writer.write(chunk)
+            await self.writer.drain()
 
 
 async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):

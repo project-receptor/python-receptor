@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from receptor.messages.envelope import Frame, FramedBuffer, FramedMessage
+from receptor.messages.framed import FileBackedBuffer, Frame, FramedBuffer, FramedMessage
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ async def test_framedbuffer(framed_buffer, msg_id):
     m = await framed_buffer.get()
 
     assert m.header == header
-    assert m.payload == payload + payload2
+    assert m.payload.readall() == payload + payload2
 
 
 @pytest.mark.asyncio
@@ -49,7 +49,7 @@ async def test_hi(msg_id, framed_buffer):
     m = await framed_buffer.get()
 
     assert m.header is None
-    assert m.payload == hi
+    assert m.payload.readall() == hi
 
 
 @pytest.mark.asyncio
@@ -86,22 +86,24 @@ async def test_command(framed_buffer, msg_id):
 async def test_overfull(framed_buffer, msg_id):
     header = {"foo": "bar"}
     payload = b"this is a test"
-    msg = FramedMessage(header=header, payload=payload)
+    fbb = FileBackedBuffer.from_data(payload)
+    msg = FramedMessage(header=header, payload=fbb)
 
-    await framed_buffer.put(msg.serialize())
+    await framed_buffer.put(b''.join(msg))
 
     m = await framed_buffer.get()
 
     assert m.header == header
-    assert m.payload == payload
+    assert m.payload.readall() == payload
 
 
 @pytest.mark.asyncio
 async def test_underfull(framed_buffer, msg_id):
     header = {"foo": "bar"}
     payload = b"this is a test"
-    msg = FramedMessage(header=header, payload=payload)
-    b = msg.serialize()
+    fbb = FileBackedBuffer.from_data(payload)
+    msg = FramedMessage(header=header, payload=fbb)
+    b = b''.join(msg)
 
     await framed_buffer.put(b[:10])
     await framed_buffer.put(b[10:])
@@ -109,7 +111,7 @@ async def test_underfull(framed_buffer, msg_id):
     m = await framed_buffer.get()
 
     assert m.header == header
-    assert m.payload == payload
+    assert m.payload.readall() == payload
 
 
 @pytest.mark.asyncio

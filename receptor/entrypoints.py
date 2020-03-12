@@ -1,14 +1,12 @@
-import logging
-import time
 import asyncio
-import sys
-import os
+import logging
 import shutil
+import sys
+import time
 
 from prometheus_client import start_http_server
 
 from .controller import Controller
-from .messages import Message
 
 logger = logging.getLogger(__name__)
 
@@ -95,12 +93,13 @@ def run_as_ping(config):
     async def read_responses():
         for _ in ping_iter():
             message = await controller.recv()
-            print("{}".format(message.raw_payload))
+            print(message.payload.readall().decode())
 
     async def send_pings():
-        for _ in ping_iter():
+        for x in ping_iter():
             await controller.ping(config.ping_recipient)
-            await asyncio.sleep(config.ping_delay)
+            if x+1 < config.ping_count:
+                await asyncio.sleep(config.ping_delay)
 
     try:
         logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')
@@ -116,33 +115,37 @@ def run_as_send(config):
                                          config.ws_extra_headers, send_message, read_responses)
 
     async def send_message():
-        msg = Message(config.send_recipient, config.send_directive)
         if config.send_payload == "-":
-            msg.data(sys.stdin.buffer.read())
-        elif os.path.exists(config.send_payload):
-            msg.file(config.send_payload)
+            data = sys.stdin.buffer.read()
         else:
-            if isinstance(config.send_payload, str):
-                send_payload = config.send_payload.encode()
-            else:
-                send_payload = config.send_payload
-            msg.data(send_payload)
-        await controller.send(msg)
+            data = config.send_payload
+        await controller.send(
+            payload=data,
+            recipient=config.send_recipient,
+            directive=config.send_directive
+        )
 
     async def read_responses():
         while True:
             message = await controller.recv()
-            if message.message_type == 'response':
+            logger.debug(f"{message}")
+            if message.header.get("in_response_to", None):
                 logger.debug('Received response message')
-                print(f'{message.raw_payload}')
-            elif message.message_type == 'eof':
-                logger.info('Received EOF')
-                if message.code != 0:
-                    logger.error(f'EOF was an error result: {message.raw_payload}')
-                    print(f'ERROR: {message.raw_payload}')
-                break
+                if message.payload:
+                    print(message.payload.readall().decode())
+                else:
+                    print("---")
+                if message.header.get("eof", False):
+                    logger.info('Received EOF')
+                    if message.header.get("code", 0) != 0:
+                        logger.error(f'EOF was an error result')
+                        if message.payload:
+                            print(f'ERROR: {message.payload.readall().decode()}')
+                        else:
+                            print(f"No EOF Error Payload")
+                    break
             else:
-                logger.warning(f'Received unknown message type {message.message_type}')
+                logger.warning(f'Received unknown message {message}')
     try:
         logger.info(f'Sending directive {config.send_directive} to {config.send_recipient} via {config.send_peer}')
         controller = Controller(config)

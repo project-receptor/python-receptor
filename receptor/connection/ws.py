@@ -1,8 +1,9 @@
-import logging
+import asyncio
 import functools
+import logging
+
 import aiohttp
 import aiohttp.web
-import asyncio
 
 from .base import Transport, log_ssl_detail
 
@@ -24,8 +25,9 @@ class WebSocket(Transport):
     def closed(self):
         return self.ws.closed
 
-    async def send(self, bytes_):
-        await self.ws.send_bytes(bytes_)
+    async def send(self, q):
+        async for chunk in q:
+            await self.ws.send_bytes(chunk)
 
 
 async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_extra_headers=None):
