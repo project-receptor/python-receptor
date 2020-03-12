@@ -93,51 +93,6 @@ class BridgeQueue(queue.Queue):
         self.put(self.sentinel)
 
 
-async def watch_queue(loop, conn, buf):
-    try:
-        logger.debug(f'Watching queue {str(conn)}')
-        while not conn.closed:
-            try:
-                ident, fp = await asyncio.wait_for(buf.get(handle_only=True), 5.0)
-                if not fp:
-                    if conn is not None and not conn.closed:
-                        await conn.close()
-            except asyncio.TimeoutError:
-                continue
-            except Exception:
-                logger.exception("watch_queue: error getting data from buffer")
-                continue
-
-            asyncio.ensure_future(send(loop, conn, buf, ident, fp))
-
-    except asyncio.CancelledError:
-        logger.debug("watch_queue: cancel request received")
-        if conn is not None and not conn.closed:
-            await conn.close()
-
-
-async def send(loop, conn, buf, ident, fp):
-    try:
-        if conn.closed:
-            logger.debug('Message not sent: connection already closed')
-        else:
-            q = BridgeQueue(maxsize=1)
-            await asyncio.gather(loop.run_in_executor(None, q.read_from, fp), conn.send(q))
-    except Exception:
-        logger.exception("watch_queue: error received trying to write")
-        await buf.put_ident(ident)
-        if conn is not None and not conn.closed:
-            return await conn.close()
-        else:
-            return
-    else:
-        fp.close()
-        try:
-            await loop.run_in_executor(None, os.remove, fp)
-        except TypeError:
-            pass  # some messages aren't actually files
-
-
 class Worker:
     def __init__(self, receptor, loop):
         self.receptor = receptor
@@ -148,6 +103,7 @@ class Worker:
         self.read_task = None
         self.handle_task = None
         self.write_task = None
+        self.outbound = None
 
     def start_receiving(self):
         self.read_task = self.loop.create_task(self.receive())
@@ -186,9 +142,53 @@ class Worker:
         self.handle_task = self.loop.create_task(
             self.receptor.message_handler(self.buf)
         )
-        out = self.receptor.buffer_mgr[self.remote_id]
-        self.write_task = self.loop.create_task(watch_queue(self.loop, self.conn, out))
+        self.outbound = self.receptor.buffer_mgr[self.remote_id]
+        self.write_task = self.loop.create_task(self.watch_queue())
         return await self.write_task
+
+    async def close(self):
+        if self.conn is not None and not self.conn.closed:
+            return await self.conn.close()
+
+    async def watch_queue(self):
+        try:
+            logger.debug(f'Watching queue {str(self.conn)}')
+            while not self.conn.closed:
+                try:
+                    ident, fp = await asyncio.wait_for(self.outbound.get(handle_only=True), 5.0)
+                    if not fp:
+                        await self.close()
+                except asyncio.TimeoutError:
+                    continue
+                except Exception:
+                    logger.exception("watch_queue: error getting data from buffer")
+                    continue
+
+                asyncio.ensure_future(self.drain_buf(ident, fp))
+
+        except asyncio.CancelledError:
+            logger.debug("watch_queue: cancel request received")
+            self.close()
+
+    async def drain_buf(self, ident, fp):
+        try:
+            if self.conn.closed:
+                logger.debug('Message not sent: connection already closed')
+            else:
+                q = BridgeQueue(maxsize=1)
+                await asyncio.gather(self.loop.run_in_executor(None, q.read_from, fp), self.conn.send(q))
+        except Exception:
+            logger.exception("watch_queue: error received trying to write")
+            await self.outbound.put_ident(ident)
+            return await self.close()
+        else:
+            try:
+                await self.loop.run_in_executor(None, os.remove, fp.name)
+            except TypeError:
+                logger.exception("failed to os.remove %s", fp)
+                pass  # some messages aren't actually files
+        finally:
+            fp.close()
 
     async def _wait_handshake(self):
         logger.debug("waiting for HI")
