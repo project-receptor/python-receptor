@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 class RawSocket(Transport):
-    def __init__(self, reader, writer, chunk_size=2 ** 8):
+    def __init__(self, reader, writer, chunk_size=2 ** 16):
         self.reader = reader
         self.writer = writer
         self._closed = False
@@ -29,7 +29,7 @@ class RawSocket(Transport):
     async def send(self, q):
         async for chunk in q:
             self.writer.write(chunk)
-            await self.writer.drain()
+        await self.writer.drain()
 
 
 async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):

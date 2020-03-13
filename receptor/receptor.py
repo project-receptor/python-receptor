@@ -280,7 +280,6 @@ class Receptor:
                     recipient=msg.header["sender"],
                     in_response_to=msg.msg_ig,
                     serial=msg.header["serial"] + 1,
-                    ttl=15,
                     code=1,
                 ),
                 payload="An invalid directive ('{}') was specified.".format(
@@ -295,7 +294,6 @@ class Receptor:
                     recipient=msg.header["sender"],
                     in_response_to=msg.msg_id,
                     serial=msg.header["serial"] + 1,
-                    ttl=15,
                     code=1,
                 ),
                 payload=f"{e}",

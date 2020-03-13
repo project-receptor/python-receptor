@@ -6,6 +6,7 @@ import pkg_resources
 from . import exceptions
 from .messages.framed import FramedMessage, FileBackedBuffer
 from .stats import active_work_gauge, work_counter, work_info
+from .plugin_utils import BYTES_PAYLOAD, BUFFER_PAYLOAD, FILE_PAYLOAD
 
 import concurrent.futures
 import queue
@@ -66,6 +67,14 @@ class WorkManager:
                 active_work_gauge.dec()
                 self.active_work.remove(work)
 
+    def resolve_payload_input(self, payload_type, payload):
+        if payload_type == BUFFER_PAYLOAD:
+            payload.seek(0)
+            return payload
+        elif payload_type == FILE_PAYLOAD:
+            return payload.name
+        return payload.readall()
+
     async def handle(self, message):
         logger.info(f'Handling work for {message.msg_id} as {message.header["directive"]}')
         namespace, action = message.header["directive"].split(":", 1)
@@ -87,11 +96,13 @@ class WorkManager:
                     f"Access denied calling {action} for {namespace}"
                 )
 
+            payload_input_type = getattr(action_method, "payload_type", BYTES_PAYLOAD)
+
             self.add_work(message)
             response_queue = queue.Queue()
             work_exec = self.thread_pool.submit(
                 action_method,
-                message.payload.readall(),
+                self.resolve_payload_input(payload_input_type, message.payload),
                 self.receptor.config.plugins.get(namespace, {}),
                 response_queue,
             )

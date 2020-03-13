@@ -137,7 +137,7 @@ class FileBackedBuffer:
 
     @classmethod
     def from_path(cls, path):
-        return cls(open(path, "r+b"), os.path.getsize(path))
+        return cls(open(path, "rb"), os.path.getsize(path))
 
     @property
     def name(self):

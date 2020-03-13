@@ -122,7 +122,7 @@ def run_as_send(config):
             controller,
             config.send_peer,
             config.send_recipient,
-            config.ws_extra_headers,
+            config.send_ws_extra_headers,
             send_message,
             read_responses,
         )

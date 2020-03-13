@@ -80,7 +80,6 @@ class Controller:
                 recipient=recipient,
                 timestamp=datetime.datetime.utcnow(),
                 directive=directive,
-                ttl=15,
             ),
             payload=buffer,
         )
