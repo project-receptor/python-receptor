@@ -39,12 +39,15 @@ class DurableBuffer:
         self._manifest_path = os.path.join(self._base_path, f"manifest-{key}")
         self._loop = loop
         self._manifest_lock = asyncio.Lock(loop=self._loop)
+        self._manifest_dirty = False
         try:
             os.makedirs(self._message_path, mode=0o700)
         except Exception:
             pass
         for item in self._read_manifest():
             self.q.put_nowait(item)
+
+        self._loop.create_task(self.manifest_writer(1.0))
 
     async def put(self, data):
         item = {
@@ -53,12 +56,12 @@ class DurableBuffer:
         }
         await self._loop.run_in_executor(pool, self._write_file, data, item)
         await self.q.put(item)
-        await self._save_manifest()
+        self._manifest_dirty = True
 
     async def get(self, handle_only=False, delete=True):
         while True:
             msg = await self.q.get()
-            await self._save_manifest()
+            self._manifest_dirty = True
             try:
                 return await self._get_file(msg["ident"], handle_only=handle_only, delete=delete)
             except FileNotFoundError:
@@ -129,6 +132,14 @@ class DurableBuffer:
                     await new_queue.put(item)
             self.q = new_queue
             self._write_manifest()
+
+    async def manifest_writer(self, write_time):
+        while True:
+            if self._manifest_dirty:
+                async with self._manifest_lock:
+                    await self._loop.run_in_executor(pool, self._write_manifest)
+                    self._manifest_dirty = False
+            await asyncio.sleep(write_time)
 
 
 class FileBufferManager(BaseBufferManager):
