@@ -23,6 +23,42 @@ def test_invalid_listen_scheme():
         node.start()
 
 
+def test_listen_fragment():
+    """Start a node, and give it a listen address with a fragment.
+
+    The node should fail to start. See `receptor #153`_.
+
+    .. _receptor #153: https://github.com/project-receptor/receptor/issues/153
+    """
+    node = Node(str(uuid4()), listen=f'receptor://127.0.0.1:{utils.random_port()}#frag')
+    with pytest.raises(NodeUnavailableError):
+        node.start()
+
+
+def test_listen_path():
+    """Start a node, and give it a listen address with a path.
+
+    The node should fail to start. See `receptor #153`_.
+
+    .. _receptor #153: https://github.com/project-receptor/receptor/issues/153
+    """
+    node = Node(str(uuid4()), listen=f'receptor://127.0.0.1:{utils.random_port()}/path')
+    with pytest.raises(NodeUnavailableError):
+        node.start()
+
+
+def test_listen_query():
+    """Start a node, and give it a listen address with a query.
+
+    The node should fail to start. See `receptor #153`_.
+
+    .. _receptor #153: https://github.com/project-receptor/receptor/issues/153
+    """
+    node = Node(str(uuid4()), listen=f'receptor://127.0.0.1:{utils.random_port()}?key=val')
+    with pytest.raises(NodeUnavailableError):
+        node.start()
+
+
 def test_no_port_given():
     """Start a node, and don't specify a port on which to listen.
 
