@@ -47,19 +47,19 @@ async def watch_queue(conn, buf):
                 logger.exception("watch_queue: error getting data from buffer")
                 continue
 
-            try:
+            def _send_done(fut):
+                if fut.exception():
+                    logger.error("watch_queue: error received trying to write")
+                    asyncio.ensure_future(buf.put(msg))
+                    if conn is not None and not conn.closed:
+                        asyncio.ensure_future(conn.close())
+
+            if conn.closed:
+                logger.debug('Message not sent: connection already closed')
+            else:
                 logger.debug(f'Sending message {str(msg)}')
-                if conn.closed:
-                    logger.debug('Message not sent: connection already closed')
-                else:
-                    await conn.send(msg)
-            except Exception:
-                logger.exception("watch_queue: error received trying to write")
-                await buf.put(msg)
-                if conn is not None and not conn.closed:
-                    return await conn.close()
-                else:
-                    return
+                asyncio.ensure_future(conn.send(msg)).add_done_callback(_send_done)
+
     except asyncio.CancelledError:
         logger.debug("watch_queue: cancel request received")
         if conn is not None and not conn.closed:

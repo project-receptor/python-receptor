@@ -29,7 +29,9 @@ async def test_manifest(event_loop, tempdir):
     await b.put(b"three")
     assert b.q.qsize() == 3
 
-    assert len(b._read_manifest()) == 3
+    assert await b.get() == b"one"
+    assert await b.get() == b"two"
+    assert await b.get() == b"three"
 
 
 @pytest.mark.asyncio
