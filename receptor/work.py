@@ -2,7 +2,6 @@ import asyncio
 import concurrent.futures
 import datetime
 import logging
-import queue
 import traceback
 
 import pkg_resources

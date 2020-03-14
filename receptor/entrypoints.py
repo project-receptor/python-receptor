@@ -64,7 +64,7 @@ async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, sen
             print("Connection failed. Exiting.")
             break
         if (recipient and controller.receptor.router.node_is_known(recipient)) or (
-            not recipient and len(controller.receptor.router.get_nodes()) > 0
+            not recipient and len(controller.receptor.router.get_nodes()) > 1
         ):
             read_task = controller.loop.create_task(read_func())
             await send_func()
@@ -192,6 +192,8 @@ def run_as_status(config):
         print()
         print("Known Node Capabilities:")
         for node, node_caps in r.node_capabilities.items():
+            if node_caps.get("ephemeral", None) and not config.status_show_ephemeral:
+                continue
             print("  ", node, ":", sep="")
             for cap, cap_value in node_caps.items():
                 print("    ", cap, ": ", str(cap_value), sep="")

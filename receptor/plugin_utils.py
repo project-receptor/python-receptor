@@ -1,5 +1,3 @@
-from functools import wraps
-
 BYTES_PAYLOAD = "bytes"
 BUFFER_PAYLOAD = "buffer"
 FILE_PAYLOAD = "file"

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import os
-import queue
 from abc import abstractmethod, abstractproperty
 from collections.abc import AsyncIterator
 

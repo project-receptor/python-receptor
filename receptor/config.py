@@ -321,6 +321,14 @@ class ReceptorConfig:
             listof="str",
             hint="Set additional headers to provide when connecting to websocket peers.",
         )
+        self.add_config_option(
+            section="status",
+            key="show_ephemeral",
+            default_value=None,
+            set_value=True,
+            value_type="bool",
+            hint="Show ephemeral nodes in output",
+        )
         self.parse_options(args)
 
     def add_config_option(
