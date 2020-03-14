@@ -356,10 +356,7 @@ class ReceptorConfig:
             if short_option:
                 args.append(short_option)
             args.append(long_option)
-            kwargs = {
-                "help": hint,
-                "action": action,
-            }
+            kwargs = {"help": hint, "action": action}
             # if the long option doesn't start with '--' it's a positional arg, in which
             # case we don't want to use dest= because it will cause an argparse conflict
             if long_option.startswith("--"):

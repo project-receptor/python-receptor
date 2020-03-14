@@ -177,7 +177,7 @@ class MeshRouter:
         logger.info(f"Sending ping to node {node_id}, timestamp={now}")
         message = FramedMessage(
             header=dict(
-                sender=self.node_id, recipient=node_id, timestamp=now, directive="receptor:ping",
+                sender=self.node_id, recipient=node_id, timestamp=now, directive="receptor:ping"
             )
         )
         return await self.send(message, expected_response)

@@ -8,6 +8,7 @@ import traceback
 import pkg_resources
 
 from . import exceptions
+from .bridgequeue import BridgeQueue
 from .messages.framed import FileBackedBuffer, FramedMessage
 from .plugin_utils import BUFFER_PAYLOAD, BYTES_PAYLOAD, FILE_PAYLOAD
 from .stats import active_work_gauge, work_counter, work_info
@@ -75,8 +76,8 @@ class WorkManager:
             return payload.name
         return payload.readall()
 
-    def get_action_method(message)
-        namespace, action = message.header["directive"].split(":", 1)
+    def get_action_method(self, directive):
+        namespace, action = directive.split(":", 1)
         worker_module = self.load_receptor_worker(namespace)
         try:
             action_method = getattr(worker_module, action)
@@ -91,50 +92,42 @@ class WorkManager:
             raise exceptions.InvalidDirectiveAction(
                 f"Access denied calling {action} for {namespace}"
             )
+        return action_method, namespace
 
     async def handle(self, message):
-        logger.info(f'Handling work for {message.msg_id} as {message.header["directive"]}')
+        directive = message.header["directive"]
+        logger.info(f"Handling work for {message.msg_id} as {directive}")
         try:
             serial = 0
             eof_response = None
-            action_method = get_action_method(message)
+            action_method, namespace = self.get_action_method(directive)
             payload_input_type = getattr(action_method, "payload_type", BYTES_PAYLOAD)
 
             self.add_work(message)
-            response_queue = queue.Queue()
-            work_exec = self.thread_pool.submit(
-                action_method,
-                self.resolve_payload_input(payload_input_type, message.payload),
-                self.receptor.config.plugins.get(namespace, {}),
-                response_queue,
-            )
-            while True:
-                # Collect 'done' status here so we drain the response queue
-                # after the work is complete
-                is_done = work_exec.done()
-                while True:
-                    try:
-                        response = response_queue.get(False)
-                        serial += 1
-                        logger.debug(f"Response emitted for {message.msg_id}, serial {serial}")
-                        response_message = FramedMessage(
-                            header=dict(
-                                recipient=message.header["sender"],
-                                in_response_to=message.msg_id,
-                                serial=serial,
-                                timestamp=datetime.datetime.utcnow(),
-                            ),
-                            payload=FileBackedBuffer.from_data(response),
-                        )
-                        await self.receptor.router.send(response_message)
-                    except queue.Empty:
-                        break
-                if is_done:
-                    # Calling result() will raise any exceptions from the worker thread,
-                    # on this thread
-                    work_exec.result()
-                    break
-                await asyncio.sleep(0.05)
+            response_queue = BridgeQueue()
+            asyncio.wrap_future(
+                self.thread_pool.submit(
+                    action_method,
+                    self.resolve_payload_input(payload_input_type, message.payload),
+                    self.receptor.config.plugins.get(namespace, {}),
+                    response_queue,
+                )
+            ).add_done_callback(lambda fut: response_queue.close())
+
+            async for response in response_queue:
+                serial += 1
+                logger.debug(f"Response emitted for {message.msg_id}, serial {serial}")
+                response_message = FramedMessage(
+                    header=dict(
+                        recipient=message.header["sender"],
+                        in_response_to=message.msg_id,
+                        serial=serial,
+                        timestamp=datetime.datetime.utcnow(),
+                    ),
+                    payload=FileBackedBuffer.from_data(response),
+                )
+                await self.receptor.router.send(response_message)
+
         except Exception as e:
             logger.error(
                 f"""Error encountered while handling the response, replying with
