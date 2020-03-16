@@ -5,6 +5,7 @@ import signal
 import sys
 
 from .config import ReceptorConfig
+from .logstash_formatter.logstash import LogstashFormatter
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +23,20 @@ def main(args=None):
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {
-                "verbose": {
+                "simple": {
                     "format": "{levelname} {asctime} {node_id} {module} {message}",
                     "style": "{",
+                },
+                "structured": {"()": LogstashFormatter},
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "structured"
+                    if config.default_logging_format == "structured"
+                    else "simple",
                 }
             },
-            "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "verbose"}},
             "loggers": {
                 "receptor": {
                     "handlers": ["console"],
