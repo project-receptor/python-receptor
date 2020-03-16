@@ -26,12 +26,9 @@ class LogstashFormatter(logging.Formatter):
     shipped out to logstash.
     """
 
-    def __init__(self,
-                 fmt=None,
-                 datefmt=None,
-                 style='%',
-                 json_cls=None,
-                 json_default=_default_json_default):
+    def __init__(
+        self, fmt=None, datefmt=None, style="%", json_cls=None, json_default=_default_json_default
+    ):
         """
         :param fmt: Config as a JSON string, allowed fields;
                extra: provide extra fields always present in logs
@@ -49,12 +46,12 @@ class LogstashFormatter(logging.Formatter):
             self._fmt = {}
         self.json_default = json_default
         self.json_cls = json_cls
-        if 'extra' not in self._fmt:
+        if "extra" not in self._fmt:
             self.defaults = {}
         else:
-            self.defaults = self._fmt['extra']
-        if 'source_host' in self._fmt:
-            self.source_host = self._fmt['source_host']
+            self.defaults = self._fmt["extra"]
+        if "source_host" in self._fmt:
+            self.source_host = self._fmt["source_host"]
         else:
             try:
                 self.source_host = socket.gethostname()
@@ -72,7 +69,7 @@ class LogstashFormatter(logging.Formatter):
 
         if isinstance(record.msg, dict):
             fields.update(record.msg)
-            fields.pop('msg')
+            fields.pop("msg")
             msg = ""
         else:
             msg = record.getMessage()
@@ -85,27 +82,31 @@ class LogstashFormatter(logging.Formatter):
             # in case we can not format the msg properly we log it as is instead of crashing
             msg = msg
 
-        if 'msg' in fields:
-            fields.pop('msg')
+        if "msg" in fields:
+            fields.pop("msg")
 
-        if 'exc_info' in fields:
-            if fields['exc_info']:
-                formatted = tb.format_exception(*fields['exc_info'])
-                fields['exception'] = formatted
-            fields.pop('exc_info')
+        if "exc_info" in fields:
+            if fields["exc_info"]:
+                formatted = tb.format_exception(*fields["exc_info"])
+                fields["exception"] = formatted
+            fields.pop("exc_info")
 
-        if 'exc_text' in fields and not fields['exc_text']:
-            fields.pop('exc_text')
+        if "exc_text" in fields and not fields["exc_text"]:
+            fields.pop("exc_text")
 
         logr = self.defaults.copy()
 
         # remove nulls
         fields = {k: v for k, v in fields.items() if v}
 
-        logr.update({'@message': msg,
-                     '@timestamp': datetime.datetime.utcnow().isoformat(),
-                     '@source_host': self.source_host,
-                     '@fields': self._build_fields(logr, fields)})
+        logr.update(
+            {
+                "@message": msg,
+                "@timestamp": datetime.datetime.utcnow().isoformat(),
+                "@source_host": self.source_host,
+                "@fields": self._build_fields(logr, fields),
+            }
+        )
 
         return json.dumps(logr, default=self.json_default, cls=self.json_cls)
 
@@ -125,4 +126,4 @@ class LogstashFormatter(logging.Formatter):
                 {'foo': 'one'}
         True
         """
-        return dict(list(defaults.get('@fields', {}).items()) + list(fields.items()))
+        return dict(list(defaults.get("@fields", {}).items()) + list(fields.items()))

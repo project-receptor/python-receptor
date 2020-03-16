@@ -26,8 +26,8 @@ import tempfile
 import uuid
 from enum import IntEnum
 
-from ..exceptions import ReceptorRuntimeError
 from .. import serde as json
+from ..exceptions import ReceptorRuntimeError
 
 logger = logging.getLogger(__name__)
 
@@ -102,9 +102,11 @@ def join_uuid(hi, lo):
 
 
 class FileBackedBuffer:
-    def __init__(self, fp, length=0):
+    def __init__(self, fp, length=0, min_chunk=2 ** 12, max_chunk=2 ** 20):
         self.length = length
         self.fp = fp
+        self._min_chunk = min_chunk
+        self._max_chunk = max_chunk
 
     @classmethod
     def from_temp(cls, dir=None, delete=False):
@@ -137,11 +139,20 @@ class FileBackedBuffer:
 
     @classmethod
     def from_path(cls, path):
-        return cls(open(path, "r+b"), os.path.getsize(path))
+        return cls(open(path, "rb"), os.path.getsize(path))
 
     @property
     def name(self):
         return self.fp.name
+
+    @property
+    def chunksize(self):
+        """
+        Returns a chunksize to be used when reading the data.
+
+        Attempts to create 1024 chunks bounded by min and max chunk sizes.
+        """
+        return min(self._max_chunk, max(self._min_chunk, self.length // 1024))
 
     def write(self, data):
         written = self.fp.write(data)
@@ -164,6 +175,9 @@ class FileBackedBuffer:
 
     def __len__(self):
         return self.length
+
+    def __str__(self):
+        return f"<FileBackedBuffer {self.fp}, {self.length} bytes, {self.chunksize} chunk size>"
 
 
 class FramedMessage:
@@ -200,7 +214,7 @@ class FramedMessage:
         if self.payload:
             yield Frame.wrap(self.payload, msg_id=self.msg_id).serialize()
             self.payload.seek(0)
-            reader = functools.partial(self.payload.read, size=2 ** 12)
+            reader = functools.partial(self.payload.read, size=self.payload.chunksize)
             for chunk in iter(reader, b""):
                 yield chunk
 

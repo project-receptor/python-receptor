@@ -5,10 +5,7 @@ from functools import partial
 
 def encode_date(obj):
     if isinstance(obj, datetime.datetime):
-        return {
-            "_type": "datetime.datetime",
-            "value": obj.timestamp(),
-        }
+        return {"_type": "datetime.datetime", "value": obj.timestamp()}
     raise TypeError
 
 

@@ -321,6 +321,14 @@ class ReceptorConfig:
             listof="str",
             hint="Set additional headers to provide when connecting to websocket peers.",
         )
+        self.add_config_option(
+            section="status",
+            key="show_ephemeral",
+            default_value=None,
+            set_value=True,
+            value_type="bool",
+            hint="Show ephemeral nodes in output",
+        )
         self.parse_options(args)
 
     def add_config_option(
@@ -356,10 +364,7 @@ class ReceptorConfig:
             if short_option:
                 args.append(short_option)
             args.append(long_option)
-            kwargs = {
-                "help": hint,
-                "action": action,
-            }
+            kwargs = {"help": hint, "action": action}
             # if the long option doesn't start with '--' it's a positional arg, in which
             # case we don't want to use dest= because it will cause an argparse conflict
             if long_option.startswith("--"):
