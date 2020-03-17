@@ -57,25 +57,27 @@ def run_as_node(config):
 
 
 async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, send_func, read_func):
-    add_peer_task = controller.add_peer(peer, ws_extra_headers=ws_extra_headers)
-    start_wait = time.time()
-    while True:
-        if add_peer_task and add_peer_task.done() and not add_peer_task.result():
-            print("Connection failed. Exiting.")
-            break
-        if (recipient and controller.receptor.router.node_is_known(recipient)) or (
-            not recipient and len(controller.receptor.router.get_nodes()) > 1
-        ):
-            read_task = controller.loop.create_task(read_func())
-            await send_func()
-            await read_task
-            break
-        if time.time() - start_wait > 5:
-            print("Connection timed out. Exiting.")
-            if not add_peer_task.done():
-                add_peer_task.cancel()
-            break
-        await asyncio.sleep(0.1)
+    if (not recipient) or (recipient != controller.receptor.node_id):
+        add_peer_task = controller.add_peer(peer, ws_extra_headers=ws_extra_headers)
+        start_wait = time.time()
+        while True:
+            if add_peer_task and add_peer_task.done() and not add_peer_task.result():
+                print("Connection failed. Exiting.")
+                return False
+            if (recipient and controller.receptor.router.node_is_known(recipient)) or (
+                not recipient and len(controller.receptor.router.get_nodes()) > 1
+            ):
+                break
+            if time.time() - start_wait > 5:
+                print("Connection timed out. Exiting.")
+                if not add_peer_task.done():
+                    add_peer_task.cancel()
+                return False
+            await asyncio.sleep(0.1)
+    read_task = controller.loop.create_task(read_func())
+    await send_func()
+    await read_task
+    return True
 
 
 def run_as_ping(config):
@@ -142,10 +144,6 @@ def run_as_send(config):
             logger.debug(f"{message}")
             if message.header.get("in_response_to", None):
                 logger.debug("Received response message")
-                if message.payload:
-                    print(message.payload.readall().decode())
-                else:
-                    print("---")
                 if message.header.get("eof", False):
                     logger.info("Received EOF")
                     if message.header.get("code", 0) != 0:
@@ -155,6 +153,10 @@ def run_as_send(config):
                         else:
                             print(f"No EOF Error Payload")
                     break
+                elif message.payload:
+                    print(message.payload.readall().decode())
+                else:
+                    print("---")
             else:
                 logger.warning(f"Received unknown message {message}")
 
