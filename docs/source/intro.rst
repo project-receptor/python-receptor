@@ -1,13 +1,7 @@
 .. _intro:
 
-Introduction to Receptor Concepts
-=================================
-
-Receptor is meant, primarily, to provide connectivity for services that need
-to distribute work across different network topologies
-
-.. image:: ../receptor_arch.png
-   :scale: 50%
+Introduction to Receptor
+========================
 
 Nodes connect to each other either by accepting connections from other nodes
 or establishing connections to nodes themselves. Once these connections are
@@ -22,116 +16,100 @@ optimal route. If a more optimal route doesn't exist then messages will be
 stored until connectivity is restored to that node, or a new route is created
 elsewhere.
 
-NodeID
-------
+Once a message reaches its destination it's handed off to one of the installed
+plugins (see :ref:`plugins`) to perform the work. A plugin can send one or more
+response messages back to the sender via the mesh until it is finished.
 
-Each **Receptor** node has a *node id* that is used to identify it. This is
-separate from any other identifying characteristic (such as hostname or ip
-address) since multiple nodes can run on the same host. If the node itself
-isn't configured with one then one will be generated for it.
+.. image:: basic_receptor.png
+    :align: center
+    :target: https://github.com/projectreceptor/receptor
+
+.. _concepts:
+
+Terminology and Concepts
+------------------------
+
+.. _term_nodes:
+
+Nodes
+^^^^^
+
+A **node** is any instance of Receptor running in the mesh, regardless of the role
+or purpose it is serving. It is typically connected to other nodes either by
+establishing a connection to the other node or receiving a connection.
+
+Nodes broadcast their availability and capabilities to their neighbors on the
+mesh. These broadcasts are then relayed to other nodes such that any other node knows
+how to route traffic destined for a particular node or group of nodes.
+
+A Node is then capable of routing messages from one node that it knows about to 
+other nodes that it knows about. If it is the target of the message, it can perform
+the work and send responses back to the sender.
+
+.. _term_controller:
 
 Controllers
------------
+^^^^^^^^^^^
 
-A **Receptor** Controller exposes an interface on a port that allows other
-services to communicate with the Receptor network in order to distribute work
-and receive replies.
+A **Controller** is a special type of **Node** in that it is responsible for sending
+work to other nodes. Typically a controller is some other system or program
+that imports the functionality from the **Receptor** codebase in order to link itself
+to the mesh of systems that could act on messages or work needed to be performed by
+the system.
 
-Routers
--------
+There can be one or many controllers present on the mesh. Since controllers are just
+another type of node, they can also be capable of performing work or routing messages.
 
-**Receptor** Routers manage connections between nodes. Almost all Receptor
-nodes are also routers that can participate in directing traffic to where
-it needs to go. Even leaf nodes that only have a single connection will
-broadcast their availability to perform work out to the larger mesh of
-receptors.
+For more details on writing and integrating controllers see :ref:`plugins`
 
-Workers
----------
+.. _term_work:
 
-**Receptor** Worker nodes are nodes that have been configured to perform work.
-These nodes have plugins installed alongside them that allow them to execute
-tasks and respond with status and results. These plugins, when installed,
-inform the Receptor network about the node's capabilities and any extra
-metadata that may aid the Receptor network in routing work to them. This
-information is automatically broadcast to the rest of the Receptor network.
+Messages, Plugins, and Work
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Example of running a basic Receptor Network
--------------------------------------------
+The Receptor mesh itself does not care and is unopinionated about the messages that are
+sent across it. Controllers (that send messages and receive responses) and Plugins (that
+receive and act on messages) are expected to agree on a contract regarding the format.
 
-First lets install Receptor, you can do this from pip or a source checkout:
+The Controller interface has multiple input options for taking data and formatting it into
+a message before sending it along to the mesh see :ref:`controller`
 
-.. code-block:: sh
+Likewise, the plugin interface has multiple options to allow the plugin to inform the mesh
+node in how it wants the data delivered to the worker, see :ref:`plugin`
 
-    pip install receptor
+Plugins are just python modules that expose a particular entrypoint. When the Receptor node
+starts up it will look for those plugins and import them and include their information
+when broadcasting the node's capabilities to its neighbors. All you should need to do to
+**install** a plugin is to use **pip** (or yum, dnf, apt, wherever you get your plugins from)
 
-We're going to launch a very simple Receptor network that looks like this::
+.. _term_flow:
 
-    controller <--> node-a <--> node-b
+Connections and Message Flow
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Then we're going to send a ping request from the ``controller`` to ``node-b``.
+By default each Node is configured to start a listening service to accept incoming
+connections from other nodes. Each node can **also** be configured to reach out and connect
+directly to other nodes (called **peers**). This means that each node is likely to have
+possibly many connections to other nodes, and this is how the **mesh** is formed.
 
-Now that we have **Receptor** installed we're going to start the 3 nodes in the
-following configuration:
+Once these connections are established it makes NO difference in how and in which direction
+messages are routed. The mesh is formed and messages can be routed in any direction and
+through any other node.
 
-``controller``
-    Will listen on port 8888 and for controller requests on
-    ``/tmp/receptor.sock``
+.. _term_reliability:
 
-``node-a``
-    Will listen on port 8889 and connect to ``controller`` on port 8888
+Stability, Reliability, and Delivery Consistency
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-``node-b``
-    Will not start a listening server but will connect directly to ``node-a`` on
-    port 8889
+Receptor makes every effort to deliver messages to the appropriate node, although it makes
+no guarantee on the path the message will take through the mesh. If a node along the route
+is down or offline then the message will be rerouted through other nodes. If there is no
+route available then the message will be stored on the last node that it made it to before
+route calculation failed to find another route. The amount of time a message will spend waiting
+on the mesh is configurable. If it reaches its timeout an error will be delivered back to the
+sender.
 
-In the video below you'll see these 3 nodes launched in a ``tmux`` 4-pane layout
-with the following commands:
-
-.. code-block:: sh
-
-    receptor \
-        --node-id=controller \
-        --data-dir /tmp/controller \
-        controller \
-        --socket-path=/tmp/receptor.sock \
-        --listen-port=8888
-    receptor \
-        --node-id=node-a \
-        --data-dir /tmp/node-a \
-        node \
-        --listen-port=8889 \
-        --peer=localhost:8888
-    receptor \
-        --node-id=node-b \
-        --data-dir /tmp/node-b \
-        node \
-        --listen-port=8890 \
-        --peer=localhost:8889
-
-In the last pane we execute the ``ping`` command:
-
-.. code-block:: sh
-
-    receptor ping --socket-path=/tmp/receptor.sock node-b
-
-.. image:: ../receptor_demo_basic.gif
-   :scale: 80%
-
-That's just a ping, though, what if we wanted to do some real work?
-`Ansible Runner <https://github.com/ansible/ansible-runner>`_ adds support for
-**Receptor** in `this pull request <https://github.com/ansible/ansible-runner/pull/308>`_
-
-In the video below you'll see a very similar workflow but instead of running the
-built-in ping command we'll call the Ansible ping module with:
-
-.. code-block:: sh
-
-    receptor send \
-        --socket-path=/tmp/receptor.sock \
-        --directive=runner:execute \
-        --recipient=node-b \
-        '{"module": "ping", "inventory": "localhost", "extravars": {"ansible_connection": "local"}, "host_pattern": "localhost"}'
-
-.. image:: ../receptor_demo_runner.gif
-   :scale: 80%
+A Receptor node itself maintains an internal accounting of messages awaiting delivery but the
+mesh itself makes no guarantee that a message **will** be delivered or even ever make it to its
+destination. The Controller system should take steps to handle the case where it might not ever
+hear back from the mesh about a sent message.
