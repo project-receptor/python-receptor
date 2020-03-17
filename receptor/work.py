@@ -107,6 +107,7 @@ class WorkManager:
             asyncio.wrap_future(
                 self.thread_pool.submit(
                     action_method,
+                    message.header,
                     self.resolve_payload_input(payload_input_type, message.payload),
                     self.receptor.config.plugins.get(namespace, {}),
                     response_queue,
