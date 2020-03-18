@@ -3,6 +3,7 @@ import datetime
 import io
 import logging
 import os
+import shutil
 from contextlib import suppress
 
 from .connection.base import Worker
