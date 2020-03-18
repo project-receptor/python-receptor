@@ -98,3 +98,17 @@ class Controller:
             pass
         finally:
             self.loop.stop()
+
+    def cleanup_tmpdir(self):
+        try:
+            is_ephemeral = self.receptor.config._is_ephemeral
+            base_path = self.receptor.base_path
+        except AttributeError:
+            return
+        if is_ephemeral:
+            try:
+                logger.debug(f"Removing temporary directory {base_path}")
+                shutil.rmtree(base_path)
+            except Exception:
+                logger.error(f"Error while removing temporary directory {base_path}", exc_info=True)
+

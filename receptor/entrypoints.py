@@ -11,20 +11,6 @@ from .controller import Controller
 logger = logging.getLogger(__name__)
 
 
-def cleanup_tmpdir(controller):
-    try:
-        is_ephemeral = controller.receptor.config._is_ephemeral
-        base_path = controller.receptor.base_path
-    except AttributeError:
-        return
-    if is_ephemeral:
-        try:
-            logger.debug(f"Removing temporary directory {base_path}")
-            shutil.rmtree(base_path)
-        except Exception:
-            logger.error(f"Error while removing temporary directory {base_path}", exc_info=True)
-
-
 def run_as_node(config):
     async def node_keepalive():
         # NOTE: I'm not really happy with this, I'd love to be able to await Peer(node).ping()
@@ -53,7 +39,7 @@ def run_as_node(config):
         controller.loop.create_task(controller.receptor.watch_expire())
         controller.run()
     finally:
-        cleanup_tmpdir(controller)
+        controller.cleanup_tmpdir()
 
 
 async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, send_func, read_func):
@@ -115,7 +101,7 @@ def run_as_ping(config):
         controller = Controller(config)
         controller.run(ping_entrypoint)
     finally:
-        cleanup_tmpdir(controller)
+        controller.cleanup_tmpdir()
 
 
 def run_as_send(config):
@@ -168,7 +154,7 @@ def run_as_send(config):
         controller = Controller(config)
         controller.run(send_entrypoint)
     finally:
-        cleanup_tmpdir(controller)
+        controller.cleanup_tmpdir()
 
 
 def run_as_status(config):
@@ -207,4 +193,4 @@ def run_as_status(config):
         controller = Controller(config)
         controller.run(status_entrypoint)
     finally:
-        cleanup_tmpdir(controller)
+        controller.cleanup_tmpdir()
