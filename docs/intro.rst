@@ -20,7 +20,7 @@ Once a message reaches its destination it's handed off to one of the installed
 plugins (see :ref:`plugins`) to perform the work. A plugin can send one or more
 response messages back to the sender via the mesh until it is finished.
 
-.. image:: basic_receptor.png
+.. image:: _static/basic_receptor.png
     :align: center
     :target: https://github.com/projectreceptor/receptor
 

@@ -12,19 +12,19 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
+import os
+import sys
 
-# sys.path.insert(0, os.path.abspath("../"))
-# sys.path.insert(0, os.path.abspath("."))
-# sys.path.insert(0, os.path.abspath('./'))
+sys.path.insert(0, os.path.abspath("../"))
+sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, os.path.abspath("./"))
 
 
 # -- Project information -----------------------------------------------------
 
 project = "Receptor"
-copyright = "2019, Matthew Jones, Jesse Jaggars, Joshua Ginsberg"
-author = "Matthew Jones, Jesse Jaggars, Joshua Ginsberg"
+copyright = "2019, Red Hat"
+author = "Red Hat"
 
 # The short X.Y version
 version = ""

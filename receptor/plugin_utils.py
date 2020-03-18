@@ -9,7 +9,8 @@ def plugin_export(payload_type):
     entrypoints typically defined in your setup.py file::
 
         entry_points={
-            'receptor.worker': 'your_package_name = your_package_name.your_module',
+            'receptor.worker': 
+              'your_package_name = your_package_name.your_module',
         }
 
     ``your_package_name.your_module`` should then contain a function decorated with
@@ -24,13 +25,13 @@ def plugin_export(payload_type):
 
     Depending on what kind of data you expect to receive you can select from one
     of 3 different incoming payload types. This determines the incoming type of the
-    ``message`` data type::
+    ``message`` data type:
 
-    * BYTES_PAYLOAD: This will give you literal python ``bytes`` that you can then read
+    * BYTES_PAYLOAD: This will give you literal python bytes that you can then read
       and interpret.
-    * BUFFER_PAYLOAD: This will send you a buffer that you can ``.read()``. This buffer
+    * BUFFER_PAYLOAD: This will send you a buffer that you can read(). This buffer
       will be automatically closed and its contents discarded when your plugin returns.
-    * FILE_PAYLOAD: This will return you a file path that you can ``open()`` or manage
+    * FILE_PAYLOAD: This will return you a file path that you can open() or manage
       in any way you see fit. It will be automatically removed after your plugin returns.
 
     For more information about developing plugins see :ref:`developing-plugins`.
