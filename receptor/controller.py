@@ -112,4 +112,3 @@ class Controller:
                 shutil.rmtree(base_path)
             except Exception:
                 logger.error(f"Error while removing temporary directory {base_path}", exc_info=True)
-
