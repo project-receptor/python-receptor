@@ -18,7 +18,6 @@ def parse_peer(peer, role):
         and (parsed_peer.path or parsed_peer.params or parsed_peer.query or parsed_peer.fragment)
     ):
         raise RuntimeError(f"Invalid Receptor peer specified: {peer}")
-
     return parsed_peer
 
 
@@ -58,7 +57,12 @@ class Manager:
         if service.scheme in ("rnp", "rnps"):
             return self.loop.create_task(
                 sock.connect(
-                    service.hostname, service.port, self.factory, self.loop, ssl_context, reconnect
+                    service.hostname,
+                    service.port or default_scheme_ports[service.scheme],
+                    self.factory,
+                    self.loop,
+                    ssl_context,
+                    reconnect
                 )
             )
         elif service.scheme in ("ws", "wss"):
