@@ -1,22 +1,40 @@
 import datetime
 import json
-from functools import partial
+from functools import partial, singledispatch
+
+decoders = {}
 
 
-def encode_date(obj):
-    if isinstance(obj, datetime.datetime):
-        return {"_type": "datetime.datetime", "value": obj.timestamp()}
-    raise TypeError
+def decoder(typename):
+    def _inner(func):
+        decoders[typename] = func
+        return func
+    return _inner
 
 
-def decode_date(o):
-    type_ = o.get("_type")
-    if type_ != "datetime.datetime":
+def decode(o):
+    try:
+        return decoders[o["_type"]](o["value"])
+    except Exception:
         return o
-    return datetime.datetime.fromtimestamp(o["value"])
 
 
-load = partial(json.load, object_hook=decode_date)
-loads = partial(json.loads, object_hook=decode_date)
-dump = partial(json.dump, default=encode_date)
-dumps = partial(json.dumps, default=encode_date)
+@singledispatch
+def encode(o):
+    return json.JSONEncoder.default(o)
+
+
+@encode.register(datetime.datetime)
+def encode_date(obj):
+    return {"_type": "datetime.datetime", "value": obj.timestamp()}
+
+
+@decoder("datetime.datetime")
+def decode_date(value):
+    return datetime.datetime.fromtimestamp(value)
+
+
+load = partial(json.load, object_hook=decode)
+loads = partial(json.loads, object_hook=decode)
+dump = partial(json.dump, default=encode)
+dumps = partial(json.dumps, default=encode)
