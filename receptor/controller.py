@@ -128,7 +128,7 @@ class Controller:
         * io.BytesIO - This can be any type that is based on *io.BytesIO* and  supports read()
 
         The *directive* should be a string and take the form of ``<plugin>:<method`` for example,
-        the `Receptor HTTP Plugin <https://github.com/project-receptor/receptor-http>` would take
+        the `Receptor HTTP Plugin <https://github.com/project-receptor/receptor-http>`_ would take
         the form of ``receptor-http:execute``
 
         This method returns a message identifier, that message identifier can be used to reference
@@ -168,8 +168,11 @@ class Controller:
         information about when it received the ping, what its capabilities are and what work it
         is currently doing.
 
+        A good example of a standalone Controller that just implements ping can be found at
+        :meth:`receptor.entrypoints.run_as_ping`
+
         :param destination: The node id of the target node
-        :returns a message-id that can be used to reference responses
+        :returns: a message-id that can be used to reference responses
         """
         return await self.receptor.router.ping_node(destination, expected_response)
 
