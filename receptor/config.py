@@ -176,7 +176,9 @@ class ReceptorConfig:
         self.add_config_option(
             section="node",
             key="server_disable",
+            long_option="--server-disable",
             default_value=False,
+            set_value=True,
             value_type="bool",
             hint="Disable the server function and only connect to configured peers",
         )
