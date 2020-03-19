@@ -89,8 +89,14 @@ def run_as_ping(config):
                 yield 0
 
     async def ping_entrypoint():
-        return await run_oneshot_command(controller, config.ping_peer, config.ping_recipient,
-                                         config.ping_ws_extra_headers, send_pings, read_responses)
+        return await run_oneshot_command(
+            controller,
+            config.ping_peer,
+            config.ping_recipient,
+            config.ping_ws_extra_headers,
+            send_pings,
+            read_responses,
+        )
 
     async def read_responses():
         for _ in ping_iter():
@@ -103,7 +109,7 @@ def run_as_ping(config):
             await asyncio.sleep(config.ping_delay)
 
     try:
-        logger.info(f'Sending ping to {config.ping_recipient} via {config.ping_peer}.')
+        logger.info(f"Sending ping to {config.ping_recipient} via {config.ping_peer}.")
         controller = Controller(config)
         controller.run(ping_entrypoint)
     finally:
@@ -112,8 +118,14 @@ def run_as_ping(config):
 
 def run_as_send(config):
     async def send_entrypoint():
-        return await run_oneshot_command(controller, config.send_peer, config.send_recipient,
-                                         config.ws_extra_headers, send_message, read_responses)
+        return await run_oneshot_command(
+            controller,
+            config.send_peer,
+            config.send_recipient,
+            config.send_ws_extra_headers,
+            send_message,
+            read_responses,
+        )
 
     async def send_message():
         msg = Message(config.send_recipient, config.send_directive)
