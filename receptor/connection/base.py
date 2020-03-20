@@ -63,11 +63,11 @@ class Worker:
         except Exception:
             logger.exception("receive")
 
-    def register(self):
-        self.receptor.update_connections(self.conn, id_=self.remote_id)
+    async def register(self):
+        await self.receptor.update_connections(self.conn, id_=self.remote_id)
 
-    def unregister(self):
-        self.receptor.remove_connection(self.conn, id_=self.remote_id, loop=self.loop)
+    async def unregister(self):
+        await self.receptor.remove_connection(self.conn, id_=self.remote_id, loop=self.loop)
         self._cancel(self.read_task)
         self._cancel(self.handle_task)
         self._cancel(self.write_task)
@@ -138,7 +138,7 @@ class Worker:
         logger.debug("waiting for HI")
         response = await self.buf.get()  # TODO: deal with timeout
         self.remote_id = response.header["id"]
-        self.register()
+        await self.register()
 
     async def client(self, transport):
         try:
@@ -149,7 +149,7 @@ class Worker:
             await self.start_processing()
             logger.debug("normal exit")
         finally:
-            self.unregister()
+            await self.unregister()
 
     async def server(self, transport):
         try:
@@ -159,4 +159,4 @@ class Worker:
             await self.hello()
             await self.start_processing()
         finally:
-            self.unregister()
+            await self.unregister()

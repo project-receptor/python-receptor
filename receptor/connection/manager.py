@@ -62,7 +62,7 @@ class Manager:
                     self.factory,
                     self.loop,
                     ssl_context,
-                    reconnect
+                    reconnect,
                 )
             )
         elif service.scheme in ("ws", "wss"):
