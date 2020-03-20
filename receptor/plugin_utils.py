@@ -1,6 +1,17 @@
 BYTES_PAYLOAD = "bytes"
+"""
+Inform Receptor that the given plugin expects BYTES for the message data
+"""
+
 BUFFER_PAYLOAD = "buffer"
+"""
+Inform Receptor that the given plugin expects a buffered reader for the message data
+"""
+
 FILE_PAYLOAD = "file"
+"""
+Inform Receptor that the given plugin expects a file path for the message data
+"""
 
 
 def plugin_export(payload_type):
@@ -16,7 +27,7 @@ def plugin_export(payload_type):
     ``your_package_name.your_module`` should then contain a function decorated with
     ``plugin_export`` as such::
 
-        @receptor.plugin_export(payload_type=BYTES_PAYLOAD):
+        @receptor.plugin_export(payload_type=receptor.BYTES_PAYLOAD):
         def execute(message, config, result_queue):
             result_queue.put("My plugin ran!")
 
@@ -34,7 +45,7 @@ def plugin_export(payload_type):
     * FILE_PAYLOAD: This will return you a file path that you can open() or manage
       in any way you see fit. It will be automatically removed after your plugin returns.
 
-    For more information about developing plugins see :ref:`developing-plugins`.
+    For more information about developing plugins see :ref:`plugins`.
     """
 
     def decorator(func):

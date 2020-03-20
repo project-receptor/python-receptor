@@ -75,7 +75,7 @@ The Controller interface has multiple input options for taking data and formatti
 a message before sending it along to the mesh see :ref:`controller`
 
 Likewise, the plugin interface has multiple options to allow the plugin to inform the mesh
-node in how it wants the data delivered to the worker, see :ref:`plugin`
+node in how it wants the data delivered to the worker, see :ref:`plugins`
 
 Plugins are just python modules that expose a particular entrypoint. When the Receptor node
 starts up it will look for those plugins and import them and include their information
