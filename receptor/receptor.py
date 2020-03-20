@@ -113,10 +113,8 @@ class Receptor:
 
     def remove_connection_manifest(self, connection):
         logger.info("Expiring connection {}".format(connection))
-        manifest = self.get_connection_manifest()
-        if connection in manifest:
-            manifest.remove(connection)
-            self.write_connection_manifest(manifest)
+        manifest = [m for m in self.get_connection_manifest() if m["id"] != connection]
+        self.write_connection_manifest(manifest)
 
     async def message_handler(self, buf):
         logger.debug("spawning message_handler")
