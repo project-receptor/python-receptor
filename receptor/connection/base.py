@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from .. import fileio
 from ..bridgequeue import BridgeQueue
 from ..messages.framed import FramedBuffer
+from ..serde import encode
 
 logger = logging.getLogger(__name__)
 

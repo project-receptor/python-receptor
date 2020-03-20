@@ -3,8 +3,10 @@ import logging
 import logging.config
 import signal
 import sys
+from collections import deque
 
 from .config import ReceptorConfig
+from .diagnostics import log_buffer
 from .logstash_formatter.logstash import LogstashFormatter
 
 logger = logging.getLogger(__name__)
@@ -48,6 +50,8 @@ def main(args=None):
 
     def _f(record):
         record.node_id = config.default_node_id
+        if record.levelno == logging.ERROR:
+            log_buffer.appendleft(record)
         return True
 
     for h in logging.getLogger("receptor").handlers:

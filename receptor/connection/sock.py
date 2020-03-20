@@ -1,5 +1,7 @@
 import asyncio
 import logging
+
+from ..serde import encode
 from .base import Transport, log_ssl_detail
 
 logger = logging.getLogger(__name__)
@@ -30,6 +32,11 @@ class RawSocket(Transport):
         async for chunk in q:
             self.writer.write(chunk)
         await self.writer.drain()
+
+
+@encode.register(RawSocket)
+def encode_rawsocket(o):
+    return {"extra": o.writer.get_extra_info(), "closed": o.closed, "chunk_size": o.chunk_size}
 
 
 async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):
