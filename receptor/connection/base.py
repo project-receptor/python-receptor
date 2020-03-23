@@ -4,6 +4,7 @@ import os
 from abc import abstractmethod, abstractproperty
 from collections.abc import AsyncIterator
 
+from .. import fileio
 from ..bridgequeue import BridgeQueue
 from ..messages.framed import FramedBuffer
 
@@ -48,6 +49,7 @@ class Worker:
         self.handle_task = None
         self.write_task = None
         self.outbound = None
+        self.deferrer = fileio.Deferrer(loop=self.loop)
 
     def start_receiving(self):
         self.read_task = self.loop.create_task(self.receive())
@@ -97,42 +99,41 @@ class Worker:
             logger.debug(f"Watching queue {str(self.conn)}")
             while not self.conn.closed:
                 try:
-                    ident, fp = await asyncio.wait_for(self.outbound.get(handle_only=True), 5.0)
-                    if not fp:
-                        await self.close()
+                    item = await asyncio.wait_for(self.outbound.get(), 5.0)
                 except asyncio.TimeoutError:
                     continue
                 except Exception:
                     logger.exception("watch_queue: error getting data from buffer")
                     continue
                 else:
-                    asyncio.ensure_future(self.drain_buf(ident, fp))
+                    # XXX: I think we need to wait for this to finish before starting another .get
+                    asyncio.ensure_future(self.drain_buf(item))
 
         except asyncio.CancelledError:
             logger.debug("watch_queue: cancel request received")
             self.close()
 
-    async def drain_buf(self, ident, fp):
+    async def drain_buf(self, item):
         try:
             if self.conn.closed:
                 logger.debug("Message not sent: connection already closed")
             else:
-                q = BridgeQueue(maxsize=1)
-                await asyncio.gather(
-                    self.loop.run_in_executor(None, q.read_from, fp), self.conn.send(q)
-                )
+                async with fileio.File(item["path"], "rb") as afp:
+                    q = BridgeQueue(maxsize=1)
+                    await asyncio.gather(
+                        self.deferrer.defer(q.read_from, afp.fileobj), self.conn.send(q)
+                    )
         except Exception:
+            # XXX: Break out these exceptions to deal with file problems and network problem separately?
             logger.exception("watch_queue: error received trying to write")
-            await self.outbound.put_ident(ident)
+            await self.outbound.put_ident(item)
             return await self.close()
         else:
             try:
-                await self.loop.run_in_executor(None, os.remove, fp.name)
+                await self.deferrer.defer(os.remove, item["path"])
             except TypeError:
-                logger.exception("failed to os.remove %s", fp)
+                logger.exception("failed to os.remove %s", item["path"])
                 pass  # some messages aren't actually files
-        finally:
-            fp.close()
 
     async def _wait_handshake(self):
         logger.debug("waiting for HI")

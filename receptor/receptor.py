@@ -42,52 +42,63 @@ def get_peers_of(edges, node):
 class Manifest:
     def __init__(self, path):
         self.path = path
+        self.lock = asyncio.Lock()
 
     async def watch_expire(self, buffer_mgr):
         while True:
-            current_manifest = await self.get()
-            for connection in current_manifest:
-                buffer = buffer_mgr[connection["id"]]
-                await buffer.expire()
-                if connection["last"] + 86400 < time.time():
-                    await self.remove(connection["id"])
+            async with self.lock:
+                current_manifest = await self.get()
+                to_remove = set()
+                for connection in current_manifest:
+                    buffer = buffer_mgr[connection["id"]]
+                    await buffer.expire_all()
+                    if connection["last"] + 86400 < time.time():
+                        to_remove.add(connection["id"])
+                if to_remove:
+                    new_manifest = set(current_manifest) - to_remove
+                    await self.write(list(new_manifest))
             await asyncio.sleep(600)
 
     async def get(self):
         if not os.path.exists(self.path):
             return []
         try:
-            async with fileio.Opened(self.path, "r") as fd:
-                data = await fileio.run_in_executor(fd.read)
+            async with fileio.File(self.path, "r") as fd:
+                data = await fd.read()
                 return json.loads(data)
         except Exception as e:
             logger.warn("Failed to read connection manifest: %s", e)
+            logger.exception("damn")
             return []
 
     async def write(self, manifest):
-        async with fileio.Opened(self.path, "w") as fd:
-            await fileio.run_in_executor(fd.write, json.dumps(manifest))
+        async with fileio.File(self.path, "w") as fd:
+            await fd.write(json.dumps(manifest))
 
     async def update(self, connection):
-        manifest = await self.get()
-        found = False
-        for node in manifest:
-            if node["id"] == connection:
-                node["last"] = time.time()
-                found = True
-                break
-        if not found:
-            manifest.append(dict(id=connection, last=time.time()))
-        await self.write(manifest)
+        async with self.lock:
+            manifest = await self.get()
+            found = False
+            for node in manifest:
+                if node["id"] == connection:
+                    node["last"] = time.time()
+                    found = True
+                    break
+            if not found:
+                manifest.append(dict(id=connection, last=time.time()))
+            await self.write(manifest)
 
     async def remove(self, connection):
-        logger.info("Expiring connection %s", connection)
-        current = await self.get()
-        manifest = [m for m in current if m["id"] != connection]
-        await self.write(manifest)
+        async with self.lock:
+            logger.info("Expiring connection %s", connection)
+            current = await self.get()
+            manifest = [m for m in current if m["id"] != connection]
+            await self.write(manifest)
 
 
 class Receptor:
+    """ Owns all connections and maintains adding and removing them. """
+
     def __init__(
         self, config, node_id=None, router_cls=None, work_manager_cls=None, response_queue=None
     ):
