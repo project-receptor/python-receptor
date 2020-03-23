@@ -81,6 +81,10 @@ Multiple instances of a plugin can be run at the same time corresponding to the 
 the plugin is invoked by one or more controllers. There is an upper limit to the number of
 simultaneous instances allowed to run, other invocations will wait until older ones are finished.
 
+The plugin itself is intended to be mostly stateless and to receive all of the information it
+needs to perform work from a controller. If additional configuration is needed it's recommended
+that it read it fetch it at plugin invocation time.
+
 Whenever a plugin finishes by *returning*, a final *EOF* message is sent back to the controller
 so that caller knows when the work is done.
 
