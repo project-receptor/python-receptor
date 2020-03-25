@@ -55,8 +55,7 @@ class Manifest:
                     if connection["last"] + 86400 < time.time():
                         to_remove.add(connection["id"])
                 if to_remove:
-                    new_manifest = set(current_manifest) - to_remove
-                    await self.write(list(new_manifest))
+                    await self.write([c for c in current_manifest if c["id"] not in to_remove])
             await asyncio.sleep(600)
 
     async def get(self):

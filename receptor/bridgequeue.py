@@ -61,4 +61,4 @@ class BridgeQueue(queue.Queue):
         while chunk:
             self.put(chunk)
             chunk = fp.read(chunk_size)
-        self.close()
+        self.put(self.sentinel)

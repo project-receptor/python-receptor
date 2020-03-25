@@ -1,8 +1,8 @@
-import sys
 import asyncio
 import datetime
 import logging
 import os
+import sys
 import uuid
 from collections import defaultdict
 from json.decoder import JSONDecodeError
@@ -20,6 +20,7 @@ class DurableBuffer:
         self._manifest_path = os.path.join(self._base_path, f"manifest-{key}")
         self._loop = loop
         self.q = asyncio.Queue(loop=self._loop)
+        self.deferrer = fileio.Deferrer(loop=self._loop)
         self._manifest_lock = asyncio.Lock(loop=self._loop)
         self._manifest_dirty = asyncio.Event(loop=self._loop)
         self._manifest_clean = asyncio.Event(loop=self._loop)
@@ -56,13 +57,18 @@ class DurableBuffer:
             "path": path,
             "expire_time": datetime.datetime.utcnow() + datetime.timedelta(minutes=5),
         }
-        async with fileio.File(path, "wb") as fp:
-            if isinstance(framed_message, bytes):
-                await fp.write(framed_message)
-            else:
-                for chunk in framed_message:
-                    await fp.write(chunk)
 
+        # using async with fileio.File here can cause us to run out of
+        # file descriptors as the actual file work can be delayed behind other
+        # file open events.  We want to run this job all in one shot.
+        def _f():
+            with open(path, "wb") as fp:
+                if isinstance(framed_message, bytes):
+                    fp.write(framed_message)
+                else:
+                    fp.writelines(framed_message)
+
+        await self.deferrer.defer(_f)
         await self.put_ident(item)
 
     async def put_ident(self, ident):
