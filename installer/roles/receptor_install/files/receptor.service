@@ -1,0 +1,8 @@
+[Unit]
+Description=Receptor Node Service
+
+[Service]
+ExecStart=/usr/local/bin/receptor --node-id=%i -c /etc/receptor/receptor-%i.conf node
+
+[Install]
+WantedBy=multi-user.target

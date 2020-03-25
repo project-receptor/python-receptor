@@ -2,6 +2,7 @@
 receptor_user: receptor
 server_port: 8888
 server_address: 0.0.0.0
-server_enable: true
+server_disable: false
 server_debug: false
-peers: []
+
+# install_plugins: ['git+https://github.com/project-receptor/receptor-sleep']

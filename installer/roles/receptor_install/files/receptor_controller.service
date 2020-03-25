@@ -1,8 +1,0 @@
-[Unit]
-Description=Receptor Relay Service
-
-[Service]
-ExecStart=/usr/local/bin/receptor controller
-
-[Install]
-WantedBy=multi-user.target
