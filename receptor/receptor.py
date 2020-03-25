@@ -62,17 +62,15 @@ class Manifest:
         if not os.path.exists(self.path):
             return []
         try:
-            async with fileio.File(self.path, "r") as fd:
-                data = await fd.read()
-                return json.loads(data)
+            data = await fileio.read(self.path, "r")
+            return json.loads(data)
         except Exception as e:
             logger.warn("Failed to read connection manifest: %s", e)
             logger.exception("damn")
             return []
 
     async def write(self, manifest):
-        async with fileio.File(self.path, "w") as fd:
-            await fd.write(json.dumps(manifest))
+        await fileio.write(self.path, json.dumps(manifest), mode="w")
 
     async def update(self, connection):
         async with self.lock:

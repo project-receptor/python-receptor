@@ -106,7 +106,8 @@ class Worker:
                     logger.exception("watch_queue: error getting data from buffer")
                     continue
                 else:
-                    # XXX: I think we need to wait for this to finish before starting another .get
+                    # TODO: I think we need to wait for this to finish before
+                    # starting another .get
                     asyncio.ensure_future(self.drain_buf(item))
 
         except asyncio.CancelledError:
@@ -118,13 +119,13 @@ class Worker:
             if self.conn.closed:
                 logger.debug("Message not sent: connection already closed")
             else:
-                async with fileio.File(item["path"], "rb") as afp:
-                    q = BridgeQueue(maxsize=1)
-                    await asyncio.gather(
-                        self.deferrer.defer(q.read_from, afp.fileobj), self.conn.send(q)
-                    )
+                q = BridgeQueue(maxsize=1)
+                await asyncio.gather(
+                    self.deferrer.defer(q.read_from, item["path"]), self.conn.send(q)
+                )
         except Exception:
-            # XXX: Break out these exceptions to deal with file problems and network problem separately?
+            # TODO: Break out these exceptions to deal with file problems
+            # and network problem separately?
             logger.exception("watch_queue: error received trying to write")
             await self.outbound.put_ident(item)
             return await self.close()

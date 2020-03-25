@@ -2,7 +2,6 @@ import asyncio
 import datetime
 import logging
 import os
-import sys
 import uuid
 from collections import defaultdict
 from json.decoder import JSONDecodeError
@@ -58,17 +57,11 @@ class DurableBuffer:
             "expire_time": datetime.datetime.utcnow() + datetime.timedelta(minutes=5),
         }
 
-        # using async with fileio.File here can cause us to run out of
-        # file descriptors as the actual file work can be delayed behind other
-        # file open events.  We want to run this job all in one shot.
-        def _f():
-            with open(path, "wb") as fp:
-                if isinstance(framed_message, bytes):
-                    fp.write(framed_message)
-                else:
-                    fp.writelines(framed_message)
+        if isinstance(framed_message, bytes):
+            await fileio.write(path, framed_message)
+        else:
+            await fileio.writelines(path, framed_message)
 
-        await self.deferrer.defer(_f)
         await self.put_ident(item)
 
     async def put_ident(self, ident):
@@ -92,8 +85,7 @@ class DurableBuffer:
 
     async def _read_manifest(self):
         try:
-            async with fileio.File(self._manifest_path, "r") as fp:
-                data = await fp.read()
+            data = await fileio.read(self._manifest_path, mode="r")
         except FileNotFoundError:
             return []
         else:
@@ -116,6 +108,8 @@ class DurableBuffer:
         return item["expire_time"] < datetime.datetime.utcnow()
 
     async def expire(self, item):
+        # TODO: we should do something more than just log expirations
+        # Consider sending a message to the sender
         logger.info("Expiring message %s", item["path"])
         await self._deferrer.defer(self._remove_path, item["path"])
 
@@ -135,8 +129,8 @@ class DurableBuffer:
             await self._manifest_dirty.wait()
             async with self._manifest_lock:
                 try:
-                    async with fileio.File(self._manifest_path, "w") as fp:
-                        await fp.write(json.dumps(list(self.q._queue)))
+                    data = json.dumps(list(self.q._queue))
+                    await fileio.write(self._manifest_path, data, mode="w")
                     self.clean()
                 except Exception:
                     logger.exception("Failed to write manifest for %s", self._manifest_path)

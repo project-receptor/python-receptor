@@ -48,7 +48,7 @@ class BridgeQueue(queue.Queue):
     def close(self):
         self.put_nowait(self.sentinel)
 
-    def read_from(self, fp, chunk_size=2 ** 12):
+    def read_from(self, path, chunk_size=2 ** 12):
         """
         Reads from a file-like object in chunk_size blocks and puts the bytes
         into the queue.
@@ -57,8 +57,9 @@ class BridgeQueue(queue.Queue):
         placed into the queue, signaling to the consumer that all data has
         been read.
         """
-        chunk = fp.read(chunk_size)
-        while chunk:
-            self.put(chunk)
+        with open(path, "rb") as fp:
             chunk = fp.read(chunk_size)
-        self.put(self.sentinel)
+            while chunk:
+                self.put(chunk)
+                chunk = fp.read(chunk_size)
+            self.put(self.sentinel)
