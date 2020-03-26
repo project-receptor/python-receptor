@@ -67,7 +67,7 @@ For more details on writing and integrating controllers see :ref:`plugins`
 Messages, Plugins, and Work
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The Receptor mesh itself does not care and is unopinionated about the messages that are
+The Receptor mesh is not opinionated about the messages that are
 sent across it. Controllers (that send messages and receive responses) and Plugins (that
 receive and act on messages) are expected to agree on a contract regarding the format.
 
@@ -88,7 +88,7 @@ Connections and Message Flow
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 By default each Node is configured to start a listening service to accept incoming
-connections from other nodes. Each node can **also** be configured to reach out and connect
+connections from other nodes. Each node can **also** be configured to connect
 directly to other nodes (called **peers**). This means that each node is likely to have
 possibly many connections to other nodes, and this is how the **mesh** is formed.
 
@@ -106,8 +106,7 @@ no guarantee on the path the message will take through the mesh. If a node along
 is down or offline then the message will be rerouted through other nodes. If there is no
 route available then the message will be stored on the last node that it made it to before
 route calculation failed to find another route. The amount of time a message will spend waiting
-on the mesh is configurable. If it reaches its timeout an error will be delivered back to the
-sender.
+on the mesh is configurable. If it reaches its timeout the message will be silently dropped.
 
 A Receptor node itself maintains an internal accounting of messages awaiting delivery but the
 mesh itself makes no guarantee that a message **will** be delivered or even ever make it to its
