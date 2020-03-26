@@ -1,6 +1,10 @@
+import asyncio
 import datetime
 import json
 from functools import partial, singledispatch
+import types
+import inspect
+import traceback as tb
 
 decoders = {}
 
@@ -30,6 +34,39 @@ def wrapped_encode(o):
         return encode(o)
     except TypeError:
         return str(o)
+
+
+@encode.register(set)
+def encode_set(s):
+    return list(s)
+
+
+@encode.register(types.FunctionType)
+def encode_function_type(func):
+    return f"{func.__module__}.{func.__qualname__}"
+
+
+@encode.register(asyncio.Task)
+def encode_coroutine_type(task):
+    coro = task._coro
+    mod = "<unknown>"
+    try:
+        mod = inspect.getmodule(coro, coro.cr_code.co_filename)
+        mod = mod.__name__ if mod else "<unknown>"
+    except AttributeError:
+        pass
+
+    out = {"state": task._state, "name": f"{mod}.{coro.__qualname__}", "stack": []}
+
+    try:
+        stack = tb.extract_stack(task.get_stack(limit=5)[0])
+        out["stack"] = [
+            {"filename": fs.filename, "line": fs.line, "lineno": fs.lineno} for fs in stack
+        ]
+    except IndexError:
+        pass
+
+    return out
 
 
 @encode.register(datetime.datetime)

@@ -57,12 +57,6 @@ def main(args=None):
     for h in logging.getLogger("receptor").handlers:
         h.addFilter(_f)
 
-    def dump_stacks(signum, frame):
-        for t in asyncio.Task.all_tasks():
-            t.print_stack(file=sys.stderr)
-
-    signal.signal(signal.SIGHUP, dump_stacks)
-
     try:
         config.go()
     except asyncio.CancelledError:

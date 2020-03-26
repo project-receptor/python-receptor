@@ -36,7 +36,18 @@ class RawSocket(Transport):
 
 @encode.register(RawSocket)
 def encode_rawsocket(o):
-    return {"extra": o.writer.get_extra_info(), "closed": o.closed, "chunk_size": o.chunk_size}
+    t = o.writer._transport.get_extra_info
+    addr, port = t("peername", (None, None))
+    return {
+        "address": addr,
+        "port": port,
+        "compression": t("compression"),
+        "cipher": t("cipher"),
+        "peercert": t("peercert"),
+        "sslcontext": t("sslcontext"),
+        "closed": o.closed,
+        "chunk_size": o.chunk_size,
+    }
 
 
 async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):
