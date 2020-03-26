@@ -18,8 +18,8 @@ different ingress patterns and security policies.
    controller
    plugins
    messages
-   security
    managing
+   security
 
 Indices and tables
 ==================
