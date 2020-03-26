@@ -7,7 +7,7 @@ import uuid
 
 import pkg_resources
 
-from . import exceptions
+from . import exceptions, fileio
 from .buffers.file import FileBufferManager
 from .exceptions import ReceptorMessageError
 from .messages import directive, framed
@@ -39,7 +39,63 @@ def get_peers_of(edges, node):
     return peers
 
 
+class Manifest:
+    def __init__(self, path):
+        self.path = path
+        self.lock = asyncio.Lock()
+
+    async def watch_expire(self, buffer_mgr):
+        while True:
+            async with self.lock:
+                current_manifest = await self.get()
+                to_remove = set()
+                for connection in current_manifest:
+                    buffer = buffer_mgr[connection["id"]]
+                    await buffer.expire_all()
+                    if connection["last"] + 86400 < time.time():
+                        to_remove.add(connection["id"])
+                if to_remove:
+                    await self.write([c for c in current_manifest if c["id"] not in to_remove])
+            await asyncio.sleep(600)
+
+    async def get(self):
+        if not os.path.exists(self.path):
+            return []
+        try:
+            data = await fileio.read(self.path, "r")
+            return json.loads(data)
+        except Exception as e:
+            logger.warn("Failed to read connection manifest: %s", e)
+            logger.exception("damn")
+            return []
+
+    async def write(self, manifest):
+        await fileio.write(self.path, json.dumps(manifest), mode="w")
+
+    async def update(self, connection):
+        async with self.lock:
+            manifest = await self.get()
+            found = False
+            for node in manifest:
+                if node["id"] == connection:
+                    node["last"] = time.time()
+                    found = True
+                    break
+            if not found:
+                manifest.append(dict(id=connection, last=time.time()))
+            await self.write(manifest)
+
+    async def remove(self, connection):
+        async with self.lock:
+            logger.info("Expiring connection %s", connection)
+            current = await self.get()
+            manifest = [m for m in current if m["id"] != connection]
+            await self.write(manifest)
+
+
 class Receptor:
+    """ Owns all connections and maintains adding and removing them. """
+
     def __init__(
         self, config, node_id=None, router_cls=None, work_manager_cls=None, response_queue=None
     ):
@@ -52,7 +108,7 @@ class Receptor:
         self.base_path = os.path.join(self.config.default_data_dir, self.node_id)
         if not os.path.exists(self.base_path):
             os.makedirs(os.path.join(self.config.default_data_dir, self.node_id))
-        self.connection_manifest_path = os.path.join(self.base_path, "connection_manifest")
+        self.connection_manifest = Manifest(os.path.join(self.base_path, "connection_manifest"))
         path = os.path.join(os.path.expanduser(self.base_path))
         self.buffer_mgr = FileBufferManager(path)
         self.stop = False
@@ -74,50 +130,6 @@ class Receptor:
                 ofs.write(f"\nRECEPTOR_NODE_ID={node_id}\n")
         return str(node_id)
 
-    async def watch_expire(self):
-        while True:
-            current_manifest = self.get_connection_manifest()
-            for connection in current_manifest:
-                buffer = self.buffer_mgr[connection["id"]]
-                await buffer.expire()
-                if connection["last"] + 86400 < time.time():
-                    self.remove_connection_manifest(connection["id"])
-            await asyncio.sleep(600)
-
-    def get_connection_manifest(self):
-        if not os.path.exists(self.connection_manifest_path):
-            return []
-        try:
-            with open(self.connection_manifest_path, "r") as fd:
-                manifest = json.load(fd)
-            return manifest
-        except Exception as e:
-            logger.warn("Failed to read connection manifest: {}".format(e))
-            return []
-
-    def write_connection_manifest(self, manifest):
-        with open(self.connection_manifest_path, "w") as fd:
-            json.dump(manifest, fd)
-
-    def update_connection_manifest(self, connection):
-        manifest = self.get_connection_manifest()
-        found = False
-        for node in manifest:
-            if node["id"] == connection:
-                node["last"] = time.time()
-                found = True
-                break
-        if not found:
-            manifest.append(dict(id=connection, last=time.time()))
-        self.write_connection_manifest(manifest)
-
-    def remove_connection_manifest(self, connection):
-        logger.info("Expiring connection {}".format(connection))
-        manifest = self.get_connection_manifest()
-        if connection in manifest:
-            manifest.remove(connection)
-            self.write_connection_manifest(manifest)
-
     async def message_handler(self, buf):
         logger.debug("spawning message_handler")
         while True:
@@ -135,7 +147,7 @@ class Receptor:
                 else:
                     asyncio.ensure_future(self.handle_message(data))
 
-    def update_connections(self, protocol_obj, id_=None):
+    async def update_connections(self, protocol_obj, id_=None):
         if id_ is None:
             id_ = protocol_obj.id
 
@@ -144,20 +156,17 @@ class Receptor:
             self.connections[id_].append(protocol_obj)
         else:
             self.connections[id_] = [protocol_obj]
-        self.update_connection_manifest(id_)
+        await self.connection_manifest.update(id_)
 
-    def add_connection(self, protocol_obj):
-        self.update_connections(protocol_obj)
-
-    def remove_ephemeral(self, node):
+    async def remove_ephemeral(self, node):
         logger.debug(f"Removing ephemeral node {node}")
         if node in self.connections:
-            self.remove_connection_manifest(node)
+            await self.connection_manifest.remove(node)
         if node in self.node_capabilities:
             del self.node_capabilities[node]
         self.router.remove_node(node)
 
-    def remove_connection(self, protocol_obj, id_=None, loop=None):
+    async def remove_connection(self, protocol_obj, id_=None, loop=None):
         notify_connections = []
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
@@ -166,11 +175,11 @@ class Receptor:
                 )
                 if self.is_ephemeral(connection_node):
                     self.connections[connection_node].remove(protocol_obj)
-                    self.remove_ephemeral(connection_node)
+                    await self.remove_ephemeral(connection_node)
                 else:
                     self.connections[connection_node].remove(protocol_obj)
                     self.router.add_or_update_edges([(self.node_id, connection_node, 100)])
-                    self.update_connection_manifest(connection_node)
+                    await self.connection_manifest.update(connection_node)
             notify_connections += self.connections[connection_node]
         if loop is None:
             loop = getattr(protocol_obj, "loop", None)
@@ -184,10 +193,10 @@ class Receptor:
             and self.node_capabilities[id_]["ephemeral"]
         )
 
-    def remove_connection_by_id(self, id_, loop=None):
+    async def remove_connection_by_id(self, id_, loop=None):
         if id_ in self.connections:
             for protocol_obj in self.connections[id_]:
-                self.remove_connection(protocol_obj, id_, loop)
+                await self.remove_connection(protocol_obj, id_, loop)
 
     async def shutdown_handler(self):
         while True:
@@ -219,7 +228,7 @@ class Receptor:
         removed_peers = old_node_peers - new_node_peers
         for removed_peer in removed_peers:
             if self.is_ephemeral(removed_peer):
-                self.remove_ephemeral(removed_peer)
+                await self.remove_ephemeral(removed_peer)
         accepted_edges = list()
         for edge in data["edges"]:
             peer = is_peer_of(edge, self.node_id)

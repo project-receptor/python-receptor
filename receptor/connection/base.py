@@ -4,6 +4,7 @@ import os
 from abc import abstractmethod, abstractproperty
 from collections.abc import AsyncIterator
 
+from .. import fileio
 from ..bridgequeue import BridgeQueue
 from ..messages.framed import FramedBuffer
 
@@ -48,6 +49,7 @@ class Worker:
         self.handle_task = None
         self.write_task = None
         self.outbound = None
+        self.deferrer = fileio.Deferrer(loop=self.loop)
 
     def start_receiving(self):
         self.read_task = self.loop.create_task(self.receive())
@@ -63,11 +65,11 @@ class Worker:
         except Exception:
             logger.exception("receive")
 
-    def register(self):
-        self.receptor.update_connections(self.conn, id_=self.remote_id)
+    async def register(self):
+        await self.receptor.update_connections(self.conn, id_=self.remote_id)
 
-    def unregister(self):
-        self.receptor.remove_connection(self.conn, id_=self.remote_id, loop=self.loop)
+    async def unregister(self):
+        await self.receptor.remove_connection(self.conn, id_=self.remote_id, loop=self.loop)
         self._cancel(self.read_task)
         self._cancel(self.handle_task)
         self._cancel(self.write_task)
@@ -97,48 +99,48 @@ class Worker:
             logger.debug(f"Watching queue {str(self.conn)}")
             while not self.conn.closed:
                 try:
-                    ident, fp = await asyncio.wait_for(self.outbound.get(handle_only=True), 5.0)
-                    if not fp:
-                        await self.close()
+                    item = await asyncio.wait_for(self.outbound.get(), 5.0)
                 except asyncio.TimeoutError:
                     continue
                 except Exception:
                     logger.exception("watch_queue: error getting data from buffer")
                     continue
                 else:
-                    asyncio.ensure_future(self.drain_buf(ident, fp))
+                    # TODO: I think we need to wait for this to finish before
+                    # starting another .get
+                    asyncio.ensure_future(self.drain_buf(item))
 
         except asyncio.CancelledError:
             logger.debug("watch_queue: cancel request received")
             self.close()
 
-    async def drain_buf(self, ident, fp):
+    async def drain_buf(self, item):
         try:
             if self.conn.closed:
                 logger.debug("Message not sent: connection already closed")
             else:
                 q = BridgeQueue(maxsize=1)
                 await asyncio.gather(
-                    self.loop.run_in_executor(None, q.read_from, fp), self.conn.send(q)
+                    self.deferrer.defer(q.read_from, item["path"]), self.conn.send(q)
                 )
         except Exception:
+            # TODO: Break out these exceptions to deal with file problems
+            # and network problem separately?
             logger.exception("watch_queue: error received trying to write")
-            await self.outbound.put_ident(ident)
+            await self.outbound.put_ident(item)
             return await self.close()
         else:
             try:
-                await self.loop.run_in_executor(None, os.remove, fp.name)
+                await self.deferrer.defer(os.remove, item["path"])
             except TypeError:
-                logger.exception("failed to os.remove %s", fp)
+                logger.exception("failed to os.remove %s", item["path"])
                 pass  # some messages aren't actually files
-        finally:
-            fp.close()
 
     async def _wait_handshake(self):
         logger.debug("waiting for HI")
         response = await self.buf.get()  # TODO: deal with timeout
         self.remote_id = response.header["id"]
-        self.register()
+        await self.register()
 
     async def client(self, transport):
         try:
@@ -149,7 +151,7 @@ class Worker:
             await self.start_processing()
             logger.debug("normal exit")
         finally:
-            self.unregister()
+            await self.unregister()
 
     async def server(self, transport):
         try:
@@ -159,4 +161,4 @@ class Worker:
             await self.hello()
             await self.start_processing()
         finally:
-            self.unregister()
+            await self.unregister()
