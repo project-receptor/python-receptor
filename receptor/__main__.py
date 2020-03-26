@@ -1,9 +1,7 @@
 import asyncio
 import logging
 import logging.config
-import signal
 import sys
-from collections import deque
 
 from .config import ReceptorConfig
 from .diagnostics import log_buffer

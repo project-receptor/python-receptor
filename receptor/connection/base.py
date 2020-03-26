@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from .. import fileio
 from ..bridgequeue import BridgeQueue
 from ..messages.framed import FramedBuffer
-from ..serde import encode
+from ..stats import bytes_recv
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,7 @@ class Worker:
             async for msg in self.conn:
                 if self.conn.closed:
                     break
+                bytes_recv.inc(len(msg))
                 await self.buf.put(msg)
         except ConnectionResetError:
             logger.debug("receive: other side closed the connection")

@@ -1,15 +1,14 @@
-import sys
 import asyncio
 import datetime
 import heapq
-import logging
 import itertools
+import logging
+import sys
 from collections import defaultdict
 
 from .exceptions import ReceptorBufferError, UnrouteableError
 from .messages.framed import FramedMessage
 from .stats import route_counter, route_info
-from .serde import encode
 
 logger = logging.getLogger(__name__)
 

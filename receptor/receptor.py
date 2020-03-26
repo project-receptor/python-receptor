@@ -8,12 +8,11 @@ import collections
 
 import pkg_resources
 
-from . import exceptions, fileio
+from . import exceptions, fileio, stats
 from .buffers.file import FileBufferManager
 from .exceptions import ReceptorMessageError
 from .messages import directive, framed
 from .router import MeshRouter
-from .stats import messages_received_counter, receptor_info
 from .work import WorkManager
 
 RECEPTOR_DIRECTIVE_NAMESPACE = "receptor"
@@ -107,7 +106,7 @@ class Receptor:
             receptor_version = receptor_dist.version
         except pkg_resources.DistributionNotFound:
             receptor_version = "unknown"
-        receptor_info.info(dict(node_id=self.node_id, receptor_version=receptor_version))
+        stats.receptor_info.info(dict(node_id=self.node_id, receptor_version=receptor_version))
 
     def _find_node_id(self):
         if "RECEPTOR_NODE_ID" in os.environ:
@@ -149,8 +148,12 @@ class Receptor:
             self.connections[id_] = [protocol_obj]
             routing_changed = True
         await self.connection_manifest.update(id_)
+<<<<<<< HEAD
         if routing_changed:
             await self.recalculate_and_send_routes_soon()
+=======
+        stats.connected_peers_gauge.inc()
+>>>>>>> 943b3d5... refactoring module extraction
 
     async def remove_ephemeral(self, node):
         logger.debug(f"Removing ephemeral node {node}")
@@ -176,8 +179,17 @@ class Receptor:
                 else:
                     self.connections[connection_node].remove(protocol_obj)
                     await self.connection_manifest.update(connection_node)
+<<<<<<< HEAD
         if routing_changed:
             await self.recalculate_and_send_routes_soon()
+=======
+                stats.connected_peers_gauge.dec()
+            notify_connections += self.connections[connection_node]
+        if loop is None:
+            loop = getattr(protocol_obj, "loop", None)
+        if loop is not None:
+            loop.create_task(self.send_route_advertisement(self.router.get_edges()))
+>>>>>>> 943b3d5... refactoring module extraction
 
     def is_ephemeral(self, id_):
         return (
@@ -446,7 +458,7 @@ class Receptor:
 
     async def handle_message(self, msg):
         try:
-            messages_received_counter.inc()
+            stats.messages_received_counter.inc()
 
             if msg.header["recipient"] != self.node_id:
                 next_hop = self.router.next_hop(msg.header["recipient"])
