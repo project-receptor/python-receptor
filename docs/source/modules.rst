@@ -1,5 +1,5 @@
-ansible_runner
-==============
+receptor
+========
 
 .. toctree::
    :maxdepth: 4

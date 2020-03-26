@@ -30,6 +30,23 @@ class ConfigOption:
 
 
 class ReceptorConfig:
+    """
+    The primary configuration object for Receptor
+
+    This will be passed to the :class:`receptor.controller.Controller` in order to set up certain
+    properties of the connection. An instance of this class is also responsible for reading and
+    parsing the Receptor config file and any environment variables. Overrides can be specified by
+    the caller by passing them in a dictionary to args::
+
+        config = receptor.ReceptorConfig(args=dict(default_config="/opt/receptor.conf"))
+        config.default_data_dir = "/var/run/"
+        controller = receptor.Controller(config)
+
+    Some options are only relevant when running as a node from the command line. When invoking
+    the :class:`receptor.controller.Controller` interface in your own code, options such as peers
+    and listen addresses will be set up using Controller methods.
+    """
+
     def __init__(self, args=None):
         self._config_options = {}
         self._cli_args = argparse.ArgumentParser("receptor")

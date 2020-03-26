@@ -222,3 +222,4 @@ class MeshRouter:
             asyncio.ensure_future(self.receptor.handle_message(message))
         else:
             await self.forward(message, next_node_id)
+        return message.msg_id

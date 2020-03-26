@@ -25,7 +25,7 @@ NVR = $(NAME)-$(VERSION)-$(NVR_RELEASE)
 RESULTDIR = rpm-build/results-$(DIST)-$(ARCH)
 
 .PHONY: clean version release dist sdist image dev shell test \
-	mock-rpm mock-srpm image
+	mock-rpm mock-srpm image docs
 
 
 clean:
@@ -58,6 +58,9 @@ shell:
 
 test:
 	tox
+
+docs:
+	cd docs && make html
 
 dist/$(VERSION).tar.gz: dist/$(NAME)-$(VERSION).tar.gz
 	cp dist/$(NAME)-$(VERSION).tar.gz dist/$(VERSION).tar.gz

@@ -4,6 +4,11 @@
     name: python3
     state: present
 
+- name: Make sure Python 3 pip is installed
+  package:
+    name: python3-pip
+    state: present
+
 - name: Install git if needed
   package:
     name: git
@@ -14,6 +19,14 @@
   pip:
     name: "{{ receptor_version }}"
     state: forcereinstall
+    executable: "pip3"
+
+# - name: Install Receptor Plugins
+#   pip:
+#     name: "{{ item }}"
+#     state: forcereinstall
+#     executable: "pip3"
+#   loop: "{{ install_plugins | default([])}}"
 
 - name: Add receptor user
   user:
@@ -26,36 +39,39 @@
     owner: "{{ receptor_user }}"
     mode: 0640
 
-- name: Install Receptor Configuration File
-  template:
-    src: receptor_node.conf.j2
-    dest: /etc/receptor/receptor.conf
+- name: Create the receptor database directory
+  file:
+    path: /var/lib/receptor
+    state: directory
     owner: "{{ receptor_user }}"
     mode: 0640
 
+- name: Install Receptor Configuration File
+  template:
+    src: receptor_node.conf.j2
+    dest: /etc/receptor/receptor-{{ ansible_hostname }}.conf
+    owner: "{{ receptor_user }}"
+    mode: 0640
+
+- name: Add peer definitions to receptor configuration
+  blockinfile:
+    path: /etc/receptor/receptor-{{ ansible_hostname }}.conf
+    block: |
+      peers={{ node_peers | join(",") }}
+  when: node_peers is defined and node_peers|length > 0
+
 - name: Install systemd units
   copy:
-    src: "{{ item }}"
-    dest: "/etc/systemd/system/{{ item }}"
+    src: "receptor.service"
+    dest: "/etc/systemd/system/receptor@.service"
     mode: 0644
-  with_items:
-    - receptor_controller.service
-    - receptor_node.service
 
 - name: Reload systemd units
   systemd:
     daemon_reload: true
 
-- name: Start and enable receptor controller if host is a controller
+- name: Start and enable a receptor node with the current hostname
   systemd:
-    name: receptor_controller
+    name: "receptor@{{ ansible_hostname }}"
     state: started
     enabled: true
-  when: "'controllers' in group_names"
-
-- name: Start and enable receptor node
-  systemd:
-    name: receptor_node
-    state: started
-    enabled: true
-  when: "'controllers' not in group_names"
