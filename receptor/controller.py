@@ -90,7 +90,7 @@ class Controller:
         :meth:`receptor.controller.Controller.run` is called.
 
         Example format:
-        * rnps://10.0.1.1:8888
+        rnps://10.0.1.1:8888
 
         :param peer: remote peer url
         """
@@ -139,8 +139,9 @@ class Controller:
         :param recipient: The node id of a Receptor Node on the mesh
         :param directive: See above
         :param expect_response: Optional Whether it is expected that the plugin will emit a
-                                response.
-        :return a message-id that can be used to reference responses
+            response.
+
+        :return: a message-id that can be used to reference responses
         """
         if os.path.exists(payload):
             buffer = FileBackedBuffer.from_path(payload)

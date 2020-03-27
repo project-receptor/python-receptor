@@ -2,4 +2,3 @@
 
 Managing the Receptor Mesh
 ==========================
-
