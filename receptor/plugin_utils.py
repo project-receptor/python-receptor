@@ -20,7 +20,7 @@ def plugin_export(payload_type):
     entrypoints typically defined in your setup.py file::
 
         entry_points={
-            'receptor.worker': 
+            'receptor.worker':
               'your_package_name = your_package_name.your_module',
         }
 
