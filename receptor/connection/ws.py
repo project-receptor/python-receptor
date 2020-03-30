@@ -4,6 +4,8 @@ import logging
 
 import aiohttp
 import aiohttp.web
+from aiohttp.helpers import proxies_from_env
+from urllib.parse import urlparse
 
 from .base import Transport, log_ssl_detail
 
@@ -36,8 +38,17 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_
 
     worker = factory()
     try:
+        proxy_scheme = {'ws': 'http', 'wss': 'https'}[urlparse(uri).scheme]
+        proxies = proxies_from_env()
+        if proxy_scheme in proxies:
+            proxy = proxies[proxy_scheme].proxy
+            proxy_auth = proxies[proxy_scheme].proxy_auth
+        else:
+            proxy = None
+            proxy_auth = None
         async with aiohttp.ClientSession().ws_connect(
-            uri, ssl=ssl_context, headers=ws_extra_headers
+            uri, ssl=ssl_context, headers=ws_extra_headers,
+            proxy=proxy, proxy_auth=proxy_auth
         ) as ws:
             log_ssl_detail(ws)
             t = WebSocket(ws)
