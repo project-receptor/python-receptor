@@ -75,7 +75,7 @@ class DurableBuffer:
             self.dirty()
             try:
                 if self.is_expired(item):
-                    self.expire(item)
+                    await self.expire(item)
                     continue
                 return item
             except (TypeError, KeyError):
