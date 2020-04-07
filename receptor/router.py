@@ -187,7 +187,8 @@ class MeshRouter:
         Forward a message on to the next hop closer to its destination
         """
         buffer_obj = self.receptor.buffer_mgr[next_hop]
-        msg.header["route_list"].append(self.node_id)
+        if "route_list" not in msg.header or msg.header["route_list"][-1] != self.node_id:
+            msg.header["route_list"].append(self.node_id)
         logger.debug(f"Forwarding frame {msg.msg_id} to {next_hop}")
         try:
             route_counter.inc()

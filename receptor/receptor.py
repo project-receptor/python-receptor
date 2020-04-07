@@ -19,26 +19,6 @@ RECEPTOR_DIRECTIVE_NAMESPACE = "receptor"
 logger = logging.getLogger(__name__)
 
 
-def is_peer_of(edge, node):
-    """If the edge includes the given node, return the other node. Otherwise, return None."""
-    if edge[0] == node:
-        return edge[1]
-    elif edge[1] == node:
-        return edge[0]
-    else:
-        return None
-
-
-def get_peers_of(edges, node):
-    """Gets the peers of a given node"""
-    peers = set()
-    for edge in edges:
-        peer = is_peer_of(edge, node)
-        if peer:
-            peers.add(peer)
-    return peers
-
-
 class Manifest:
     def __init__(self, path):
         self.path = path
@@ -142,7 +122,7 @@ class Receptor:
                 logger.exception("message_handler")
                 break
             else:
-                if "cmd" in data.header and data.header["cmd"] == "ROUTE":
+                if "cmd" in data.header and data.header["cmd"].startswith("ROUTE"):
                     await self.handle_route_advertisement(data.header)
                 else:
                     asyncio.ensure_future(self.handle_message(data))
@@ -184,7 +164,7 @@ class Receptor:
         if loop is None:
             loop = getattr(protocol_obj, "loop", None)
         if loop is not None:
-            loop.create_task(self.send_route_advertisement(self.router.get_edges()))
+            loop.create_task(self.send_route_advertisement())
 
     def is_ephemeral(self, id_):
         return (
@@ -219,49 +199,57 @@ class Receptor:
         )
 
     async def handle_route_advertisement(self, data):
-        self.node_capabilities[data["id"]] = data["capabilities"]
+        if "id" in data:
+            sender = data["id"]
+        else:
+            raise exceptions.UnknownMessageType("Malformed route advertisement: No sender")
+
+        if "cmd" not in data or data["cmd"] != "ROUTE2":
+            raise exceptions.UnknownMessageType(
+                f"Unknown route advertisement protocol received from {sender}")
+
+        if sender not in self.connections:
+            raise exceptions.UnknownMessageType(
+                f"Route advertisement received from unknown sender {sender}")
+
+        logger.debug(f"Route advertisement received From {sender}")
+
         if "node_capabilities" in data:
             for node, caps in data["node_capabilities"].items():
                 self.node_capabilities[node] = caps
-        old_node_peers = get_peers_of(self.router.get_edges(), data["id"])
-        new_node_peers = get_peers_of(data["edges"], data["id"])
-        removed_peers = old_node_peers - new_node_peers
-        for removed_peer in removed_peers:
-            if self.is_ephemeral(removed_peer):
-                await self.remove_ephemeral(removed_peer)
-        accepted_edges = list()
-        for edge in data["edges"]:
-            peer = is_peer_of(edge, self.node_id)
-            if peer:
-                if peer == data["id"]:
-                    accepted_edges.append(edge)
-                else:
-                    logger.debug(f"Excluding edge {edge}")
+
+        old_nodes = set([node for e in self.router.get_edges() for node in e[0:2]])
+        new_nodes = set([node for e in data["edges"] for node in e[0:2]])
+        for removed_node in old_nodes - new_nodes:
+            if self.is_ephemeral(removed_node) and removed_node not in self.connections:
+                await self.remove_ephemeral(removed_node)
+        self.router.add_or_update_edges(data["edges"])
+        await self.send_route_advertisement(exclude_conn=[sender])
+
+    async def send_route_advertisement(self, exclude_conn=None):
+        send_conn = set(self.connections)
+        if exclude_conn:
+            send_conn -= set(exclude_conn)
+
+        if send_conn:
+            if not exclude_conn:
+                logger.debug(f"Emitting route advertisements")
             else:
-                accepted_edges.append(edge)
-        self.router.add_or_update_edges(accepted_edges)
-        await self.send_route_advertisement(self.router.get_edges(), data["seen"])
+                logger.debug(f"Emitting route advertisements, excluding {exclude_conn}")
 
-    async def send_route_advertisement(self, edges=None, seen=None):
-        edges = edges or self.router.get_edges()
-        seen = set(seen) if seen else set()
-        logger.debug("Emitting Route Advertisements, excluding {}".format(seen))
-        destinations = set(self.connections) - seen
-        seens = list(seen | destinations | {self.node_id})
-
-        # TODO: This should be a broadcast call to the connection manager
-        for node_id in destinations:
+        for node_id in send_conn:
+            if exclude_conn and node_id in exclude_conn:
+                continue
             buf = self.buffer_mgr[node_id]
             try:
                 msg = framed.FramedMessage(
                     header={
-                        "cmd": "ROUTE",
+                        "cmd": "ROUTE2",
+                        "recipient": node_id,
                         "id": self.node_id,
-                        "capabilities": self.work_manager.get_capabilities(),
                         "node_capabilities": self.node_capabilities,
                         "groups": self.config.node_groups,
-                        "edges": edges,
-                        "seen": seens,
+                        "edges": self.router.get_edges(),
                     }
                 )
                 await buf.put(msg.serialize())
