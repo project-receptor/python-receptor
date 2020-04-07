@@ -60,6 +60,8 @@ class Worker:
                 if self.conn.closed:
                     break
                 await self.buf.put(msg)
+        except ConnectionResetError:
+            logger.debug("receive: other side closed the connection")
         except asyncio.CancelledError:
             logger.debug("receive: cancel request received")
         except Exception:

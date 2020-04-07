@@ -42,8 +42,8 @@ async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):
         log_ssl_detail(w._transport)
         t = RawSocket(r, w)
         await worker.client(t)
-    except Exception:
-        logger.exception("sock.connect")
+    except Exception as ex:
+        logger.info(f"sock.connect: connection failed, {str(ex)}")
         if not reconnect:
             return False
     finally:
