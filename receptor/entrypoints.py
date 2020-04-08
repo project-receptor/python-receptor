@@ -52,7 +52,7 @@ async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, sen
                 print("Connection failed. Exiting.")
                 return False
             if (recipient and controller.receptor.router.node_is_known(recipient)) or (
-                not recipient and len(controller.receptor.router.get_nodes()) > 1
+                not recipient and controller.receptor.routes_received
             ):
                 break
             if time.time() - start_wait > 5:

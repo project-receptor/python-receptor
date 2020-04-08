@@ -82,6 +82,7 @@ class Receptor:
         self.config = config
         self.node_id = node_id or self.config.default_node_id or self._find_node_id()
         self.router = (router_cls or MeshRouter)(self)
+        self.routes_received = False
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
         self.response_queue = response_queue
@@ -225,6 +226,7 @@ class Receptor:
                 await self.remove_ephemeral(removed_node)
         self.router.add_or_update_edges(data["edges"])
         await self.send_route_advertisement(exclude_conn=[sender])
+        self.routes_received = True
 
     async def send_route_advertisement(self, exclude_conn=None):
         send_conn = set(self.connections)
