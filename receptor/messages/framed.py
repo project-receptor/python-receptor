@@ -2,19 +2,19 @@
 This module provides classes to build framed messages as well as consume a
 stream of framed messages into descrete messages.
 
-There are two configurations of framed messages, single and dual part:
+There are two configurations of framed messages, single and dual part::
 
-FramedMessage--------------------------------
-    Frame (Header)
-    {json data}
-    Frame (Payload)
-    FileBackedBuffer
----------------------------------------------
+    FramedMessage--------------------------------
+        Frame (Header)
+        {json data}
+        Frame (Payload)
+        FileBackedBuffer
+    ---------------------------------------------
 
-FramedMessage--------------------------------
-    Frame (Command)
-    {json data}
----------------------------------------------
+    FramedMessage--------------------------------
+        Frame (Command)
+        {json data}
+    ---------------------------------------------
 """
 import asyncio
 import functools
