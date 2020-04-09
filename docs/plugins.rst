@@ -16,9 +16,9 @@ they are launched using a thread. Each plugin is given three parameters
 
 * The *message* data sent from the Controller
 * Any *configuration* specifically defined for it, which includes some details about the receptor
-    node that sent the message
+  node that sent the message
 * A *queue* to place responses into. These responses are delivered back to the Controller
-    immediately when they are placed into the queue
+  immediately when they are placed into the queue
 
 There are some great example plugins hosted in the
 `Receptor Github Organization <https://github.com/project-receptor/>`_
