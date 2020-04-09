@@ -60,7 +60,7 @@ the system.
 There can be one or many controllers present on the mesh. Since controllers are just
 another type of node, they can also be capable of performing work or routing messages.
 
-For more details on writing and integrating controllers see :ref:`plugins`
+For more details on writing and integrating controllers see :ref:`controller`
 
 .. _term_work:
 
