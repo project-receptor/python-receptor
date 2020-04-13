@@ -65,11 +65,15 @@ In the above example we used the payload type *receptor.BYTES_PAYLOAD* which tol
 we wanted the incoming message delivered as `bytes`. You have 3 options here, depending on how you
 expect to handle the data:
 
-* BYTES_PAYLOAD - A value of type `bytes`
-* BUFFER_PAYLOAD - A value that contains a `read()` method so that you can treat the payload as a
-    file handle
-* FILE_PAYLOAD - A temp file path that you can `open()` or do what you want with. This file will
-    be removed once your function returns
+BYTES_PAYLOAD
+    A value of type `bytes`.
+
+BUFFER_PAYLOAD
+    A value that contains a `read()` method so that you can treat the payload as a file handle.
+
+FILE_PAYLOAD
+    A temp file path that you can `open()` or do what you want with. This file will be removed once
+    your function returns.
 
 Caveats and Expected Behavior
 -----------------------------
