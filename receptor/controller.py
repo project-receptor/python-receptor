@@ -104,7 +104,7 @@ class Controller:
     async def recv(self):
         """
         Fetch a single response message from the response queue, this method blocks
-        and should be *await*ed or assigned to a Future
+        and should be *await* ed or assigned to a Future
 
         :return: A single response message
         :rtype: :class:`receptor.messages.framed.FramedMessage`
