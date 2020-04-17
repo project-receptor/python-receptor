@@ -2,7 +2,6 @@ import asyncio
 import concurrent.futures
 import datetime
 import logging
-import traceback
 
 import pkg_resources
 
@@ -85,8 +84,7 @@ class WorkManager:
             raise exceptions.InvalidDirectiveAction(f"Invalid action {action} for {namespace}")
         if not getattr(action_method, "receptor_export", False):
             logger.exception(
-                f"""Not allowed to call {action} from {namespace} because
-                it is not marked for export"""
+                f"""Not allowed to call {action} from {namespace} because it is not marked for export"""
             )
             raise exceptions.InvalidDirectiveAction(
                 f"Access denied calling {action} for {namespace}"
@@ -128,11 +126,9 @@ class WorkManager:
                 await self.receptor.router.send(response_message)
 
         except Exception as e:
-            logger.error(
-                f"""Error encountered while handling the response, replying with
-                    an error message ({e})"""
+            logger.exception(
+                """Error encountered while handling the response, replying with an error message"""
             )
-            logger.error(traceback.format_tb(e.__traceback__))
             eof_response = FramedMessage(
                 header=dict(
                     recipient=message.header["sender"],

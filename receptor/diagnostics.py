@@ -10,8 +10,7 @@ from collections import defaultdict, deque
 from datetime import datetime
 from functools import singledispatch
 
-from prometheus_client.metrics_core import Metric
-from prometheus_client.registry import REGISTRY
+from prometheus_client import generate_latest
 
 from . import fileio
 from .logstash_formatter.logstash import LogstashFormatter
@@ -113,11 +112,6 @@ def format_router(router):
     return {"nodes": router._nodes, "edges": edges, "neighbors": neighbors, "table": table}
 
 
-@encode.register(Metric)
-def encode_metric(m):
-    return {"name": m.name, "type": m.type, "samples": [s._asdict() for s in m.samples]}
-
-
 async def status(receptor_object):
     path = os.path.join(receptor_object.base_path, "diagnostics.json")
     doc = {}
@@ -134,7 +128,7 @@ async def status(receptor_object):
         ]
         doc["routes"] = format_router(receptor_object.router)
         doc["tasks"] = tasks()
-        doc["metrics"] = list(REGISTRY.collect())
+        doc["metrics"] = generate_latest()
         try:
             await fileio.write(path, json.dumps(doc, default=encode), mode="w")
         except Exception:
