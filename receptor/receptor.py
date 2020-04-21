@@ -337,7 +337,7 @@ class Receptor:
             return
         self.route_adv_seen[data["route_adv_id"]] = time.time()
 
-        # If this is the first time we've seen this node, advertise ourselves so it can know we exist
+        # If this is the first time we've seen this node, advertise ourselves to it
         if origin not in self.known_nodes:
             await self.recalculate_and_send_routes_soon(force_send=True)
 
@@ -349,7 +349,8 @@ class Receptor:
             logger.warn(
                 f"Ignoring routing update {data['route_adv_id']} from {origin} "
                 + f"epoch {data['seq_epoch']} seq {data['sequence']} because we already have "
-                + f"epoch {self.known_nodes[origin]['seq_epoch']} seq {self.known_nodes[origin['sequence']]}"
+                + f"epoch {self.known_nodes[origin]['seq_epoch']} "
+                + f"seq {self.known_nodes[origin['sequence']]}"
             )
             return
 
