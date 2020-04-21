@@ -60,6 +60,8 @@ class Worker:
                 if self.conn.closed:
                     break
                 await self.buf.put(msg)
+        except ConnectionResetError:
+            logger.debug("receive: other side closed the connection")
         except asyncio.CancelledError:
             logger.debug("receive: cancel request received")
         except Exception:
@@ -69,7 +71,7 @@ class Worker:
         await self.receptor.update_connections(self.conn, id_=self.remote_id)
 
     async def unregister(self):
-        await self.receptor.remove_connection(self.conn, id_=self.remote_id, loop=self.loop)
+        await self.receptor.remove_connection(self.conn, id_=self.remote_id)
         self._cancel(self.read_task)
         self._cancel(self.handle_task)
         self._cancel(self.write_task)
@@ -83,7 +85,7 @@ class Worker:
         await self.conn.send(BridgeQueue.one(msg))
 
     async def start_processing(self):
-        await self.receptor.send_route_advertisement()
+        await self.receptor.recalculate_and_send_routes_soon()
         logger.debug("starting normal loop")
         self.handle_task = self.loop.create_task(self.receptor.message_handler(self.buf))
         self.outbound = self.receptor.buffer_mgr[self.remote_id]
@@ -112,7 +114,7 @@ class Worker:
 
         except asyncio.CancelledError:
             logger.debug("watch_queue: cancel request received")
-            self.close()
+            await self.close()
 
     async def drain_buf(self, item):
         try:
@@ -141,6 +143,7 @@ class Worker:
         response = await self.buf.get()  # TODO: deal with timeout
         self.remote_id = response.header["id"]
         await self.register()
+        await self.receptor.recalculate_and_send_routes_soon()
 
     async def client(self, transport):
         try:

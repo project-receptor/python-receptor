@@ -4,6 +4,7 @@ import logging
 import os
 import time
 import uuid
+import collections
 
 import pkg_resources
 
@@ -17,26 +18,6 @@ from .work import WorkManager
 
 RECEPTOR_DIRECTIVE_NAMESPACE = "receptor"
 logger = logging.getLogger(__name__)
-
-
-def is_peer_of(edge, node):
-    """If the edge includes the given node, return the other node. Otherwise, return None."""
-    if edge[0] == node:
-        return edge[1]
-    elif edge[1] == node:
-        return edge[0]
-    else:
-        return None
-
-
-def get_peers_of(edges, node):
-    """Gets the peers of a given node"""
-    peers = set()
-    for edge in edges:
-        peer = is_peer_of(edge, node)
-        if peer:
-            peers.add(peer)
-    return peers
 
 
 class Manifest:
@@ -102,6 +83,10 @@ class Receptor:
         self.config = config
         self.node_id = node_id or self.config.default_node_id or self._find_node_id()
         self.router = (router_cls or MeshRouter)(self)
+        self.route_sender_task = None
+        self.route_send_time = time.time()
+        self.last_sent_seq = None
+        self.route_adv_seen = dict()
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
         self.response_queue = response_queue
@@ -112,7 +97,11 @@ class Receptor:
         path = os.path.join(os.path.expanduser(self.base_path))
         self.buffer_mgr = FileBufferManager(path)
         self.stop = False
-        self.node_capabilities = {self.node_id: self.work_manager.get_capabilities()}
+        self.known_nodes = collections.defaultdict(
+            lambda: dict(capabilities=dict(), sequence=0, seq_epoch=0.0, connections=dict())
+        )
+        self.known_nodes[self.node_id]["seq_epoch"] = time.time()
+        self.known_nodes[self.node_id]["capabilities"] = self.work_manager.get_capabilities()
         try:
             receptor_dist = pkg_resources.get_distribution("receptor")
             receptor_version = receptor_dist.version
@@ -142,7 +131,7 @@ class Receptor:
                 logger.exception("message_handler")
                 break
             else:
-                if "cmd" in data.header and data.header["cmd"] == "ROUTE":
+                if "cmd" in data.header and data.header["cmd"].startswith("ROUTE"):
                     await self.handle_route_advertisement(data.header)
                 else:
                     asyncio.ensure_future(self.handle_message(data))
@@ -151,52 +140,56 @@ class Receptor:
         if id_ is None:
             id_ = protocol_obj.id
 
-        self.router.add_or_update_edges([(id_, self.node_id, 1)])
+        routing_changed = False
         if id_ in self.connections:
-            self.connections[id_].append(protocol_obj)
+            if protocol_obj not in self.connections[id_]:
+                self.connections[id_].append(protocol_obj)
+                routing_changed = True
         else:
             self.connections[id_] = [protocol_obj]
+            routing_changed = True
         await self.connection_manifest.update(id_)
+        if routing_changed:
+            await self.recalculate_and_send_routes_soon()
 
     async def remove_ephemeral(self, node):
         logger.debug(f"Removing ephemeral node {node}")
+        changed = False
         if node in self.connections:
             await self.connection_manifest.remove(node)
-        if node in self.node_capabilities:
-            del self.node_capabilities[node]
-        self.router.remove_node(node)
+            changed = True
+        if node in self.known_nodes:
+            del self.known_nodes[node]
+            changed = True
+        if changed:
+            await self.recalculate_and_send_routes_soon()
 
-    async def remove_connection(self, protocol_obj, id_=None, loop=None):
-        notify_connections = []
+    async def remove_connection(self, protocol_obj, id_=None):
+        routing_changed = False
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
-                logger.info(
-                    "Removing connection {} for node {}".format(protocol_obj, connection_node)
-                )
+                routing_changed = True
+                logger.info(f"Removing connection for node {connection_node}")
                 if self.is_ephemeral(connection_node):
                     self.connections[connection_node].remove(protocol_obj)
                     await self.remove_ephemeral(connection_node)
                 else:
                     self.connections[connection_node].remove(protocol_obj)
-                    self.router.add_or_update_edges([(self.node_id, connection_node, 100)])
                     await self.connection_manifest.update(connection_node)
-            notify_connections += self.connections[connection_node]
-        if loop is None:
-            loop = getattr(protocol_obj, "loop", None)
-        if loop is not None:
-            loop.create_task(self.send_route_advertisement(self.router.get_edges()))
+        if routing_changed:
+            await self.recalculate_and_send_routes_soon()
 
     def is_ephemeral(self, id_):
         return (
-            id_ in self.node_capabilities
-            and "ephemeral" in self.node_capabilities[id_]
-            and self.node_capabilities[id_]["ephemeral"]
+            id_ in self.known_nodes
+            and "ephemeral" in self.known_nodes[id_]["capabilities"]
+            and self.known_nodes[id_]["capabilities"]["ephemeral"]
         )
 
     async def remove_connection_by_id(self, id_, loop=None):
         if id_ in self.connections:
             for protocol_obj in self.connections[id_]:
-                await self.remove_connection(protocol_obj, id_, loop)
+                await self.remove_connection(protocol_obj, id_)
 
     async def shutdown_handler(self):
         while True:
@@ -218,55 +211,188 @@ class Receptor:
             }
         )
 
-    async def handle_route_advertisement(self, data):
-        self.node_capabilities[data["id"]] = data["capabilities"]
-        if "node_capabilities" in data:
-            for node, caps in data["node_capabilities"].items():
-                self.node_capabilities[node] = caps
-        old_node_peers = get_peers_of(self.router.get_edges(), data["id"])
-        new_node_peers = get_peers_of(data["edges"], data["id"])
-        removed_peers = old_node_peers - new_node_peers
-        for removed_peer in removed_peers:
-            if self.is_ephemeral(removed_peer):
-                await self.remove_ephemeral(removed_peer)
-        accepted_edges = list()
-        for edge in data["edges"]:
-            peer = is_peer_of(edge, self.node_id)
-            if peer:
-                if peer == data["id"]:
-                    accepted_edges.append(edge)
-                else:
-                    logger.debug(f"Excluding edge {edge}")
-            else:
-                accepted_edges.append(edge)
-        self.router.add_or_update_edges(accepted_edges)
-        await self.send_route_advertisement(self.router.get_edges(), data["seen"])
+    async def recalculate_routes(self):
+        """Construct local routing table from source data"""
+        edge_costs = dict()
+        logger.debug("Constructing routing table")
+        for node in self.connections:
+            if self.connections[node]:
+                edge_costs[tuple(sorted([self.node_id, node]))] = 1
+        manifest = await self.connection_manifest.get()
+        for node in manifest:
+            node_key = tuple(sorted([self.node_id, node["id"]]))
+            if node_key not in edge_costs:
+                edge_costs[node_key] = 100
+        for node in self.known_nodes:
+            if node == self.node_id:
+                continue
+            for conn, cost in self.known_nodes[node]["connections"].items():
+                node_key = tuple(sorted([node, conn]))
+                if node_key not in edge_costs:
+                    edge_costs[node_key] = cost
+            pass
+        new_edges = [(key[0], key[1], value) for key, value in edge_costs.items()]
+        if new_edges == self.router.get_edges():
+            logger.debug(f"   Routing not changed. Existing table: {self.router.get_edges()}")
+            return False
+        else:
+            self.router.add_or_update_edges(new_edges, replace_all=True)
+            logger.debug(f"   Routing updated. New table: {self.router.get_edges()}")
+            return True
 
-    async def send_route_advertisement(self, edges=None, seen=None):
-        edges = edges or self.router.get_edges()
-        seen = set(seen) if seen else set()
-        logger.debug("Emitting Route Advertisements, excluding {}".format(seen))
-        destinations = set(self.connections) - seen
-        seens = list(seen | destinations | {self.node_id})
+    async def send_routes(self):
+        """Send routing update to connected peers"""
+        route_adv_id = str(uuid.uuid4())
+        seq = self.known_nodes[self.node_id]["sequence"] + 1
+        self.known_nodes[self.node_id]["sequence"] = seq
+        logger.debug(f"Sending route advertisement {route_adv_id} seq {seq}")
+        self.last_sent_seq = seq
 
-        # TODO: This should be a broadcast call to the connection manager
-        for node_id in destinations:
+        advertised_connections = dict()
+        for node1, node2, cost in self.router.get_edges():
+            other_node = (
+                node1 if node2 == self.node_id else node2 if node1 == self.node_id else None
+            )
+            if other_node:
+                advertised_connections[other_node] = cost
+        logger.debug(f"   Advertised connections: {advertised_connections}")
+
+        for node_id in self.connections:
+            if not self.connections[node_id]:
+                continue
             buf = self.buffer_mgr[node_id]
             try:
                 msg = framed.FramedMessage(
                     header={
-                        "cmd": "ROUTE",
+                        "cmd": "ROUTE2",
+                        "recipient": node_id,
                         "id": self.node_id,
-                        "capabilities": self.work_manager.get_capabilities(),
-                        "node_capabilities": self.node_capabilities,
-                        "groups": self.config.node_groups,
-                        "edges": edges,
-                        "seen": seens,
+                        "origin": self.node_id,
+                        "route_adv_id": route_adv_id,
+                        "connections": advertised_connections,
+                        "seq_epoch": self.known_nodes[self.node_id]["seq_epoch"],
+                        "sequence": seq,
+                        "node_capabilities": {
+                            node: value["capabilities"]
+                            for (node, value) in self.known_nodes.items()
+                        },
                     }
                 )
                 await buf.put(msg.serialize())
+                logger.debug(f"   Sent to {node_id}")
             except Exception as e:
-                logger.exception("Error trying to broadcast routes and capabilities: {}".format(e))
+                logger.exception("Error trying to send route update: {}".format(e))
+
+    async def route_send_check(self, force_send=False):
+        while time.time() < self.route_send_time:
+            await asyncio.sleep(self.route_send_time - time.time())
+        self.route_sender_task = None
+        routes_changed = await self.recalculate_routes()
+        if (
+            force_send
+            or routes_changed
+            or self.known_nodes[self.node_id]["sequence"] != self.last_sent_seq
+        ):
+            await self.send_routes()
+
+    async def recalculate_and_send_routes_soon(self, force_send=False):
+        self.route_send_time = time.time() + 0.1
+        if not self.route_sender_task:
+            self.route_sender_task = asyncio.ensure_future(self.route_send_check(force_send))
+
+    async def handle_route_advertisement(self, data):
+
+        # Sanity checks of the message
+        if "origin" in data:
+            origin = data["origin"]
+        else:
+            raise exceptions.UnknownMessageType("Malformed route advertisement: No origin")
+        if (
+            "cmd" not in data
+            or "route_adv_id" not in data
+            or "seq_epoch" not in data
+            or "sequence" not in data
+            or data["cmd"] != "ROUTE2"
+        ):
+            raise exceptions.UnknownMessageType(
+                f"Unknown route advertisement protocol received from {origin}"
+            )
+        logger.debug(
+            f"Route advertisement {data['route_adv_id']} seq {data['sequence']} "
+            + f"received From {origin} via {data['id']}"
+        )
+
+        # Check if we received an update about ourselves
+        if origin == self.node_id:
+            logger.debug(f"Ignoring route advertisement {data['sequence']} from ourselves")
+            return
+
+        # Check that we have not seen this exact update before
+        expire_time = time.time() - 600
+        self.route_adv_seen = {
+            raid: exp for (raid, exp) in self.route_adv_seen.items() if exp > expire_time
+        }
+        if data["route_adv_id"] in self.route_adv_seen:
+            logger.debug(f"Ignoring already-seen route advertisement {data['route_adv_id']}")
+            return
+        self.route_adv_seen[data["route_adv_id"]] = time.time()
+
+        # If this is the first time we've seen this node, advertise ourselves to it
+        if origin not in self.known_nodes:
+            await self.recalculate_and_send_routes_soon(force_send=True)
+
+        # Check that the epoch and sequence epoch are not older than what we already have
+        if origin in self.known_nodes and (
+            self.known_nodes[origin]["seq_epoch"] > data["seq_epoch"]
+            or self.known_nodes[origin]["sequence"] >= data["sequence"]
+        ):
+            logger.warn(
+                f"Ignoring routing update {data['route_adv_id']} from {origin} "
+                + f"epoch {data['seq_epoch']} seq {data['sequence']} because we already have "
+                + f"epoch {self.known_nodes[origin]['seq_epoch']} "
+                + f"seq {self.known_nodes[origin['sequence']]}"
+            )
+            return
+
+        # TODO: don't just assume this is all correct
+        if "node_capabilities" in data:
+            for node, caps in data["node_capabilities"].items():
+                self.known_nodes[node]["capabilities"] = caps
+
+        # Remove any orphaned leaf nodes
+        unreachable = set()
+        for node in self.known_nodes:
+            if node == self.node_id:
+                continue
+            if (
+                len(self.known_nodes[node]["connections"]) == 1
+                and origin in self.known_nodes[node]["connections"]
+                and node not in data["connections"]
+            ):
+                unreachable.add(node)
+        for node in unreachable:
+            logger.debug(f"Removing orphaned node {node}")
+            del self.known_nodes[node]
+
+        # Update our own routing table based on the data we just received
+        self.known_nodes[origin]["connections"] = data["connections"]
+        self.known_nodes[origin]["seq_epoch"] = data["seq_epoch"]
+        self.known_nodes[origin]["sequence"] = data["sequence"]
+        await self.recalculate_routes()
+
+        # Re-send the routing update to all our connections except the one it came in on
+        for conn in self.connections:
+            if conn == data["id"]:
+                continue
+            send_data = dict(data)
+            buf = self.buffer_mgr[conn]
+            try:
+                send_data["id"] = self.node_id
+                send_data["recipient"] = conn
+                msg = framed.FramedMessage(header=send_data)
+                await buf.put(msg.serialize())
+            except Exception as e:
+                logger.exception("Error trying to forward route broadcast: {}".format(e))
 
     async def handle_directive(self, msg):
         try:

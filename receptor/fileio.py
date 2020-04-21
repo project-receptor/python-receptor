@@ -1,7 +1,16 @@
+import atexit
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 pool = ThreadPoolExecutor()
+
+
+def shutdown_pool():
+    for thread in pool._threads:
+        thread._tstate_lock.release()
+
+
+atexit.register(shutdown_pool)
 
 
 class Deferrer:
