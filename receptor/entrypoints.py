@@ -51,16 +51,17 @@ async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, sen
             if add_peer_task and add_peer_task.done() and not add_peer_task.result():
                 print("Connection failed. Exiting.")
                 return False
-            if (recipient and controller.receptor.router.node_is_known(recipient)) or (
-                not recipient and controller.receptor.routes_received
-            ):
+            if ((not recipient or controller.receptor.router.node_is_known(recipient)) and
+                controller.receptor.route_send_time is not None and
+                time.time() - controller.receptor.route_send_time > 2.0
+                ):
                 break
-            if time.time() - start_wait > 5:
+            if time.time() - start_wait > 10:
                 print("Connection timed out. Exiting.")
                 if not add_peer_task.done():
                     add_peer_task.cancel()
                 return False
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.5)
     read_task = controller.loop.create_task(read_func())
     await send_func()
     await read_task
@@ -180,11 +181,9 @@ def run_as_status(config):
             print("-", str(tuple(edge)))
         print()
         print("Known Node Capabilities:")
-        for node, node_caps in r.node_capabilities.items():
-            if node_caps.get("ephemeral", None) and not config.status_show_ephemeral:
-                continue
+        for node, node_data in r.known_nodes.items():
             print("  ", node, ":", sep="")
-            for cap, cap_value in node_caps.items():
+            for cap, cap_value in node_data["capabilities"].items():
                 print("    ", cap, ": ", str(cap_value), sep="")
 
     async def noop():

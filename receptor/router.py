@@ -72,12 +72,16 @@ class MeshRouter:
     def node_is_known(self, node_id):
         return node_id in self._nodes or node_id == self.node_id
 
-    def add_or_update_edges(self, edges):
+    def add_or_update_edges(self, edges, replace_all=False):
         """
         Adds a list of edges supplied as (node1, node2, cost) tuples.
         Already-existing edges have their cost updated.
         Supplying a cost of None removes the edge.
         """
+        if replace_all:
+            self._nodes = set()
+            self._edges = dict()
+            self._neighbors = defaultdict(set)
         for left, right, cost in edges:
             edge_key = tuple(sorted([left, right]))
             if edge_key not in self._edges:
@@ -107,6 +111,10 @@ class MeshRouter:
         if node in self._nodes:
             self._nodes.remove(node)
         route_info.info(dict(edges=str(set(self.get_edges()))))
+
+    def get_edge_keys(self):
+        """Returns list of edge keys as sorted node-pair tuples"""
+        return set(self._edges.keys())
 
     def get_edges(self):
         """Returns set of edges as a list of (node1, node2, cost) tuples."""
