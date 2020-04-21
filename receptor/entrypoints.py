@@ -51,10 +51,11 @@ async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, sen
             if add_peer_task and add_peer_task.done() and not add_peer_task.result():
                 print("Connection failed. Exiting.")
                 return False
-            if ((not recipient or controller.receptor.router.node_is_known(recipient)) and
-                controller.receptor.route_send_time is not None and
-                time.time() - controller.receptor.route_send_time > 2.0
-                ):
+            if (
+                (not recipient or controller.receptor.router.node_is_known(recipient))
+                and controller.receptor.route_send_time is not None
+                and time.time() - controller.receptor.route_send_time > 2.0
+            ):
                 break
             if time.time() - start_wait > 10:
                 print("Connection timed out. Exiting.")
