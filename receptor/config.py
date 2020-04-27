@@ -244,7 +244,7 @@ class ReceptorConfig:
             section="node",
             key="ws_heartbeat",
             long_option="--ws_heartbeat",
-            default_value=1800,
+            default_value=None,
             value_type="int",
             hint="Set heartbeat interval for websocket connections."
         )
