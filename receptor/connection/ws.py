@@ -32,7 +32,15 @@ class WebSocket(Transport):
             await self.ws.send_bytes(chunk)
 
 
-async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_extra_headers=None, ws_heartbeat=None):
+async def connect(
+    uri,
+    factory,
+    loop=None,
+    ssl_context=None,
+    reconnect=True,
+    ws_extra_headers=None,
+    ws_heartbeat=None
+):
     if not loop:
         loop = asyncio.get_event_loop()
 

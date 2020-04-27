@@ -67,7 +67,14 @@ class Manager:
             )
         elif service.scheme in ("ws", "wss"):
             return self.loop.create_task(
-                ws.connect(peer, self.factory, self.loop, ssl_context, reconnect, ws_extra_headers, ws_heartbeat)
+                ws.connect(
+                    peer,
+                    self.factory,
+                    self.loop,
+                    ssl_context,
+                    reconnect,
+                    ws_extra_headers,
+                    ws_heartbeat)
             )
         else:
             raise RuntimeError(f"Unknown URL scheme {service.scheme}")
