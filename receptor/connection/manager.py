@@ -74,7 +74,8 @@ class Manager:
                     ssl_context,
                     reconnect,
                     ws_extra_headers,
-                    ws_heartbeat)
+                    ws_heartbeat,
+                )
             )
         else:
             raise RuntimeError(f"Unknown URL scheme {service.scheme}")

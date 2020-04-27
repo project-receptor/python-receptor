@@ -48,13 +48,7 @@ def run_as_node(config):
 
 
 async def run_oneshot_command(
-    controller,
-    peer,
-    recipient,
-    ws_extra_headers,
-    ws_heartbeat,
-    send_func,
-    read_func
+    controller, peer, recipient, ws_extra_headers, ws_heartbeat, send_func, read_func
 ):
     if (not recipient) or (recipient != controller.receptor.node_id):
         add_peer_task = controller.add_peer(
