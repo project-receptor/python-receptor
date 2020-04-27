@@ -240,6 +240,14 @@ class ReceptorConfig:
             value_type="key-value-list",
             hint="Set additional headers to provide when connecting to websocket peers.",
         )
+        self.add_config_option(
+            section="node",
+            key="ws_heartbeat",
+            long_option="--ws_heartbeat",
+            default_value=None,
+            value_type="int",
+            hint="Set heartbeat interval for websocket connections."
+        )
         # ping options
         self.add_config_option(
             section="ping",
@@ -280,6 +288,14 @@ class ReceptorConfig:
             default_value=[],
             value_type="key-value-list",
             hint="Set additional headers to provide when connecting to websocket peers.",
+        )
+        self.add_config_option(
+            section="ping",
+            key="ws_heartbeat",
+            long_option="--ws_heartbeat",
+            default_value=None,
+            value_type="int",
+            hint="Set heartbeat interval for websocket connections."
         )
         # send options
         self.add_config_option(
@@ -322,6 +338,14 @@ class ReceptorConfig:
             value_type="list",
             hint="Set additional headers to provide when connecting to websocket peers.",
         )
+        self.add_config_option(
+            section="send",
+            key="ws_heartbeat",
+            long_option="--ws_heartbeat",
+            default_value=None,
+            value_type="int",
+            hint="Set heartbeat interval for websocket connections."
+        )
         # status options
         self.add_config_option(
             section="status",
@@ -347,6 +371,14 @@ class ReceptorConfig:
             set_value=True,
             value_type="bool",
             hint="Show ephemeral nodes in output",
+        )
+        self.add_config_option(
+            section="status",
+            key="ws_heartbeat",
+            long_option="--ws_heartbeat",
+            default_value=None,
+            value_type="int",
+            hint="Set heartbeat interval for websocket connections."
         )
         self.parse_options(args)
 

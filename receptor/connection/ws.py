@@ -32,7 +32,10 @@ class WebSocket(Transport):
             await self.ws.send_bytes(chunk)
 
 
-async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_extra_headers=None):
+async def connect(
+    uri, factory, loop=None, ssl_context=None, reconnect=True,
+    ws_extra_headers=None, ws_heartbeat=None
+):
     if not loop:
         loop = asyncio.get_event_loop()
 
@@ -48,7 +51,7 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_
             proxy_auth = None
         async with aiohttp.ClientSession().ws_connect(
             uri, ssl=ssl_context, headers=ws_extra_headers,
-            proxy=proxy, proxy_auth=proxy_auth
+            proxy=proxy, proxy_auth=proxy_auth, heartbeat=ws_heartbeat
         ) as ws:
             log_ssl_detail(ws)
             t = WebSocket(ws)
@@ -67,6 +70,7 @@ async def connect(uri, factory, loop=None, ssl_context=None, reconnect=True, ws_
                     loop=loop,
                     ssl_context=ssl_context,
                     ws_extra_headers=ws_extra_headers,
+                    ws_heartbeat=ws_heartbeat,
                 )
             )
         return True

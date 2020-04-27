@@ -84,7 +84,7 @@ class Controller:
             tasks.append(self.loop.create_task(listener))
         return tasks
 
-    def add_peer(self, peer, ws_extra_headers=None):
+    def add_peer(self, peer, ws_extra_headers=None, ws_heartbeat=None):
         """
         Adds a Receptor Node *Peer*. A connection will be established to this node once
         :meth:`receptor.controller.Controller.run` is called.
@@ -99,6 +99,7 @@ class Controller:
             peer,
             reconnect=not self.receptor.config._is_ephemeral,
             ws_extra_headers=ws_extra_headers,
+            ws_heartbeat=ws_heartbeat,
         )
 
     async def recv(self):
