@@ -32,7 +32,7 @@ def run_as_node(config):
             listen_tasks = controller.enable_server(config.node_listen)
             controller.loop.create_task(controller.exit_on_exceptions_in(listen_tasks))
         for peer in config.node_peers:
-            controller.add_peer(peer, ws_extra_headers=config.node_ws_extra_headers)
+            controller.add_peer(peer, ws_extra_headers=config.node_ws_extra_headers, ws_heartbeat=config.node_ws_heartbeat)
         if config.node_keepalive_interval > 1:
             controller.loop.create_task(node_keepalive())
         controller.loop.create_task(
@@ -43,9 +43,9 @@ def run_as_node(config):
         controller.cleanup_tmpdir()
 
 
-async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, send_func, read_func):
+async def run_oneshot_command(controller, peer, recipient, ws_extra_headers, ws_heartbeat, send_func, read_func):
     if (not recipient) or (recipient != controller.receptor.node_id):
-        add_peer_task = controller.add_peer(peer, ws_extra_headers=ws_extra_headers)
+        add_peer_task = controller.add_peer(peer, ws_extra_headers=ws_extra_headers, ws_heartbeat=ws_heartbeat)
         start_wait = time.time()
         while True:
             if add_peer_task and add_peer_task.done() and not add_peer_task.result():
@@ -84,6 +84,7 @@ def run_as_ping(config):
             config.ping_peer,
             config.ping_recipient,
             config.ping_ws_extra_headers,
+            config.ping_ws_heartbeat,
             send_pings,
             read_responses,
         )
@@ -114,6 +115,7 @@ def run_as_send(config):
             config.send_peer,
             config.send_recipient,
             config.send_ws_extra_headers,
+            config.send_ws_heartbeat,
             send_message,
             read_responses,
         )
@@ -163,7 +165,7 @@ def run_as_send(config):
 def run_as_status(config):
     async def status_entrypoint():
         return await run_oneshot_command(
-            controller, config.status_peer, None, config.status_ws_extra_headers, print_status, noop
+            controller, config.status_peer, None, config.status_ws_extra_headers, config.status_ws_heartbeat, print_status, noop
         )
 
     async def print_status():
