@@ -58,13 +58,7 @@ class LogstashFormatter(logging.Formatter):
             except Exception:
                 self.source_host = ""
 
-    def format(self, record):
-        """
-        Format a log record to JSON, if the message is a dict
-        assume an empty message and use the dict as additional
-        fields.
-        """
-
+    def _record_to_dict(self, record):
         fields = record.__dict__.copy()
 
         if isinstance(record.msg, dict):
@@ -107,7 +101,16 @@ class LogstashFormatter(logging.Formatter):
                 "@fields": self._build_fields(logr, fields),
             }
         )
+        return logr
 
+    def format(self, record):
+        """
+        Format a log record to JSON, if the message is a dict
+        assume an empty message and use the dict as additional
+        fields.
+        """
+
+        logr = self._record_to_dict(record)
         return json.dumps(logr, default=self.json_default, cls=self.json_cls)
 
     def _build_fields(self, defaults, fields):

@@ -35,7 +35,7 @@ def run_as_node(config):
             controller.add_peer(
                 peer,
                 ws_extra_headers=config.node_ws_extra_headers,
-                ws_heartbeat=config.node_ws_heartbeat
+                ws_heartbeat=config.node_ws_heartbeat,
             )
         if config.node_keepalive_interval > 1:
             controller.loop.create_task(node_keepalive())
@@ -179,7 +179,7 @@ def run_as_status(config):
             config.status_ws_extra_headers,
             config.status_ws_heartbeat,
             print_status,
-            noop
+            noop,
         )
 
     async def print_status():

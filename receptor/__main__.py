@@ -1,10 +1,10 @@
 import asyncio
 import logging
 import logging.config
-import signal
 import sys
 
 from .config import ReceptorConfig
+from .diagnostics import log_buffer
 from .logstash_formatter.logstash import LogstashFormatter
 
 logger = logging.getLogger(__name__)
@@ -48,16 +48,12 @@ def main(args=None):
 
     def _f(record):
         record.node_id = config.default_node_id
+        if record.levelno == logging.ERROR:
+            log_buffer.appendleft(record)
         return True
 
     for h in logging.getLogger("receptor").handlers:
         h.addFilter(_f)
-
-    def dump_stacks(signum, frame):
-        for t in asyncio.Task.all_tasks():
-            t.print_stack(file=sys.stderr)
-
-    signal.signal(signal.SIGHUP, dump_stacks)
 
     try:
         config.go()

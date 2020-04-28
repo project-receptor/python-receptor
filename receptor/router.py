@@ -1,9 +1,9 @@
-import sys
 import asyncio
 import datetime
 import heapq
-import logging
 import itertools
+import logging
+import sys
 from collections import defaultdict
 
 from .exceptions import ReceptorBufferError, UnrouteableError

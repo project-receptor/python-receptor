@@ -1,5 +1,6 @@
 import asyncio
 import logging
+
 from .base import Transport, log_ssl_detail
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,20 @@ class RawSocket(Transport):
         async for chunk in q:
             self.writer.write(chunk)
         await self.writer.drain()
+
+    def _diagnostics(self):
+        t = self.writer._transport.get_extra_info
+        addr, port = t("peername", (None, None))
+        return {
+            "address": addr,
+            "port": port,
+            "compression": t("compression"),
+            "cipher": t("cipher"),
+            "peercert": t("peercert"),
+            "sslcontext": t("sslcontext"),
+            "closed": self.closed,
+            "chunk_size": self.chunk_size,
+        }
 
 
 async def connect(host, port, factory, loop=None, ssl=None, reconnect=True):

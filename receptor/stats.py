@@ -1,5 +1,6 @@
 from prometheus_client import Counter, Gauge, Info
 
+bytes_recv = Counter("bytes_recv", "Number of bytes received")
 messages_received_counter = Counter("incoming_messages", "Messages received from Receptor Peers")
 connected_peers_gauge = Gauge("connected_peers", "Number of active peer connections")
 work_counter = Counter(

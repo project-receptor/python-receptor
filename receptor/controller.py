@@ -8,6 +8,7 @@ from contextlib import suppress
 
 from .connection.base import Worker
 from .connection.manager import Manager
+from .diagnostics import status
 from .messages.framed import FileBackedBuffer, FramedMessage
 from .receptor import Receptor
 
@@ -39,6 +40,7 @@ class Controller:
         if self.queue is None:
             self.queue = asyncio.Queue(loop=loop)
         self.receptor.response_queue = self.queue
+        self.status_task = loop.create_task(status(self.receptor))
 
     async def shutdown_loop(self):
         tasks = [
