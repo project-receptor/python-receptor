@@ -56,10 +56,23 @@ class Controller:
             tasks.append(self.loop.create_task(listener))
         return tasks
 
-    def add_peer(self, peer, ws_extra_headers=None):
+    def add_peer(self, peer, ws_extra_headers=None, ws_heartbeat=None):
+        """
+        Adds a Receptor Node *Peer*. A connection will be established to this node once
+        :meth:`receptor.controller.Controller.run` is called.
+
+        Example format:
+        rnps://10.0.1.1:8888
+
+        :param peer: remote peer url
+        """
         logger.info("Connecting to peer {}".format(peer))
-        return self.connection_manager.get_peer(peer, reconnect=not self.receptor.config._is_ephemeral,
-                                                ws_extra_headers=ws_extra_headers)
+        return self.connection_manager.get_peer(
+            peer,
+            reconnect=not self.receptor.config._is_ephemeral,
+            ws_extra_headers=ws_extra_headers,
+            ws_heartbeat=ws_heartbeat,
+        )
 
     async def recv(self):
         return await self.receptor.response_queue.get()
