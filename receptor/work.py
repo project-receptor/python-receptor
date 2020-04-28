@@ -84,7 +84,8 @@ class WorkManager:
             raise exceptions.InvalidDirectiveAction(f"Invalid action {action} for {namespace}")
         if not getattr(action_method, "receptor_export", False):
             logger.exception(
-                f"""Not allowed to call {action} from {namespace} because it is not marked for export"""
+                f"""Not allowed to call {action} from {namespace} """
+                """because it is not marked for export"""
             )
             raise exceptions.InvalidDirectiveAction(
                 f"Access denied calling {action} for {namespace}"

@@ -1,10 +1,10 @@
 import asyncio
+import collections
 import json
 import logging
 import os
 import time
 import uuid
-import collections
 
 import pkg_resources
 
@@ -148,12 +148,11 @@ class Receptor:
             self.connections[id_] = [protocol_obj]
             routing_changed = True
         await self.connection_manifest.update(id_)
-<<<<<<< HEAD
+
         if routing_changed:
             await self.recalculate_and_send_routes_soon()
-=======
+
         stats.connected_peers_gauge.inc()
->>>>>>> 943b3d5... refactoring module extraction
 
     async def remove_ephemeral(self, node):
         logger.debug(f"Removing ephemeral node {node}")
@@ -179,17 +178,9 @@ class Receptor:
                 else:
                     self.connections[connection_node].remove(protocol_obj)
                     await self.connection_manifest.update(connection_node)
-<<<<<<< HEAD
         if routing_changed:
             await self.recalculate_and_send_routes_soon()
-=======
-                stats.connected_peers_gauge.dec()
-            notify_connections += self.connections[connection_node]
-        if loop is None:
-            loop = getattr(protocol_obj, "loop", None)
-        if loop is not None:
-            loop.create_task(self.send_route_advertisement(self.router.get_edges()))
->>>>>>> 943b3d5... refactoring module extraction
+            stats.connected_peers_gauge.dec()
 
     def is_ephemeral(self, id_):
         return (

@@ -246,7 +246,7 @@ class ReceptorConfig:
             long_option="--ws_heartbeat",
             default_value=None,
             value_type="int",
-            hint="Set heartbeat interval for websocket connections."
+            hint="Set heartbeat interval for websocket connections.",
         )
         # ping options
         self.add_config_option(
@@ -295,7 +295,7 @@ class ReceptorConfig:
             long_option="--ws_heartbeat",
             default_value=None,
             value_type="int",
-            hint="Set heartbeat interval for websocket connections."
+            hint="Set heartbeat interval for websocket connections.",
         )
         # send options
         self.add_config_option(
@@ -344,7 +344,7 @@ class ReceptorConfig:
             long_option="--ws_heartbeat",
             default_value=None,
             value_type="int",
-            hint="Set heartbeat interval for websocket connections."
+            hint="Set heartbeat interval for websocket connections.",
         )
         # status options
         self.add_config_option(
@@ -378,7 +378,7 @@ class ReceptorConfig:
             long_option="--ws_heartbeat",
             default_value=None,
             value_type="int",
-            hint="Set heartbeat interval for websocket connections."
+            hint="Set heartbeat interval for websocket connections.",
         )
         self.parse_options(args)
 

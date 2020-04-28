@@ -33,15 +33,20 @@ class WebSocket(Transport):
 
 
 async def connect(
-    uri, factory, loop=None, ssl_context=None, reconnect=True,
-    ws_extra_headers=None, ws_heartbeat=None
+    uri,
+    factory,
+    loop=None,
+    ssl_context=None,
+    reconnect=True,
+    ws_extra_headers=None,
+    ws_heartbeat=None,
 ):
     if not loop:
         loop = asyncio.get_event_loop()
 
     worker = factory()
     try:
-        proxy_scheme = {'ws': 'http', 'wss': 'https'}[urlparse(uri).scheme]
+        proxy_scheme = {"ws": "http", "wss": "https"}[urlparse(uri).scheme]
         proxies = proxies_from_env()
         if proxy_scheme in proxies:
             proxy = proxies[proxy_scheme].proxy
@@ -50,8 +55,12 @@ async def connect(
             proxy = None
             proxy_auth = None
         async with aiohttp.ClientSession().ws_connect(
-            uri, ssl=ssl_context, headers=ws_extra_headers,
-            proxy=proxy, proxy_auth=proxy_auth, heartbeat=ws_heartbeat
+            uri,
+            ssl=ssl_context,
+            headers=ws_extra_headers,
+            proxy=proxy,
+            proxy_auth=proxy_auth,
+            heartbeat=ws_heartbeat,
         ) as ws:
             log_ssl_detail(ws)
             t = WebSocket(ws)
