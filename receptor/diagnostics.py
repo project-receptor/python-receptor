@@ -49,6 +49,11 @@ def encode_set(s):
     return list(s)
 
 
+@encode.register(bytes)
+def decode_bytes(b):
+    return b.decode("utf-8")
+
+
 @encode.register(types.FunctionType)
 def encode_function_type(func):
     return f"{func.__module__}.{func.__qualname__}"
