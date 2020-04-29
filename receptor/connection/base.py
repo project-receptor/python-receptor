@@ -124,7 +124,7 @@ class Worker:
 
     async def _wait_handshake(self):
         logger.debug("waiting for HI")
-        response = await self.buf.get()  # TODO: deal with timeout
+        response = await asyncio.wait_for(self.buf.get(), 5.0)
         self.remote_id = response.header["id"]
         self.register()
 
