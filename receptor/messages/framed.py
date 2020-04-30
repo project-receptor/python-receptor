@@ -287,8 +287,8 @@ class FramedBuffer:
         self.to_read = 0
         self.bb = FileBackedBuffer.from_temp()
 
-    async def get(self):
-        return await self.q.get()
+    async def get(self, timeout=None):
+        return await asyncio.wait_for(self.q.get(), timeout)
 
     def get_nowait(self):
         return self.q.get_nowait()
