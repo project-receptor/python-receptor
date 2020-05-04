@@ -548,7 +548,6 @@ pyyaml = "^5.3"
 receptor = "branch master"
 requests = "^2.22.0"
 setuptools = "*"
-typing = "^3.7.4"
 wait-for = "^1.1.1"
 
 [package.source]
@@ -741,14 +740,6 @@ name = "typed-ast"
 optional = false
 python-versions = "*"
 version = "1.4.1"
-
-[[package]]
-category = "dev"
-description = "Type Hints for Python"
-name = "typing"
-optional = false
-python-versions = "*"
-version = "3.7.4.1"
 
 [[package]]
 category = "main"
