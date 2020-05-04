@@ -142,7 +142,7 @@ class Worker:
 
     async def _wait_handshake(self):
         logger.debug("waiting for HI")
-        response = await self.buf.get()  # TODO: deal with timeout
+        response = await self.buf.get(timeout=20.0)
         self.remote_id = response.header["id"]
         await self.register()
         await self.receptor.recalculate_and_send_routes_soon()
