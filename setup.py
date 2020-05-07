@@ -10,7 +10,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name="receptor",
-    version="0.6.1",
+    version="0.6.2",
     author='Red Hat',
     url="https://github.com/project-receptor/receptor",
     license='Apache',
