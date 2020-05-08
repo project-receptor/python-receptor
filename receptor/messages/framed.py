@@ -109,9 +109,8 @@ class FileBackedBuffer:
         self._max_chunk = max_chunk
 
     @classmethod
-    def from_temp(cls, dir=None, delete=False):
-        # return cls(tempfile.NamedTemporaryFile(dir=dir, delete=delete))
-        return cls(tempfile.SpooledTemporaryFile(dir=dir, max_size=2 ** 12))
+    def from_temp(cls, dir=None, delete=True):
+        return cls(tempfile.NamedTemporaryFile(dir=dir, delete=delete))
 
     @classmethod
     def from_buffer(cls, buffered_io, dir=None, delete=False):
@@ -120,7 +119,7 @@ class FileBackedBuffer:
         return cls(fp=buffered_io, length=buffered_io.getbuffer().nbytes)
 
     @classmethod
-    def from_data(cls, raw_data, dir=None, delete=False):
+    def from_data(cls, raw_data, dir=None, delete=True):
         if isinstance(raw_data, str):
             raw_data = raw_data.encode()
         fbb = cls.from_temp(dir=dir, delete=delete)
@@ -128,7 +127,7 @@ class FileBackedBuffer:
         return fbb
 
     @classmethod
-    def from_dict(cls, raw_data, dir=None, delete=False):
+    def from_dict(cls, raw_data, dir=None, delete=True):
         try:
             d = json.dumps(raw_data).encode("utf-8")
         except Exception as e:
@@ -172,6 +171,9 @@ class FileBackedBuffer:
             return self.fp.read()
         finally:
             self.fp.seek(pos)
+
+    def flush(self):
+        self.fp.flush()
 
     def __len__(self):
         return self.length

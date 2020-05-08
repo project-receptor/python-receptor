@@ -71,6 +71,7 @@ class WorkManager:
             payload.seek(0)
             return payload
         elif payload_type == FILE_PAYLOAD:
+            payload.flush()
             return payload.name
         return payload.readall()
 
