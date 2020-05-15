@@ -6,6 +6,8 @@ import sys
 from .config import ReceptorConfig
 from .diagnostics import log_buffer
 from .logstash_formatter.logstash import LogstashFormatter
+from . import entrypoints
+from .exceptions import ReceptorRuntimeError
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +49,7 @@ def main(args=None):
     )
 
     def _f(record):
-        record.node_id = config.default_node_id
+        record.node_id = config.node_node_id
         if record.levelno == logging.ERROR:
             log_buffer.appendleft(record)
         return True
@@ -56,7 +58,12 @@ def main(args=None):
         h.addFilter(_f)
 
     try:
-        config.go()
+        entrypoint_name = config.get_entrypoint_name()
+        entrypoint_func = getattr(entrypoints, entrypoint_name, None)
+        if entrypoint_func:
+            entrypoint_func(config)
+        else:
+            raise ReceptorRuntimeError(f"Unknown entrypoint {entrypoint_name}")
     except asyncio.CancelledError:
         pass
     except Exception:

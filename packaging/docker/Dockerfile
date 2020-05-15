@@ -28,7 +28,9 @@ ENV LANG=en_US.UTF-8
 ENV LANGUAGE=en_US:en
 ENV LC_ALL=en_US.UTF-8
 ENV HOME=/var/lib/receptor
-EXPOSE 8888/tcp
+EXPOSE 7323/tcp
+EXPOSE 7324/tcp
+EXPOSE 7325/tcp
 WORKDIR /var/lib/receptor
 ENTRYPOINT ["entrypoint"]
 CMD ["receptor", "-c", "/var/lib/receptor/receptor.conf", "node"]

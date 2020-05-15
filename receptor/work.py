@@ -42,8 +42,6 @@ class WorkManager:
             },
             "max_work_threads": self.receptor.config.default_max_workers,
         }
-        if self.receptor.config._is_ephemeral:
-            caps["ephemeral"] = True
         return caps
 
     def get_work(self):

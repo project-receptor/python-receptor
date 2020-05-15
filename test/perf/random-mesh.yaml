@@ -2,7 +2,7 @@
 nodes:
   controller:
     connections: []
-    listen: receptor://127.0.0.1:8889
+    listen: receptor://127.0.0.1:7323
     name: controller
     stats_enable: true
     stats_port: null

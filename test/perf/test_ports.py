@@ -62,7 +62,7 @@ def test_listen_query():
 def test_no_port_given():
     """Start a node, and don't specify a port on which to listen.
 
-    Assert that it listens on port 8888. Older versions of receptor would listen on a random port.
+    Assert that it listens on port 7323. Older versions of receptor would listen on a random port.
     See: `receptor #138`_.
 
     .. _receptor #138: https://github.com/project-receptor/receptor/issues/138
@@ -72,6 +72,6 @@ def test_no_port_given():
     try:
         conns = psutil.Process(node.pid).connections()
         assert len(conns) == 1
-        assert conns[0].laddr.port == 8888
+        assert conns[0].laddr.port == 7323
     finally:
         node.stop()

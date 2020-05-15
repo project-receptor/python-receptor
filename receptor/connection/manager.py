@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 
 from . import sock, ws
 
-default_scheme_ports = {"rnp": 8888, "rnps": 8899, "ws": 80, "wss": 443}
+default_scheme_ports = {"rnp": 7323, "rnps": 7324, "ws": 80, "wss": 443}
 
 
 def parse_peer(peer, role):

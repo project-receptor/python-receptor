@@ -1,24 +1,19 @@
+import os
 import argparse
 import configparser
 import logging
-import os
 import ssl
 
-from .entrypoints import run_as_node, run_as_ping, run_as_send, run_as_status
 from .exceptions import ReceptorRuntimeError, ReceptorConfigError
 
 logger = logging.getLogger(__name__)
 
 SINGLETONS = {}
 SUBCOMMAND_EXTRAS = {
-    "node": {"hint": "Run a Receptor node", "entrypoint": run_as_node, "is_ephemeral": False},
-    "ping": {"hint": "Ping a Receptor node", "entrypoint": run_as_ping, "is_ephemeral": True},
-    "send": {"hint": "Send a directive to a node", "entrypoint": run_as_send, "is_ephemeral": True},
-    "status": {
-        "hint": "Display status of the Receptor network",
-        "entrypoint": run_as_status,
-        "is_ephemeral": True,
-    },
+    "node": {"hint": "Run a Receptor node", "entrypoint": "run_as_node"},
+    "ping": {"hint": "Ping a Receptor node", "entrypoint": "run_as_ping"},
+    "send": {"hint": "Send a directive to a node", "entrypoint": "run_as_send"},
+    "status": {"hint": "Display status of the Receptor network", "entrypoint": "run_as_status"},
 }
 
 
@@ -39,7 +34,7 @@ class ReceptorConfig:
     the caller by passing them in a dictionary to args::
 
         config = receptor.ReceptorConfig(args=dict(default_config="/opt/receptor.conf"))
-        config.default_data_dir = "/var/run/"
+        config.node_data_dir = "/var/run/"
         controller = receptor.Controller(config)
 
     Some options are only relevant when running as a node from the command line. When invoking
@@ -47,25 +42,22 @@ class ReceptorConfig:
     and listen addresses will be set up using Controller methods.
     """
 
-    def __init__(self, args=None):
+    def __init__(
+        self, args=None, parser_class=argparse.ArgumentParser, parser_opts=None, context=None
+    ):
         self._config_options = {}
-        self._cli_args = argparse.ArgumentParser("receptor")
+        if not parser_opts:
+            parser_opts = {}
+        self._cli_args = parser_class("receptor", **parser_opts)
         self._cli_sub_args = self._cli_args.add_subparsers()
         self._parsed_args = None
         self._config_file = configparser.ConfigParser(allow_no_value=True, delimiters=("=",))
-        self._is_ephemeral = False
+        self._context = context
 
         # Default options, which apply to all sub-commands.
         self.add_config_option(
             section="default",
-            key="node_id",
-            default_value="",
-            value_type="str",
-            hint="""Set/override node identifier. If unspecified here or in a config file,
-                    one will be automatically generated.""",
-        )
-        self.add_config_option(
-            section="default",
+            contexts=["cli"],
             key="config",
             short_option="-c",
             default_value="/etc/receptor/receptor.conf",
@@ -74,14 +66,26 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="default",
-            key="data_dir",
-            short_option="-d",
-            default_value=None,
+            contexts=["cli"],
+            key="socket_path",
+            short_option="-s",
+            default_value="/var/run/receptor.sock",
             value_type="path",
-            hint="Path to the directory where Receptor stores its database and metadata.",
+            hint="Path to the Receptor control socket.",
         )
         self.add_config_option(
             section="default",
+            contexts=["cli"],
+            key="no_socket",
+            long_option="--no-socket",
+            default_value=False,
+            set_value=True,
+            value_type="bool",
+            hint="Disable the control socket",
+        )
+        self.add_config_option(
+            section="default",
+            contexts=["cli"],
             key="debug",
             default_value=None,
             set_value=True,
@@ -91,6 +95,7 @@ class ReceptorConfig:
         default_max_workers = min(32, os.cpu_count() + 4)
         self.add_config_option(
             section="default",
+            contexts=["cli"],
             key="max_workers",
             default_value=default_max_workers,
             value_type="int",
@@ -99,6 +104,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="default",
+            contexts=["cli"],
             key="logging_format",
             default_value="simple",
             value_type="str",
@@ -109,6 +115,7 @@ class ReceptorConfig:
         # so all of these options use `subparse=False`.
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="server_cert",
             default_value="",
             value_type="str",
@@ -117,6 +124,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="server_key",
             default_value="",
             value_type="str",
@@ -125,6 +133,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="server_ca_bundle",
             default_value=None,
             value_type="str",
@@ -133,6 +142,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="client_cert",
             default_value="",
             value_type="str",
@@ -141,6 +151,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="client_key",
             default_value="",
             value_type="str",
@@ -149,6 +160,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="client_verification_ca",
             default_value=None,
             value_type="str",
@@ -157,6 +169,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="server_cipher_list",
             default_value=None,
             value_type="str",
@@ -165,6 +178,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="auth",
+            contexts=["cli"],
             key="client_cipher_list",
             default_value=None,
             value_type="str",
@@ -174,14 +188,44 @@ class ReceptorConfig:
         # Receptor node options
         self.add_config_option(
             section="node",
-            key="listen",
-            default_value=["rnp://0.0.0.0:8888"],
-            value_type="list",
-            hint="""Set/override IP address and port to listen on. If not set here
-                    or in a config file, the default is rnp://0.0.0.0:8888.""",
+            contexts=["cli"],
+            key="node_id",
+            default_value="",
+            value_type="str",
+            hint="""Set/override node identifier. If unspecified here or in a config file,
+                    one will be automatically generated.""",
         )
         self.add_config_option(
             section="node",
+            contexts=["cli"],
+            key="data_dir",
+            short_option="-d",
+            default_value="/var/lib/receptor",
+            value_type="path",
+            hint="Path to the directory where Receptor stores its database and metadata.",
+        )
+        self.add_config_option(
+            section="node",
+            contexts=["cli"],
+            key="listen",
+            default_value=["rnp://0.0.0.0:7323"],
+            value_type="list",
+            hint="""Set/override IP address and port to listen on. If not set here
+                    or in a config file, the default is rnp://0.0.0.0:7323.""",
+        )
+        self.add_config_option(
+            section="node",
+            contexts=["cli"],
+            key="no_listen",
+            long_option="--no-listen",
+            default_value=False,
+            set_value=True,
+            value_type="bool",
+            hint="Disable the server function and only connect to configured peers",
+        )
+        self.add_config_option(
+            section="node",
+            contexts=["cli"],
             key="peers",
             short_option="-p",
             long_option="--peer",
@@ -192,15 +236,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="node",
-            key="server_disable",
-            long_option="--server-disable",
-            default_value=False,
-            set_value=True,
-            value_type="bool",
-            hint="Disable the server function and only connect to configured peers",
-        )
-        self.add_config_option(
-            section="node",
+            contexts=["cli"],
             key="stats_enable",
             default_value=None,
             set_value=True,
@@ -209,13 +245,15 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="node",
+            contexts=["cli"],
             key="stats_port",
-            default_value=8889,
+            default_value=7325,
             value_type="int",
             hint="Port to listen for requests to show stats",
         )
         self.add_config_option(
             section="node",
+            contexts=["cli"],
             key="keepalive_interval",
             default_value=-1,
             value_type="int",
@@ -224,6 +262,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="node",
+            contexts=["cli"],
             key="groups",
             short_option="-g",
             long_option="--group",
@@ -234,6 +273,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="node",
+            contexts=["cli"],
             key="ws_extra_headers",
             long_option="--ws_extra_header",
             default_value=[],
@@ -242,6 +282,7 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="node",
+            contexts=["cli"],
             key="ws_heartbeat",
             long_option="--ws_heartbeat",
             default_value=None,
@@ -251,22 +292,16 @@ class ReceptorConfig:
         # ping options
         self.add_config_option(
             section="ping",
-            key="peer",
-            default_value="localhost:8888",
-            value_type="str",
-            hint="""The peer to relay the ping directive through. If unspecified here or
-                    in a config file, localhost:8888 will be used.""",
-        )
-        self.add_config_option(
-            section="ping",
+            contexts=["cli", "socket"],
             key="count",
-            default_value=4,
+            default_value=1,
             value_type="int",
             hint="""Number of pings to send. If set to zero, pings will be continuously
                     sent until interrupted.""",
         )
         self.add_config_option(
             section="ping",
+            contexts=["cli", "socket"],
             key="delay",
             default_value=1,
             value_type="float",
@@ -275,46 +310,17 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="ping",
+            contexts=["cli", "socket"],
             key="recipient",
             long_option="ping_recipient",
             default_value="",
             value_type="str",
             hint="Node ID of the Receptor node to ping.",
         )
-        self.add_config_option(
-            section="ping",
-            key="ws_extra_headers",
-            long_option="--ws_extra_header",
-            default_value=[],
-            value_type="key-value-list",
-            hint="Set additional headers to provide when connecting to websocket peers.",
-        )
-        self.add_config_option(
-            section="ping",
-            key="ws_heartbeat",
-            long_option="--ws_heartbeat",
-            default_value=None,
-            value_type="int",
-            hint="Set heartbeat interval for websocket connections.",
-        )
         # send options
         self.add_config_option(
             section="send",
-            key="peer",
-            default_value="localhost:8888",
-            value_type="str",
-            hint="""The peer to relay the directive through. If unspecified here or in a config
-                    file, localhost:8888 will be used.""",
-        )
-        self.add_config_option(
-            section="send",
-            key="directive",
-            default_value="",
-            value_type="str",
-            hint="Directive to send.",
-        )
-        self.add_config_option(
-            section="send",
+            contexts=["cli", "socket"],
             key="recipient",
             long_option="send_recipient",
             default_value="",
@@ -323,6 +329,16 @@ class ReceptorConfig:
         )
         self.add_config_option(
             section="send",
+            contexts=["cli", "socket"],
+            key="directive",
+            long_option="send_directive",
+            default_value="",
+            value_type="str",
+            hint="Directive to send.",
+        )
+        self.add_config_option(
+            section="send",
+            contexts=["cli", "socket"],
             key="payload",
             long_option="send_payload",
             default_value="",
@@ -330,61 +346,23 @@ class ReceptorConfig:
             hint="""Payload of the directive to send. Use - for stdin or give the path
                     to a file to transmit the file contents.""",
         )
-        self.add_config_option(
-            section="send",
-            key="ws_extra_headers",
-            long_option="--ws_extra_header",
-            default_value=[],
-            value_type="list",
-            hint="Set additional headers to provide when connecting to websocket peers.",
-        )
-        self.add_config_option(
-            section="send",
-            key="ws_heartbeat",
-            long_option="--ws_heartbeat",
-            default_value=None,
-            value_type="int",
-            hint="Set heartbeat interval for websocket connections.",
-        )
         # status options
         self.add_config_option(
             section="status",
-            key="peer",
-            default_value="localhost:8888",
-            value_type="str",
-            hint="""The peer to access the mesh through. If unspecified here or in a config file,
-                    localhost:8888 will be used.""",
-        )
-        self.add_config_option(
-            section="status",
-            key="ws_extra_headers",
-            long_option="--ws_extra_header",
-            default_value=[],
-            value_type="key-value-list",
-            listof="str",
-            hint="Set additional headers to provide when connecting to websocket peers.",
-        )
-        self.add_config_option(
-            section="status",
-            key="show_ephemeral",
-            default_value=None,
+            contexts=["cli", "socket"],
+            key="verbose",
+            long_option="verbose",
+            default_value=False,
             set_value=True,
             value_type="bool",
-            hint="Show ephemeral nodes in output",
-        )
-        self.add_config_option(
-            section="status",
-            key="ws_heartbeat",
-            long_option="--ws_heartbeat",
-            default_value=None,
-            value_type="int",
-            hint="Set heartbeat interval for websocket connections.",
+            hint="Print additional status information.",
         )
         self.parse_options(args)
 
     def add_config_option(
         self,
         section,
+        contexts,
         key,
         cli=True,
         short_option="",
@@ -396,6 +374,8 @@ class ReceptorConfig:
         subparse=True,
         hint=None,
     ):
+        if self._context and self._context not in contexts:
+            return
         config_entry = "%s_%s" % (section, key)
         if cli:
             # for lists, we switch the action from 'store' to 'append'
@@ -437,8 +417,7 @@ class ReceptorConfig:
                     sub_extra = SUBCOMMAND_EXTRAS.get(section, None)
                     if sub_extra:
                         subparser = self._cli_sub_args.add_parser(section, help=sub_extra["hint"])
-                        subparser.set_defaults(func=sub_extra["entrypoint"])
-                        subparser.set_defaults(ephemeral=sub_extra["is_ephemeral"])
+                        subparser.set_defaults(entrypoint=sub_extra["entrypoint"])
                 subparser.add_argument(*args, **kwargs)
 
         # finally, we add the ConfigOption to the internal dict for tracking
@@ -471,15 +450,16 @@ class ReceptorConfig:
     def parse_options(self, args):
         # first we parse the cli args
         self._parsed_args = self._cli_args.parse_args(args)
-        # we manually force the config entry to be parsed first, since
-        # we need it before we do anything else
-        config_entry = self._config_options["default_config"]
-        config_path = self._get_config_value("default_config", ignore_config_file=True)
-        if config_path is not None:
-            config_entry.value = config_path
-        self._enforce_entry_type(config_entry)
-        # next we read the config file
-        self._config_file.read([config_entry.value])
+        if "default_config" in self._config_options:
+            # we manually force the config entry to be parsed first, since
+            # we need it before we do anything else
+            config_entry = self._config_options["default_config"]
+            config_path = self._get_config_value("default_config", ignore_config_file=True)
+            if config_path is not None:
+                config_entry.value = config_path
+            self._enforce_entry_type(config_entry)
+            # next we read the config file
+            self._config_file.read([config_entry.value])
         # then we loop through our config options, based on the option
         # precedence of CLI > environment > config file
         for key in self._config_options:
@@ -500,12 +480,6 @@ class ReceptorConfig:
                 self._config_options["plugins"][section.replace("plugin_", "")] = dict(
                     self._config_file[section]
                 )
-        # If we did not get a data_dir from anywhere else, use a default
-        if self._config_options["default_data_dir"].value is None:
-            if self._is_ephemeral:
-                self._config_options["default_data_dir"].value = "/tmp/receptor"
-            else:
-                self._config_options["default_data_dir"].value = "/var/lib/receptor"
 
     def _enforce_entry_type(self, entry):
         if entry.value is not None:
@@ -559,15 +533,14 @@ class ReceptorConfig:
                 return None
             raise ReceptorConfigError(e)
 
-    def go(self):
+    def get_entrypoint_name(self):
         if not self._parsed_args:
             raise ReceptorRuntimeError("there are no parsed args yet")
-        elif not hasattr(self._parsed_args, "func"):
+        elif not hasattr(self._parsed_args, "entrypoint"):
             raise ReceptorRuntimeError(
                 "you must specify a subcommand (%s)." % (", ".join(SUBCOMMAND_EXTRAS.keys()),)
             )
-        self._is_ephemeral = self._parsed_args.ephemeral
-        self._parsed_args.func(self)
+        return self._parsed_args.entrypoint
 
     def get_ssl_context(self, context_type):
         if context_type == "server":

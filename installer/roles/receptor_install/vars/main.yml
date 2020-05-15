@@ -1,6 +1,6 @@
 ---
 receptor_user: receptor
-service_port: 8888
+service_port: 7323
 server_address: 0.0.0.0
-server_disable: false
+no_listen: false
 server_debug: false

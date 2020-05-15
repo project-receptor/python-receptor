@@ -3,7 +3,6 @@ import datetime
 import io
 import logging
 import os
-import shutil
 from contextlib import suppress
 
 from .connection.base import Worker
@@ -11,6 +10,7 @@ from .connection.manager import Manager
 from .diagnostics import status
 from .messages.framed import FileBackedBuffer, FramedMessage
 from .receptor import Receptor
+from .control_socket import ControlSocketServer
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +30,12 @@ class Controller:
     :type queue: asyncio.Queue
     """
 
-    def __init__(self, config, loop=asyncio.get_event_loop(), queue=None):
+    def __init__(self, config, loop=asyncio.get_event_loop()):
         self.receptor = Receptor(config)
         self.loop = loop
         self.connection_manager = Manager(
             lambda: Worker(self.receptor, loop), self.receptor.config.get_ssl_context, loop
         )
-        self.queue = queue
-        if self.queue is None:
-            self.queue = asyncio.Queue(loop=loop)
-        self.receptor.response_queue = self.queue
         self.status_task = loop.create_task(status(self.receptor))
 
     async def shutdown_loop(self):
@@ -69,9 +65,9 @@ class Controller:
 
         Examples of supported formats:
 
-        * rnps://0.0.0.0:8888 - Secure receptor protocol bound on all interfaces port 8888
-        * rnp://1.2.3.4:8888 - Insecure receptor protocol bound to the interface of 1.2.3.4
-          port 8888
+        * rnps://0.0.0.0:7323 - Secure receptor protocol bound on all interfaces port 7323
+        * rnp://1.2.3.4:7323 - Insecure receptor protocol bound to the interface of 1.2.3.4
+          port 7323
         * wss://0.0.0.0:443 - Secure websocket protocol bound on all interfaces port 443
 
         The services are started as asyncio tasks and will start listening once
@@ -81,10 +77,26 @@ class Controller:
         """
         tasks = list()
         for url in listen_urls:
-            listener = self.connection_manager.get_listener(url)
             logger.info("Serving on %s", url)
+            listener = self.connection_manager.get_listener(url)
             tasks.append(self.loop.create_task(listener))
         return tasks
+
+    def enable_control_socket(self, socket_path):
+        """
+        Enables a Unix domain socket over which the running node can receive commands such as send,
+        ping and status.
+
+        The socket listener is started as an asyncio task and will start listening once
+        :meth:`receptor.controller.Controller.run` is called.
+
+        :param socket_path: A path to the socket file, such as /var/run/receptor.sock.
+        """
+        logger.info("Listening on Unix socket on %s", socket_path)
+        socket_server = asyncio.start_unix_server(
+            ControlSocketServer(self).serve_from_socket, path=socket_path, loop=self.loop
+        )
+        return self.loop.create_task(socket_server)
 
     def add_peer(self, peer, ws_extra_headers=None, ws_heartbeat=None):
         """
@@ -92,29 +104,16 @@ class Controller:
         :meth:`receptor.controller.Controller.run` is called.
 
         Example format:
-        rnps://10.0.1.1:8888
+        rnps://10.0.1.1:7323
 
         :param peer: remote peer url
         """
         logger.info("Connecting to peer {}".format(peer))
         return self.connection_manager.get_peer(
-            peer,
-            reconnect=not self.receptor.config._is_ephemeral,
-            ws_extra_headers=ws_extra_headers,
-            ws_heartbeat=ws_heartbeat,
+            peer, ws_extra_headers=ws_extra_headers, ws_heartbeat=ws_heartbeat,
         )
 
-    async def recv(self):
-        """
-        Fetch a single response message from the response queue, this method blocks
-        and should be *await* ed or assigned to a Future
-
-        :return: A single response message
-        :rtype: :class:`receptor.messages.framed.FramedMessage`
-        """
-        return await self.receptor.response_queue.get()
-
-    async def send(self, payload, recipient, directive, expect_response=True):
+    async def send(self, payload, recipient, directive, response_handler=None):
         """
         Sends a payload to a recipient *Node* to execute under a given *directive*.
 
@@ -163,22 +162,20 @@ class Controller:
             ),
             payload=buffer,
         )
-        await self.receptor.router.send(message, expected_response=expect_response)
+        await self.receptor.router.send(message, response_handler=response_handler)
         return message.msg_id
 
-    async def ping(self, destination, expected_response=True):
+    async def ping(self, destination, response_handler=None):
         """
         Sends a ping message to a remote Receptor node with the expectation that it will return
         information about when it received the ping, what its capabilities are and what work it
         is currently doing.
 
-        A good example of a standalone Controller that just implements ping can be found at
-        :meth:`receptor.entrypoints.run_as_ping`
-
         :param destination: The node id of the target node
+        :param response_handler: Callback function to receive the ping response
         :returns: a message-id that can be used to reference responses
         """
-        return await self.receptor.router.ping_node(destination, expected_response)
+        return await self.receptor.router.ping_node(destination, response_handler)
 
     def run(self, app=None):
         """
@@ -196,16 +193,3 @@ class Controller:
             pass
         finally:
             self.loop.stop()
-
-    def cleanup_tmpdir(self):
-        try:
-            is_ephemeral = self.receptor.config._is_ephemeral
-            base_path = self.receptor.base_path
-        except AttributeError:
-            return
-        if is_ephemeral:
-            try:
-                logger.debug(f"Removing temporary directory {base_path}")
-                shutil.rmtree(base_path)
-            except Exception:
-                logger.error(f"Error while removing temporary directory {base_path}", exc_info=True)

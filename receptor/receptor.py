@@ -76,11 +76,9 @@ class Manifest:
 class Receptor:
     """ Owns all connections and maintains adding and removing them. """
 
-    def __init__(
-        self, config, node_id=None, router_cls=None, work_manager_cls=None, response_queue=None
-    ):
+    def __init__(self, config, node_id=None, router_cls=None, work_manager_cls=None):
         self.config = config
-        self.node_id = node_id or self.config.default_node_id or self._find_node_id()
+        self.node_id = node_id or self.config.node_node_id or self._find_node_id()
         self.router = (router_cls or MeshRouter)(self)
         self.route_sender_task = None
         self.route_send_time = time.time()
@@ -88,10 +86,9 @@ class Receptor:
         self.route_adv_seen = dict()
         self.work_manager = (work_manager_cls or WorkManager)(self)
         self.connections = dict()
-        self.response_queue = response_queue
-        self.base_path = os.path.join(self.config.default_data_dir, self.node_id)
+        self.base_path = os.path.join(self.config.node_data_dir, self.node_id)
         if not os.path.exists(self.base_path):
-            os.makedirs(os.path.join(self.config.default_data_dir, self.node_id))
+            os.makedirs(os.path.join(self.config.node_data_dir, self.node_id))
         self.connection_manifest = Manifest(os.path.join(self.base_path, "connection_manifest"))
         path = os.path.join(os.path.expanduser(self.base_path))
         self.buffer_mgr = FileBufferManager(path)
@@ -154,40 +151,17 @@ class Receptor:
 
         stats.connected_peers_gauge.inc()
 
-    async def remove_ephemeral(self, node):
-        logger.debug(f"Removing ephemeral node {node}")
-        changed = False
-        if node in self.connections:
-            await self.connection_manifest.remove(node)
-            changed = True
-        if node in self.known_nodes:
-            del self.known_nodes[node]
-            changed = True
-        if changed:
-            await self.recalculate_and_send_routes_soon()
-
     async def remove_connection(self, protocol_obj, id_=None):
         routing_changed = False
         for connection_node in self.connections:
             if protocol_obj in self.connections[connection_node]:
                 routing_changed = True
                 logger.info(f"Removing connection for node {connection_node}")
-                if self.is_ephemeral(connection_node):
-                    self.connections[connection_node].remove(protocol_obj)
-                    await self.remove_ephemeral(connection_node)
-                else:
-                    self.connections[connection_node].remove(protocol_obj)
-                    await self.connection_manifest.update(connection_node)
+                self.connections[connection_node].remove(protocol_obj)
+                await self.connection_manifest.update(connection_node)
         if routing_changed:
             await self.recalculate_and_send_routes_soon()
             stats.connected_peers_gauge.dec()
-
-    def is_ephemeral(self, id_):
-        return (
-            id_ in self.known_nodes
-            and "ephemeral" in self.known_nodes[id_]["capabilities"]
-            and self.known_nodes[id_]["capabilities"]["ephemeral"]
-        )
 
     async def remove_connection_by_id(self, id_, loop=None):
         if id_ in self.connections:
@@ -443,7 +417,9 @@ class Receptor:
         in_response_to = msg.header["in_response_to"]
         if in_response_to in self.router.response_registry:
             logger.info(f"Handling response to {in_response_to} with callback.")
-            await self.response_queue.put(msg)
+            resp = self.router.response_registry[in_response_to].get("response_handler", None)
+            if resp:
+                asyncio.ensure_future(resp(msg))
         else:
             logger.warning(f"Received response to {in_response_to} but no record of sent message.")
 

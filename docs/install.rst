@@ -13,7 +13,7 @@ Receptor nodes once you provide an ``inventory`` file that looks like this
 
   hostA server_port=32888
   hostB peers=["hostA"]
-  hostC peers=["hostB", "hostA:32888"] server_port=8889
+  hostC peers=["hostB", "hostA:32888"] server_port=7323
 
 This will deploy a 3 node cluster. There are some other ways of tuning the deployment on each node
 which you can see by reading the install playbook, run ansible to start the install::

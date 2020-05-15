@@ -180,7 +180,7 @@ class MeshRouter:
         else:
             return None
 
-    async def ping_node(self, node_id, expected_response=True):
+    async def ping_node(self, node_id, response_handler=None):
         now = datetime.datetime.utcnow()
         logger.info(f"Sending ping to node {node_id}, timestamp={now}")
         message = FramedMessage(
@@ -188,7 +188,7 @@ class MeshRouter:
                 sender=self.node_id, recipient=node_id, timestamp=now, directive="receptor:ping"
             )
         )
-        return await self.send(message, expected_response)
+        return await self.send(message, response_handler)
 
     async def forward(self, msg, next_hop):
         """
@@ -209,7 +209,7 @@ class MeshRouter:
         except Exception as e:
             logger.exception("Error trying to forward message to {}: {}".format(next_hop, e))
 
-    async def send(self, message, expected_response=False):
+    async def send(self, message, response_handler=None):
         """
         Send a new message with the given outer envelope.
         """
@@ -223,9 +223,9 @@ class MeshRouter:
 
         message.header.update({"sender": self.node_id, "route_list": [self.node_id]})
         logger.debug(f"Sending {message.msg_id} to {recipient} via {next_node_id}")
-        if expected_response and "directive" in message.header:
+        if response_handler:
             self.response_registry[message.msg_id] = dict(
-                message_sent_time=message.header["timestamp"]
+                response_handler=response_handler, message_sent_time=message.header["timestamp"]
             )
         if next_node_id == self.node_id:
             asyncio.ensure_future(self.receptor.handle_message(message))
