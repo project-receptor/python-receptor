@@ -18,7 +18,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires=">=3.6",
-    install_requires=["prometheus_client==0.7.1", "aiohttp==3.6.2", "python-dateutil>=2.8.1"],
+    install_requires=["prometheus_client==0.7.1", "aiohttp>=3.6.2,<4.0", "python-dateutil>=2.8.1"],
     zip_safe=False,
     entry_points={"console_scripts": ["receptor = receptor.__main__:main"]},
     classifiers=["Programming Language :: Python :: 3"],

@@ -11,7 +11,7 @@ repository = "https://github.com/project-receptor/receptor"
 version = "1.0.0"
 
 [tool.poetry.dependencies]
-aiohttp = "^3.6.2"
+aiohttp = ">= 3.6.2, < 4.0"
 prometheus_client = "^0.7.1"
 python = "^3.6"
 
